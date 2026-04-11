@@ -35,8 +35,10 @@ from skill.scripts.models import (
     AdjustmentsToIncome,
     CanonicalReturn,
     ComputedTotals,
+    Credits,
     FilingStatus,
     ItemizedDeductions,
+    OtherTaxes,
     Payments,
     ScheduleC,
     ScheduleCExpenses,
@@ -505,6 +507,99 @@ def total_payments(return_: CanonicalReturn) -> Decimal:
 
 
 # ---------------------------------------------------------------------------
+# Earned income / investment income / MAGI (patch-layer inputs)
+# ---------------------------------------------------------------------------
+
+
+def earned_income(return_: CanonicalReturn) -> Decimal:
+    """Earned income for CTC/ACTC/EITC purposes.
+
+    Includes:
+      - W-2 box 1 wages (all W-2s, taxpayer + spouse)
+      - Schedule C net profit (Line 31) summed across all businesses
+
+    Excludes (explicitly NOT earned):
+      - Interest, dividends, capital gains (investment income)
+      - 1099-R pensions/IRAs (retirement distributions)
+      - Schedule E rental / royalties (passive)
+      - SSA-1099 Social Security benefits
+      - Unemployment (1099-G box 1)
+
+    TODO: Include Schedule SE-eligible partnership earnings from K-1. The v1
+    ScheduleK1 model carries ordinary_business_income and guaranteed_payments,
+    but classification as SE-eligible requires source_type inspection and a
+    material-participation flag we do not yet model. Deferred.
+    """
+    w2_sum = sum((w2.box1_wages for w2 in return_.w2s), start=Decimal("0"))
+    sc_net = sum(
+        (schedule_c_net_profit(sc) for sc in return_.schedules_c), start=Decimal("0")
+    )
+    # TODO(k1-se): add SE-eligible partnership earnings from K-1s.
+    return w2_sum + sc_net
+
+
+def investment_income(return_: CanonicalReturn) -> Decimal:
+    """Investment income for the EITC disqualifier.
+
+    Includes:
+      - 1099-INT box 1 (taxable interest) + box 3 (US Treasury interest)
+      - 1099-DIV box 1a (ordinary dividends, which already contains qualified)
+      - 1099-DIV box 2a (capital gain distributions)
+      - 1099-B realized gains (ST + LT)
+      - Schedule E Part I net (rental + royalties)
+
+    Excludes:
+      - SSA-1099 SS benefits
+      - 1099-R pensions/retirement
+      - Tax-exempt interest (box 8)
+
+    Per IRS Pub. 596, EITC investment income limits compare TOTAL investment
+    income (not net). Losses (e.g. negative rental) DO reduce the total.
+    """
+    interest = sum(
+        (
+            f.box1_interest_income + f.box3_us_savings_bond_and_treasury_interest
+            for f in return_.forms_1099_int
+        ),
+        start=Decimal("0"),
+    )
+    ord_div = sum(
+        (f.box1a_ordinary_dividends for f in return_.forms_1099_div),
+        start=Decimal("0"),
+    )
+    cap_gain_distr = sum(
+        (f.box2a_total_capital_gain_distributions for f in return_.forms_1099_div),
+        start=Decimal("0"),
+    )
+
+    realized_gains = Decimal("0")
+    for form in return_.forms_1099_b:
+        for txn in form.transactions:
+            realized_gains += txn.proceeds - txn.cost_basis + txn.adjustment_amount
+
+    rental_net = sum(
+        (schedule_e_total_net(sched) for sched in return_.schedules_e),
+        start=Decimal("0"),
+    )
+
+    return interest + ord_div + cap_gain_distr + realized_gains + rental_net
+
+
+def magi(return_: CanonicalReturn, agi: Decimal) -> Decimal:
+    """Modified Adjusted Gross Income.
+
+    v1: MAGI == AGI for purely domestic returns.
+
+    TODO: Add back §911 foreign earned income exclusion (Form 2555 excluded
+    amount) + §931/933 US-territory exclusions when those modules land. For
+    CTC/NIIT/EITC, the add-back rules differ slightly — see IRC §24(b), §1411,
+    and §32 respectively — but all collapse to AGI when there are no foreign
+    exclusions to add back.
+    """
+    return agi
+
+
+# ---------------------------------------------------------------------------
 # Input hash — detects stale computed totals after mutation
 # ---------------------------------------------------------------------------
 
@@ -530,7 +625,23 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     """Compute a canonical return end-to-end.
 
     Returns a new CanonicalReturn with ComputedTotals populated.
+
+    Architecture:
+      1. Marshal CanonicalReturn -> tenforty.evaluate_return kwargs.
+      2. Unpack tenforty result (AGI, taxable income, federal income tax,
+         federal total tax = fed tax + SE + Add'l Medicare, effective/marginal
+         rates).
+      3. Apply the patch layer (CTC, NIIT, EITC) — tenforty does not compute
+         these from its high-level API.
+      4. Fold patch results into Credits / Payments / OtherTaxes on a copy of
+         the canonical return, and recompute the top-line totals so the
+         caller's `computed` block reflects the full federal picture.
     """
+    # Lazy import to avoid circular import: niit.py imports from this module.
+    from skill.scripts.calc.patches.ctc import compute_ctc
+    from skill.scripts.calc.patches.eitc import compute_eitc
+    from skill.scripts.calc.patches.niit import compute_niit
+
     tf_input = _to_tenforty_input(return_)
     tf_result = tenforty.evaluate_return(
         year=tf_input.year,
@@ -552,22 +663,117 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     agi = _cents(tf_result.federal_adjusted_gross_income)
     ti = _cents(tf_result.federal_taxable_income)
     fed_tax = _cents(tf_result.federal_income_tax)
-    total_tax_val = _cents(tf_result.federal_total_tax)
+    tf_total_tax = _cents(tf_result.federal_total_tax)
     deduction = (agi - ti) if (agi is not None and ti is not None) else None
 
     ti_val = _cents(total_income(return_))
     adjustments_val = _cents(_sum_adjustments(return_.adjustments))
     payments_val = _cents(total_payments(return_))
 
-    # Other taxes total = total_tax - federal_income_tax (SE + Add'l Medicare + NIIT + AMT ...)
-    other_taxes_val: Decimal | None = None
-    if total_tax_val is not None and fed_tax is not None:
-        other_taxes_val = total_tax_val - fed_tax
+    # -------------------------------------------------------------------
+    # Patch layer inputs
+    # -------------------------------------------------------------------
+    # AGI from tenforty is authoritative. MAGI == AGI for v1 (no FEIE).
+    agi_for_patches = agi if agi is not None else Decimal("0")
+    magi_val = magi(return_, agi_for_patches)
+    earned_income_val = earned_income(return_)
+    investment_income_val = investment_income(return_)
+    tax_before_credits = fed_tax if fed_tax is not None else Decimal("0")
+
+    # -------------------------------------------------------------------
+    # Patch: CTC + ACTC + ODC
+    # -------------------------------------------------------------------
+    ctc_result = compute_ctc(
+        return_=return_,
+        magi=magi_val,
+        tax_before_credits=tax_before_credits,
+        earned_income=earned_income_val,
+    )
+
+    # -------------------------------------------------------------------
+    # Patch: NIIT (Form 8960)
+    # -------------------------------------------------------------------
+    niit_result = compute_niit(return_=return_, magi=magi_val)
+
+    # -------------------------------------------------------------------
+    # Patch: EITC
+    # -------------------------------------------------------------------
+    eitc_result = compute_eitc(
+        return_=return_,
+        agi=agi_for_patches,
+        earned_income=earned_income_val,
+        investment_income=investment_income_val,
+    )
+
+    # -------------------------------------------------------------------
+    # Fold patch outputs into the Credits / Payments / OtherTaxes objects
+    # -------------------------------------------------------------------
+    # CTC nonrefundable credits (child tax credit + ODC) reduce tax dollar
+    # for dollar and cannot produce a refund. ACTC is the refundable slice,
+    # landed in Payments. EITC is fully refundable.
+    nonref_ctc = _cents(ctc_result.nonrefundable_ctc) or Decimal("0")
+    nonref_odc = _cents(ctc_result.credit_for_other_dependents) or Decimal("0")
+    refundable_actc = _cents(ctc_result.refundable_actc) or Decimal("0")
+    niit_val = _cents(niit_result.niit) or Decimal("0")
+    eitc_val = (
+        Decimal("0") if eitc_result.disqualified else (_cents(eitc_result.eitc) or Decimal("0"))
+    )
+
+    updated_credits = return_.credits.model_copy(
+        update={
+            "child_tax_credit": nonref_ctc,
+            "credit_for_other_dependents": nonref_odc,
+            "additional_child_tax_credit_refundable": refundable_actc,
+            "earned_income_tax_credit": eitc_val,
+        }
+    )
+    updated_other_taxes = return_.other_taxes.model_copy(
+        update={"net_investment_income_tax": niit_val}
+    )
+    # The wave-1 patch layer sets Payments refundable-credit fields directly
+    # so total_payments() reflects them.
+    updated_payments = return_.payments.model_copy(
+        update={
+            "additional_child_tax_credit_refundable": refundable_actc,
+            "earned_income_credit_refundable": eitc_val,
+        }
+    )
+
+    # -------------------------------------------------------------------
+    # Recompute top-line totals using the patch-augmented return.
+    # -------------------------------------------------------------------
+    total_credits_nonref = nonref_ctc + nonref_odc
+
+    # Other taxes: SE + Add'l Medicare already in tenforty's federal_total_tax,
+    # plus NIIT that we computed ourselves.
+    tf_other_taxes = (
+        (tf_total_tax - fed_tax) if (tf_total_tax is not None and fed_tax is not None) else Decimal("0")
+    )
+    other_taxes_val = tf_other_taxes + niit_val
+
+    # Final total tax:
+    #   max(0, federal income tax - nonrefundable credits)
+    #   + other federal taxes (SE + Add'l Medicare + NIIT)
+    fed_tax_after_nonref = max(Decimal("0"), tax_before_credits - total_credits_nonref)
+    final_total_tax = _cents(fed_tax_after_nonref + other_taxes_val)
+
+    # total_payments must include the refundable credits we just set.
+    # total_payments() already sums Payments.additional_child_tax_credit_refundable
+    # and Payments.earned_income_credit_refundable, so rebuild a temporary
+    # return with the updated Payments object to get the correct aggregate.
+    return_with_patches = return_.model_copy(
+        update={
+            "credits": updated_credits,
+            "other_taxes": updated_other_taxes,
+            "payments": updated_payments,
+        }
+    )
+    payments_val = _cents(total_payments(return_with_patches))
 
     refund: Decimal | None = None
     owed: Decimal | None = None
-    if total_tax_val is not None and payments_val is not None:
-        diff = payments_val - total_tax_val
+    if final_total_tax is not None and payments_val is not None:
+        diff = payments_val - final_total_tax
         if diff > 0:
             refund = diff
         elif diff < 0:
@@ -593,8 +799,9 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
         deduction_taken=deduction,
         taxable_income=ti,
         tentative_tax=fed_tax,
-        other_taxes_total=other_taxes_val,
-        total_tax=total_tax_val,
+        total_credits_nonrefundable=_cents(total_credits_nonref),
+        other_taxes_total=_cents(other_taxes_val),
+        total_tax=final_total_tax,
         total_payments=payments_val,
         refund=refund,
         amount_owed=owed,
@@ -603,4 +810,4 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
         computed_input_hash=_input_hash(return_),
     )
 
-    return return_.model_copy(update={"computed": computed})
+    return return_with_patches.model_copy(update={"computed": computed})

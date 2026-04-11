@@ -231,6 +231,11 @@ class TestStateRegistry:
         for code in ("CA", "NY", "WA", "DC"):
             assert registry.has(code), f"{code} should be registered"
 
+    def test_fanout_wave_2_taxing_states_registered(self):
+        """Fan-out wave 2 landed AZ, MA, MI, NJ, PA, VA as state plugins."""
+        for code in ("AZ", "MA", "MI", "NJ", "PA", "VA"):
+            assert registry.has(code), f"{code} should be registered"
+
     def test_unregistered_state_still_raises(self):
         """States not yet implemented should still raise cleanly."""
         with pytest.raises(KeyError, match="no state plugin registered"):
@@ -250,8 +255,8 @@ class TestStateRegistry:
         assert codes == sorted(codes)
 
     def test_registry_len(self):
-        """8 no-tax + 4 wave-1 taxing states = 12 registered plugins."""
-        assert len(registry) == 12
+        """8 no-tax + 4 wave-1 + 6 wave-2 taxing states = 18 registered plugins."""
+        assert len(registry) == 18
 
 
 # ---------------------------------------------------------------------------

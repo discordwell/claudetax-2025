@@ -81,8 +81,10 @@ _FORM_ORDER: tuple[str, ...] = (
     "form_8949",
     "schedule_e",
     "schedule_se",
+    "form_6251",      # AMT; attachment sequence 32
     "schedule_eic",
     "schedule_8812",
+    "form_4562",      # depreciation; attachment sequence 67
     "form_8829",      # home-office deduction; attachment sequence 176
 )
 

@@ -654,17 +654,11 @@ def run_pipeline(
     # ------------------------------------------------------------------
     # 6. Build paper bundle (cover sheet + forms + sig + mailing).
     #
-    # This step runs AFTER all federal PDFs are rendered and AFTER
-    # result.json is emitted so that a failure during bundle assembly
-    # (missing reference data, pypdf merge error, etc.) leaves the
-    # loose PDFs on disk for forensic inspection.
-    #
-    # NOTE: This block is placed after the state-dispatch insertion
-    # point that wave-6 agent 1 owns. When agent 1's changes land, the
-    # state-return PDFs they render should live ABOVE this block so
-    # the paper bundle can filter them out of the federal envelope
-    # (``skill.scripts.output.paper_bundle.order_forms`` drops any
-    # path whose filename begins with ``state_``).
+    # Runs AFTER all federal PDFs are rendered and AFTER result.json is
+    # emitted so a bundle-assembly failure leaves loose PDFs on disk for
+    # forensic inspection. State-return PDFs produced earlier in the
+    # state-dispatch block are filtered out by ``order_forms`` via the
+    # ``state_`` filename prefix so the federal envelope stays federal.
     # ------------------------------------------------------------------
     if build_paper_bundle and rendered:
         from skill.scripts.output.paper_bundle import (

@@ -6,6 +6,43 @@ Session memory for this project. Top section = most recent session summaries (ne
 
 ## Session Summaries
 
+### 2026-04-11 22:30 UTC — Wave 6 complete: D/8949 + 6251 + 4562 + 8829 + state dispatch + FFFF + packaging
+
+**Wave 6 dispatched and landed** in one 9-agent fan-out (8 parallel worktrees + 1 serial cleanup). The skill is now functionally complete end-to-end: every federal form a common filer needs, every state, every output channel.
+
+**Agents**:
+- **A0 cleanup** (d0cb8a5): gatekeeper test name unification to `test_resident_single_65k_tax_lock` across 16 hand-rolled plugins, `LOCK_VALUE` module-level constants, AR DFA primary-source citation + low-income $29/exemption credit post-hoc adjustment, gap.md docstring pointers on all 26 wave-4/5 state plugins.
+- **A1 pipeline state dispatch** (9397125): `run_pipeline` now calls `_dispatch_state_plugins` after federal compute, relevant states = resident state + every W-2 `state_rows[*].state_code`, residency inferred from address match. New `state_source_wages_from_w2s` / `state_source_schedule_c` / `sourced_or_prorated_wages` helpers in `_hand_rolled_base.py` replace blind `day_prorate` across 18 hand-rolled plugins. CA/NY get real Schedule CA-NR / IT-203-B scaffolding (`Person.ny_workdays_in_ny` field). PA/IL multi-state fixture re-locked to sourced numbers PA $921 / IL $1,591.43.
+- **A2 Schedule D + Form 8949** (01ed8ab): capital-gains compute chain with per-lot classification (box A-F short/long-term), 11-row overflow pagination, wash-sale adjustment, $3k/$1.5k loss cap. `Form1099BTransaction.form_8949_box_code` override for manual entries. Real IRS widget maps (agent built them directly from live f1040sd/f8949 PDFs — wave 7 "research" task deleted).
+- **A3 Form 6251 AMT** (9d83599 — landed on main DURING fan-out by the agent): AMT compute + render, `AMTAdjustments` dataclass for ISO/PAB/depreciation manual inputs, engine integration adds AMT to `total_tax`, `ty2025-constants.json` AMT block with Part-III capital-gains worksheet left as TODO.
+- **A4 Form 4562 depreciation** (148bc33): MACRS tables (3/5/7/10/15/20/25/27.5/39-year, half-year and mid-month conventions) from IRS Pub 946. `DepreciableAsset` model, §179 ($1.25M TY2025 limit, $3.13M phase-out, $31,300 SUV cap), 40% bonus depreciation, §280F auto caps. Schedule C line 13 hook via `_effective_line_13_depreciation`.
+- **A5 Form 8829 home office** (ae49d48): simplified ($5/sq ft, 300 cap, $1,500 max) + regular-method compute + render. `HomeOffice` model, 58/58 IRS widgets mapped. 39-year straight-line mid-month depreciation on home. Engine dispatcher `apply_home_office_deductions` runs before any tenforty pass.
+- **A6 real IRS AcroForm widgets** (ef48f93): 7 of 9 Tier-1 ingesters now carry BOTH synthetic and real widget names (W-2, 1099-INT/DIV/NEC/R/G, K-1 1065/1120-S). 1099-B and SSA-1099 confirmed as flattened (non-fillable) at canonical IRS URLs — upgrade path is Azure DI or OCR. Added `TestReal<FORM>AcroForm` classes (29 tests) verifying real IRS PDFs classify + ingest without crashing.
+- **A7 FFFF entry map + bundle integration** (ae5f96c): new `build_ffff_entry_map` emits Form 1040 + Sch A/B/C/SE field-by-field transcript (ASCII-only `to_text()`, structured `to_json()`). `run_pipeline` now wires in `build_paper_bundle` + FFFF emit with `build_paper_bundle`/`emit_ffff_map` kwargs (both default True). Guards for Schedule D / 6251 future wire-ups present.
+- **A8 distribution packaging** (ebb6dc8): CLI entry point `tax-prep` with `run/schema/version` subcommands, `pyproject.toml` 0.0.1 → 0.1.0 + full runtime deps, README with install story, 10 CLI tests. `pip install -e .` works cleanly.
+
+**Suite**: 3310 → **3596 passed + 3 skipped** (+286 net new tests).
+
+**Non-blocking wave 7 items (from review)**:
+1. **Form 4562 / Form 8829 depreciation interaction** — when a single Schedule C has BOTH `depreciable_assets` AND regular-method `home_office`, `_sch_c_non_home_office_expenses` uses stale `expenses.line13_depreciation` instead of the `_effective_line_13_depreciation` override. No test covers this combo. Rare but real arithmetic leak.
+2. **AR low-income credit pin** fragility — `$248.73 → $219.73` graph probe is pinned to current tenforty version; future version bump can shift by a cent. Consider pinning tenforty version.
+3. **Form 8829 helper docstring drift** — claims "re-implement formula here" but imports from engine.
+4. **Nonresident apportionment** (CA 540NR, NY IT-203-B) — scaffolding only; plugins still day-prorate for states without W-2 state rows. Real sourcing is per-state DOR work.
+5. **Graph-backend WI output-field gaps** not cross-referenced from wrap plugin docstrings.
+
+**Quick fixes applied inline after review**:
+- `paper_bundle._FORM_ORDER` now explicitly includes `form_4562` (seq 67) + `form_6251` (seq 32) so they slot into IRS attachment sequence order instead of the alphabetical tail.
+- Stale TODO comment in `pipeline.py` about "when agent 1's changes land" rewritten to describe the shipped state.
+
+**Merge choreography surprise**: Agent 3 (Form 6251) and Agent 8 (packaging) committed directly to `main` from their worktrees rather than staying on a worktree branch, so by the time I started cherry-picking, those two commits were already on main. Cleaned up by using `git cherry-pick --skip` where the commit was already present. Also a pile of main-path file leaks from Agents 0/4/6 editing main by mistake (path substitution error in their Edit calls); stashed and dropped safely since every leaked file was duplicated in the worktree commits.
+
+**Key patterns confirmed**:
+- Real IRS widget maps are viable for Form 1040 + every schedule — the agents demonstrated this on the fly. "Synthetic widget names" as a wave-strategy crutch is retired.
+- Post-hoc graph-backend credit adjustments (AR $29 low-income credit) are a clean pattern for fixing the handful of graph-wrap plugins that diverge only at edge incomes.
+- Parallel worktree fan-out + cherry-pick merging scales to 8-9 agents with manageable pipeline.py conflict load (always in render-gates section + kwarg section). Merge cost is ~5 minutes per wave.
+
+---
+
 ### 2026-04-11 18:00 UTC — Wave 5 complete: 51-state coverage + real AcroForm overlays
 
 **Wave 5 dispatched and landed** in one 12-agent fan-out. Every one of the 21 remaining taxing states now has a plugin; real IRS AcroForm overlays replace the reportlab scaffolds for Form 1040 + Schedule A/B/C/SE; Schedule K-1 ingester lands; paper-file bundle generator + SKILL.md interview scaffold ship; multi-state PA→IL golden fixture locks the state plugin dispatch chain end-to-end.

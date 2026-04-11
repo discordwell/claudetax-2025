@@ -31,6 +31,9 @@ htmlcov/
 *.swo
 *~
 
+# Claude Code agent worktrees (fan-out waves create these under .claude/worktrees/)
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db

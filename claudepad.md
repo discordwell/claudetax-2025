@@ -27,7 +27,29 @@ Session memory for this project. Top section = most recent session summaries (ne
 
 **Serial critical path COMPLETE.** Full test suite: 229 passed in 0.54s.
 
-**Next:** FAN-OUT — dispatch ~80 parallel sub-agents against the frozen interfaces. Tracks: calc hot spots (12), ingesters (12), output renderers (20), golden fixtures (6), state plugins (43), interview/packaging/wet test (3).
+**Repo live** at https://github.com/discordwell/claudetax-2025 (public).
+
+**Code review pass landed** (commit 0d92807, 11 files changed): 6 calc-engine blockers fixed (Sch C net profit, total_payments all categories, itemized + SALT cap, QSS spouse validation, total_income/adjustments_total semantics, adjustments marshaled via schedule_1_income). Interface enrichment: StateStartingPoint enum, FederalTotals enriched, PartialReturn.add() typed, ComputedTotals.computed_input_hash, W2StateRow multi-state list, Form1099R/G/SSA/K1 typed stubs, OBBBA adjustment fields (Sch 1-A tips/overtime, senior, Trump Account). 32 new regression tests. Suite: 261 passed.
+
+**FAN-OUT wave 1 complete** (commits a6b2540 → 04d6c78, octopus merge + registry wiring): 12 parallel sub-agents dispatched via manual git worktrees under /tmp/claudetax-wt/. Each agent owned disjoint files, zero merge conflicts. Landed:
+- **States (4)**: CA (fanout/ca +34), NY (fanout/ny +20), WA (fanout/wa +18 real $278k TY2025 threshold from DOR), DC (fanout/dc +27 real TY2025 brackets from OTR D-40ES). All 4 wired into `_registry.py`.
+- **Calc patches (3)**: CTC/ACTC/ODC (fanout/ctc +14, OBBBA $2,200 + combined-phase-out ODC-first), NIIT Form 8960 (fanout/niit +20), EITC (fanout/eitc +21 full phase-in/plateau/phase-out from Rev. Proc. 2024-40). **NOT yet wired into engine.py** — deferred to wave 2.
+- **Ingesters (3)**: W-2 pypdf (fanout/w2pdf +15), 1099-INT pypdf (fanout/int1099pdf +15) — both use SYNTHETIC field names with loud TODOs for real IRS widget research. W-2 Azure DI (fanout/w2azure +27 +1 skip, real schema from the document-intelligence-code-samples repo).
+- **Golden fixtures (2)**: w2_investments_itemized (fanout/goldenw2inv +15, SALT cap regression-locked at $10k → deduction $35k, MFJ $218.5k → $6,253 owed), se_home_office (fanout/goldensehome +15, Sch C $120k gross - $30k expenses → AGI $83,641 regression-locking the net-profit fix).
+
+Full suite: **503 passed + 1 skipped** in 1.07s. Registry now has 12 entries (8 no-tax + CA/NY/WA/DC).
+
+**Deferred to fan-out wave 2:**
+- Wire CTC/NIIT/EITC patches into engine.py (needs earned_income/investment_income computation, golden-fixture updates to reflect credits)
+- Real per-state nonresident apportionment (CA 540NR, NY IT-203 source ratio, WA RCW 82.87.100 sourcing)
+- OBBBA senior deduction (§63(f)(3)), Form 4547 Trump Account calc, Schedule 1-A tips/overtime calc
+- Remaining ~30 taxing states (AL, AR, CO, CT, DE, GA, HI, ID, IL, IN, IA, KS, KY, LA, ME, MD, MN, MS, MO, MT, NE, NM, ND, OK, OR, RI, SC, UT, VT, WI, WV)
+- Remaining ingesters: 1099-DIV/B/NEC/K/R/G pypdf, SSA-1099, K-1, plus Azure DI variants
+- PDF output renderers per IRS form (1040, Sch A/B/C/D/E/SE, 8949, 8829, 6251, etc.)
+- FFFF entry map and paper bundle output
+- Real IRS W-2 and 1099-INT AcroForm field name research
+- SKILL.md interview flow
+- Distribution packaging
 
 ---
 

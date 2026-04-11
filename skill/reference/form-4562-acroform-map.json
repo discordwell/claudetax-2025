@@ -1,0 +1,157 @@
+{
+  "source_pdf_url": "https://www.irs.gov/pub/irs-pdf/f4562.pdf",
+  "source_pdf_sha256": "c05f9d1f5e26b1b21e18b0a13adbbcd3d568bb9f3ca53bd7bba7c795c7799b4a",
+  "source_pdf_bytes": 206401,
+  "source_pdf_title": "2025 Form 4562",
+  "fetched_at": "2026-04-11",
+  "pypdf_version": "5.9.0",
+  "form_year": 2025,
+  "form": "4562",
+  "total_widgets": 278,
+  "mapped_count": 22,
+  "unmapped_count": 256,
+  "notes": [
+    "Form 4562 Depreciation and Amortization — wave 6 widget map. Synthetic semantic mapping covering Part I (Section 179), Part II (special/bonus depreciation), Part III (MACRS summary rows only), Part IV (summary totals), and Part VI (amortization total).",
+    "Per-asset repeating blocks (Part III Section B rows, Part V listed property rows, Part VI amortization rows) are NOT individually mapped — those tables render via continuation statements in a future wave. The computed per-asset detail is still available on the Layer 1 Form4562Fields dataclass so Layer 2 can emit an attached statement if the filer needs one.",
+    "Header rows: f1_1 is the taxpayer name, f1_2 is the business or activity to which this form relates, f1_3 is the identifying number (SSN/EIN).",
+    "Part I layout: f1_4 = line 1 max ($1,250,000), f1_5 = line 2 total cost, f1_6 = line 3 threshold ($3,130,000), f1_7 = line 4 reduction, f1_8 = line 5 dollar limit after reduction, f1_15 = line 7 listed property, f1_16 = line 8 total elected cost, f1_17 = line 9 tentative deduction, f1_18 = line 10 carryover from prior year, f1_19 = line 11 business income limitation, f1_20 = line 12 §179 deduction current year, f1_21 = line 13 carryover to next year.",
+    "Part II: f1_22 = line 14 special depreciation allowance, f1_23 = line 15 listed property special, f1_24 = line 16 other depreciation.",
+    "Part III: f1_25 = line 17 MACRS prior years, c1_1 = line 18 checkbox for group election.",
+    "Part IV / Part VI summary widgets live on page 2; f2_57 ~= line 22 total depreciation, f2_58 ~= line 23 current-year portion; Part VI line 44 amortization total lives at f3_13 on page 3.",
+    "Widget positions verified via coordinate inspection of the 2025 form PDF. Because the IRS may reshuffle the f1_N numbering between issues, the Layer 2 renderer silently skips widgets that cannot be resolved (a widget_name absent from the reader's field list) — the SHA-256 pin is the load-bearing check for form revisions."
+  ],
+  "mapping": {
+    "taxpayer_name": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_1[0]",
+      "terminal_name": "f1_1[0]",
+      "type": "text",
+      "page": 1
+    },
+    "business_or_activity": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_2[0]",
+      "terminal_name": "f1_2[0]",
+      "type": "text",
+      "page": 1
+    },
+    "identifying_number": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_3[0]",
+      "terminal_name": "f1_3[0]",
+      "type": "text",
+      "page": 1
+    },
+    "line_1_max_amount": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_4[0]",
+      "terminal_name": "f1_4[0]",
+      "type": "text",
+      "page": 1
+    },
+    "line_2_total_cost_section_179_property": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_5[0]",
+      "terminal_name": "f1_5[0]",
+      "type": "text",
+      "page": 1
+    },
+    "line_3_threshold": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_6[0]",
+      "terminal_name": "f1_6[0]",
+      "type": "text",
+      "page": 1
+    },
+    "line_4_reduction_in_limitation": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_7[0]",
+      "terminal_name": "f1_7[0]",
+      "type": "text",
+      "page": 1
+    },
+    "line_5_dollar_limit_after_reduction": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_8[0]",
+      "terminal_name": "f1_8[0]",
+      "type": "text",
+      "page": 1
+    },
+    "line_7_listed_property_amount": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_15[0]",
+      "terminal_name": "f1_15[0]",
+      "type": "text",
+      "page": 1
+    },
+    "line_8_total_elected_cost": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_16[0]",
+      "terminal_name": "f1_16[0]",
+      "type": "text",
+      "page": 1
+    },
+    "line_9_tentative_deduction": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_17[0]",
+      "terminal_name": "f1_17[0]",
+      "type": "text",
+      "page": 1
+    },
+    "line_10_carryover_from_prior_year": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_18[0]",
+      "terminal_name": "f1_18[0]",
+      "type": "text",
+      "page": 1
+    },
+    "line_11_business_income_limitation": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_19[0]",
+      "terminal_name": "f1_19[0]",
+      "type": "text",
+      "page": 1
+    },
+    "line_12_section_179_deduction_current_year": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_20[0]",
+      "terminal_name": "f1_20[0]",
+      "type": "text",
+      "page": 1
+    },
+    "line_13_carryover_to_next_year": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_21[0]",
+      "terminal_name": "f1_21[0]",
+      "type": "text",
+      "page": 1
+    },
+    "line_14_special_depreciation_allowance": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_22[0]",
+      "terminal_name": "f1_22[0]",
+      "type": "text",
+      "page": 1
+    },
+    "line_15_listed_property_special": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_23[0]",
+      "terminal_name": "f1_23[0]",
+      "type": "text",
+      "page": 1
+    },
+    "line_16_other_depreciation": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_24[0]",
+      "terminal_name": "f1_24[0]",
+      "type": "text",
+      "page": 1
+    },
+    "line_17_macrs_prior_years": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_25[0]",
+      "terminal_name": "f1_25[0]",
+      "type": "text",
+      "page": 1
+    },
+    "line_22_total_depreciation": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_57[0]",
+      "terminal_name": "f2_57[0]",
+      "type": "text",
+      "page": 2
+    },
+    "line_23_current_year_assets_portion": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_58[0]",
+      "terminal_name": "f2_58[0]",
+      "type": "text",
+      "page": 2
+    },
+    "line_44_amortization_current_year": {
+      "widget_name": "topmostSubform[0].Page3[0].f3_13[0]",
+      "terminal_name": "f3_13[0]",
+      "type": "text",
+      "page": 3
+    }
+  }
+}

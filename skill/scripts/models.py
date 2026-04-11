@@ -445,6 +445,38 @@ class ScheduleCExpenses(_StrictModel):
     other_expense_detail: dict[str, Money] = Field(default_factory=dict)
 
 
+class DepreciableAsset(_StrictModel):
+    """A single depreciable asset tracked on Form 4562.
+
+    Attached to a ScheduleC (or ScheduleE / Form 2106 in a later wave).
+    The Form 4562 renderer groups the business's assets into Part I
+    (§179), Part II (special / bonus depreciation), Part III (MACRS
+    Section A for current-year additions / Section C for prior years),
+    Part V (listed property), and Part VI (amortization). Which Part an
+    asset lands in is computed from the flags below — callers populate
+    the facts, not the form placement.
+    """
+
+    description: str
+    date_placed_in_service: dt.date
+    cost: Money
+    business_use_pct: Decimal = Decimal("100")
+    """Percentage (not fraction). Listed property under §280F must
+    clear 50% to be eligible for MACRS / §179 / bonus."""
+    macrs_class: Literal["3", "5", "7", "10", "15", "20", "25", "27.5", "39"] | None = None
+    """IRS class life. ``None`` means the asset is not MACRS-depreciable
+    — use this for intangibles amortized under §197 / §195 (Part VI)."""
+    section_179_elected: Money = Decimal("0")
+    bonus_depreciation_elected: bool = True
+    """True means accept the default §168(k) bonus depreciation (40%
+    for TY2025) on the post-§179 basis."""
+    prior_year_depreciation: Money = Decimal("0")
+    """Pull the asset into Part III Section C (prior-year MACRS)."""
+    is_listed_property: bool = False
+    is_suv_over_6000lb: bool = False
+    """Subject to the $31,300 §179 sub-cap for TY2025."""
+
+
 class ScheduleC(_StrictModel):
     """Form 1040 Schedule C — Profit or Loss From Business (Sole Proprietorship)."""
 
@@ -477,6 +509,19 @@ class ScheduleC(_StrictModel):
     line30_home_office_expense: Money = Decimal("0")
     """From Form 8829."""
     line32_at_risk_box: Literal["all_at_risk", "some_not_at_risk"] = "all_at_risk"
+
+    # Depreciation / Form 4562 inputs (Wave 6 Agent 4)
+    depreciable_assets: list[DepreciableAsset] = Field(default_factory=list)
+    """Assets tracked on this business's Form 4562. The calc module
+    aggregates these into Part I/II/III/V/VI and writes the total
+    into Schedule C line 13 — callers should NOT also hand-populate
+    ``expenses.line13_depreciation`` when ``depreciable_assets`` is
+    non-empty."""
+
+    section_179_carryover_from_prior_year: Money = Decimal("0")
+    """Per-business §179 carryforward from prior year. Zero means
+    "no carryover to apply on this business"; the Form 4562 Part I
+    line 10 uses this value directly."""
 
 
 class ScheduleEProperty(_StrictModel):

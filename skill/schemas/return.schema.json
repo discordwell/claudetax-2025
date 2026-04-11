@@ -984,6 +984,120 @@
       "title": "DependentRelationship",
       "type": "string"
     },
+    "DepreciableAsset": {
+      "additionalProperties": false,
+      "description": "A single depreciable asset tracked on Form 4562.\n\nAttached to a ScheduleC (or ScheduleE / Form 2106 in a later wave).\nThe Form 4562 renderer groups the business's assets into Part I\n(\u00a7179), Part II (special / bonus depreciation), Part III (MACRS\nSection A for current-year additions / Section C for prior years),\nPart V (listed property), and Part VI (amortization). Which Part an\nasset lands in is computed from the flags below \u2014 callers populate\nthe facts, not the form placement.",
+      "properties": {
+        "bonus_depreciation_elected": {
+          "default": true,
+          "title": "Bonus Depreciation Elected",
+          "type": "boolean"
+        },
+        "business_use_pct": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "100",
+          "title": "Business Use Pct"
+        },
+        "cost": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Cost"
+        },
+        "date_placed_in_service": {
+          "format": "date",
+          "title": "Date Placed In Service",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "is_listed_property": {
+          "default": false,
+          "title": "Is Listed Property",
+          "type": "boolean"
+        },
+        "is_suv_over_6000lb": {
+          "default": false,
+          "title": "Is Suv Over 6000Lb",
+          "type": "boolean"
+        },
+        "macrs_class": {
+          "anyOf": [
+            {
+              "enum": [
+                "3",
+                "5",
+                "7",
+                "10",
+                "15",
+                "20",
+                "25",
+                "27.5",
+                "39"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Macrs Class"
+        },
+        "prior_year_depreciation": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Prior Year Depreciation"
+        },
+        "section_179_elected": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Section 179 Elected"
+        }
+      },
+      "required": [
+        "description",
+        "date_placed_in_service",
+        "cost"
+      ],
+      "title": "DepreciableAsset",
+      "type": "object"
+    },
     "FilingStatus": {
       "enum": [
         "single",
@@ -2721,6 +2835,13 @@
           "title": "Business Name",
           "type": "string"
         },
+        "depreciable_assets": {
+          "items": {
+            "$ref": "#/$defs/DepreciableAsset"
+          },
+          "title": "Depreciable Assets",
+          "type": "array"
+        },
         "ein": {
           "anyOf": [
             {
@@ -2866,6 +2987,20 @@
           "default": true,
           "title": "Proprietor Is Taxpayer",
           "type": "boolean"
+        },
+        "section_179_carryover_from_prior_year": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Section 179 Carryover From Prior Year"
         },
         "started_or_acquired_this_year": {
           "default": false,

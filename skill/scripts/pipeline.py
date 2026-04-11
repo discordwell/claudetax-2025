@@ -412,6 +412,7 @@ def run_pipeline(
     render_schedule_c: bool = True,
     render_schedule_se: bool = True,
     render_form_6251: bool = True,
+    render_form_4562: bool = True,
     render_state_returns: bool = True,
 ) -> PipelineResult:
     """Run the full pipeline: ingest → compute → render → emit result.
@@ -430,12 +431,13 @@ def run_pipeline(
     output_dir
         Directory to write rendered PDFs and ``result.json``. Created
         if it does not exist.
-    render_form_1040, render_schedule_a, ..., render_schedule_se
+    render_form_1040, render_schedule_a, ..., render_schedule_se, render_form_4562
         Per-form render gates. Default ``True`` renders every applicable
         federal form. Schedule B is skipped if ``schedule_b_required``
         returns False; Schedule C is skipped if no schedules_c are
         present; Schedule SE is skipped if SE net earnings are under
-        the $400 filing floor.
+        the $400 filing floor; Form 4562 is rendered per Schedule C
+        that has ``depreciable_assets`` populated.
 
     Returns
     -------
@@ -548,6 +550,15 @@ def run_pipeline(
 
         sch_c_paths = render_schedule_c_pdfs_all(canonical, output_dir)
         rendered.extend(sch_c_paths)
+
+    # Form 4562 — one per Schedule C with depreciable_assets.
+    if render_form_4562 and canonical.schedules_c:
+        any_has_assets = any(sc.depreciable_assets for sc in canonical.schedules_c)
+        if any_has_assets:
+            from skill.scripts.output.form_4562 import render_form_4562_pdfs_all
+
+            f4562_paths = render_form_4562_pdfs_all(canonical, output_dir)
+            rendered.extend(f4562_paths)
 
     if render_schedule_se:
         from skill.scripts.output.schedule_se import (

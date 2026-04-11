@@ -108,7 +108,15 @@ def _cents(v: Any) -> Decimal | None:
 
 
 def _sch_c_total_expenses(expenses: ScheduleCExpenses) -> Decimal:
-    """Sum every Schedule C Part II expense line plus other_expense_detail."""
+    """Sum every Schedule C Part II expense line plus other_expense_detail.
+
+    Note: when a ScheduleC has ``depreciable_assets`` populated, the
+    line-13 depreciation total is recomputed from Form 4562 and OVERRIDES
+    the caller-supplied ``expenses.line13_depreciation``. This helper
+    still takes only ``ScheduleCExpenses`` so existing callers work; the
+    override lives inside ``schedule_c_net_profit`` which has the full
+    ``ScheduleC`` in hand.
+    """
     fixed_sum = (
         expenses.line8_advertising
         + expenses.line9_car_and_truck
@@ -138,6 +146,28 @@ def _sch_c_total_expenses(expenses: ScheduleCExpenses) -> Decimal:
     return fixed_sum + other_sum
 
 
+def _effective_line_13_depreciation(sc: ScheduleC) -> Decimal:
+    """Return the depreciation that should appear on Schedule C line 13.
+
+    If the business has ``depreciable_assets`` populated, the Form 4562
+    total (line 22) is the authoritative figure and OVERRIDES
+    ``expenses.line13_depreciation`` even when the caller set both. When
+    no assets are present, the caller-supplied ``line13_depreciation``
+    passes through unchanged — this preserves the pre-wave-6 behavior
+    for returns that don't use the Form 4562 compute pipeline.
+
+    Lazy-imports the Form 4562 module to avoid a circular dependency
+    (form_4562.py imports the engine's ``schedule_c_net_profit``).
+    """
+    if not sc.depreciable_assets:
+        return sc.expenses.line13_depreciation
+    from skill.scripts.output.form_4562 import (  # local to break cycle
+        compute_form_4562_fields_for_schedule_c,
+    )
+    fields = compute_form_4562_fields_for_schedule_c(sc)
+    return fields.line_22_total_depreciation
+
+
 def schedule_c_net_profit(sc: ScheduleC) -> Decimal:
     """Compute a single Schedule C's net profit (Line 31).
 
@@ -146,6 +176,10 @@ def schedule_c_net_profit(sc: ScheduleC) -> Decimal:
     Line 29 = tentative profit = line 7 - line 28
     Line 30 = home office expense (from Form 8829)
     Line 31 = net profit = line 29 - line 30
+
+    When ``sc.depreciable_assets`` is non-empty, line 13 depreciation
+    is recomputed from the Form 4562 compute layer and replaces the
+    caller-supplied ``expenses.line13_depreciation`` in the total.
     """
     gross_income = (
         sc.line1_gross_receipts
@@ -154,6 +188,13 @@ def schedule_c_net_profit(sc: ScheduleC) -> Decimal:
         + sc.line6_other_income
     )
     total_expenses = _sch_c_total_expenses(sc.expenses)
+    if sc.depreciable_assets:
+        effective_13 = _effective_line_13_depreciation(sc)
+        total_expenses = (
+            total_expenses
+            - sc.expenses.line13_depreciation
+            + effective_13
+        )
     tentative_profit = gross_income - total_expenses
     return tentative_profit - sc.line30_home_office_expense
 

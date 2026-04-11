@@ -1,0 +1,387 @@
+{
+  "source_pdf_url": "https://www.irs.gov/pub/irs-pdf/f1040sd.pdf",
+  "source_pdf_sha256": "90564c8b7e49280363612639b804d113ebedb516c2e87c70649f29c844da1d2e",
+  "source_pdf_bytes": 97968,
+  "source_pdf_title": "2025 Schedule D (Form 1040)",
+  "fetched_at": "2026-04-11",
+  "pypdf_version": "5.9.0",
+  "form_year": 2025,
+  "schedule": "D",
+  "total_widgets": 55,
+  "mapped_count": 48,
+  "unmapped_count": 7,
+  "notes": [
+    "Schedule D (Form 1040) AcroForm widget map for the IRS-hosted TY2025 PDF (PDF /Title metadata: '2025 Schedule D (Form 1040)').",
+    "Part I (short-term) has four rows: 1a (aggregate totals w/ basis reported, not listed on 8949), 1b (detail-listed totals, basis reported), 2 (basis NOT reported), 3 (not on 1099-B). Each row has four money columns: (d) proceeds, (e) cost basis, (g) adjustment amount, (h) gain/loss.",
+    "Part II (long-term) mirrors Part I with rows 8a/8b/9/10 and the same four columns.",
+    "Line 16 (total gain/loss) and the Part III worksheet lines 17-22 live on page 2. Line 17/20/22 are Yes/No checkbox pairs; only the Yes box is mapped and the No box is in unmapped_widgets.",
+    "The digital-asset Yes/No pair (c1_1[0]/[1]) on page 1 is NOT yet wired to Layer 1 - wave 7 will route the canonical return's digital_asset_disposition flag here.",
+    "Form 8949 transaction detail is rendered in a separate map (form-8949-acroform-map.json); Schedule D line 1b/2/3/8b/9/10 totals are summed from the 8949 Layer 1 totals."
+  ],
+  "mapping": {
+    "taxpayer_name": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_1[0]",
+      "terminal_name": "f1_1[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [36.0, 672.0, 446.4, 684.0],
+      "note": "Taxpayer name(s) as shown on Form 1040."
+    },
+    "taxpayer_ssn": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_2[0]",
+      "terminal_name": "f1_2[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [453.6, 672.0, 576.0, 684.0],
+      "note": "Taxpayer SSN."
+    },
+    "line_1a_proceeds": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartI[0].Row1a[0].f1_3[0]",
+      "terminal_name": "f1_3[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [288.0, 504.0, 360.0, 516.0],
+      "note": "Line 1a (d) proceeds - totals from Box A 1099-B transactions not detail-listed."
+    },
+    "line_1a_cost_basis": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartI[0].Row1a[0].f1_4[0]",
+      "terminal_name": "f1_4[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [360.0, 504.0, 432.0, 516.0],
+      "note": "Line 1a (e) cost basis."
+    },
+    "line_1a_adjustment": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartI[0].Row1a[0].f1_5[0]",
+      "terminal_name": "f1_5[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [432.0, 504.0, 504.0, 516.0],
+      "note": "Line 1a (g) adjustments - typically blank for aggregate."
+    },
+    "line_1a_gain_loss": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartI[0].Row1a[0].f1_6[0]",
+      "terminal_name": "f1_6[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [504.0, 504.0, 576.0, 516.0],
+      "note": "Line 1a (h) gain/loss = proceeds - cost basis + adjustment."
+    },
+    "line_1b_proceeds": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_7[0]",
+      "terminal_name": "f1_7[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [288.0, 480.0, 360.0, 492.0],
+      "note": "Line 1b (d) proceeds - total from 8949 Part I box A."
+    },
+    "line_1b_cost_basis": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_8[0]",
+      "terminal_name": "f1_8[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [360.0, 480.0, 432.0, 492.0],
+      "note": "Line 1b (e) cost basis."
+    },
+    "line_1b_adjustment": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_9[0]",
+      "terminal_name": "f1_9[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [432.0, 480.0, 504.0, 492.0],
+      "note": "Line 1b (g) adjustments."
+    },
+    "line_1b_gain_loss": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_10[0]",
+      "terminal_name": "f1_10[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [504.0, 480.0, 576.0, 492.0],
+      "note": "Line 1b (h) gain/loss."
+    },
+    "line_2_proceeds": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartI[0].Row2[0].f1_11[0]",
+      "terminal_name": "f1_11[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [288.0, 456.0, 360.0, 468.0],
+      "note": "Line 2 (d) proceeds - total from 8949 Part I box B."
+    },
+    "line_2_cost_basis": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartI[0].Row2[0].f1_12[0]",
+      "terminal_name": "f1_12[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [360.0, 456.0, 432.0, 468.0],
+      "note": "Line 2 (e) cost basis."
+    },
+    "line_2_adjustment": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartI[0].Row2[0].f1_13[0]",
+      "terminal_name": "f1_13[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [432.0, 456.0, 504.0, 468.0],
+      "note": "Line 2 (g) adjustments."
+    },
+    "line_2_gain_loss": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartI[0].Row2[0].f1_14[0]",
+      "terminal_name": "f1_14[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [504.0, 456.0, 576.0, 468.0],
+      "note": "Line 2 (h) gain/loss."
+    },
+    "line_3_proceeds": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartI[0].Row3[0].f1_15[0]",
+      "terminal_name": "f1_15[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [288.0, 432.0, 360.0, 444.0],
+      "note": "Line 3 (d) proceeds - total from 8949 Part I box C (not on 1099-B)."
+    },
+    "line_3_cost_basis": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartI[0].Row3[0].f1_16[0]",
+      "terminal_name": "f1_16[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [360.0, 432.0, 432.0, 444.0],
+      "note": "Line 3 (e) cost basis."
+    },
+    "line_3_adjustment": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartI[0].Row3[0].f1_17[0]",
+      "terminal_name": "f1_17[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [432.0, 432.0, 504.0, 444.0],
+      "note": "Line 3 (g) adjustments."
+    },
+    "line_3_gain_loss": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartI[0].Row3[0].f1_18[0]",
+      "terminal_name": "f1_18[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [504.0, 432.0, 576.0, 444.0],
+      "note": "Line 3 (h) gain/loss."
+    },
+    "line_4_short_term_gain_from_6252": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_19[0]",
+      "terminal_name": "f1_19[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [504.0, 420.0, 576.0, 432.0],
+      "note": "Line 4 - short-term gain from Form 6252 and short-term gain/loss from Forms 4684, 6781, 8824. Deferred; Layer 1 emits 0."
+    },
+    "line_5_partnership_short_term": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_20[0]",
+      "terminal_name": "f1_20[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [504.0, 408.0, 576.0, 420.0],
+      "note": "Line 5 - net short-term gain/loss from partnerships, S-corps, estates, trusts (Schedule K-1). Deferred."
+    },
+    "line_6_short_term_loss_carryover": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_21[0]",
+      "terminal_name": "f1_21[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [507.0, 384.0, 576.0, 396.0],
+      "note": "Line 6 - short-term capital loss carryover (negative)."
+    },
+    "line_7_net_short_term_gain_loss": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_22[0]",
+      "terminal_name": "f1_22[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [504.0, 360.0, 576.0, 372.0],
+      "note": "Line 7 - net short-term capital gain or loss (sum of lines 1a-6)."
+    },
+    "line_8a_proceeds": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartII[0].Row8a[0].f1_23[0]",
+      "terminal_name": "f1_23[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [288.0, 216.0, 360.0, 228.0],
+      "note": "Line 8a (d) proceeds - long-term aggregate."
+    },
+    "line_8a_cost_basis": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartII[0].Row8a[0].f1_24[0]",
+      "terminal_name": "f1_24[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [360.0, 216.0, 432.0, 228.0]
+    },
+    "line_8a_adjustment": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartII[0].Row8a[0].f1_25[0]",
+      "terminal_name": "f1_25[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [432.0, 216.0, 504.0, 228.0]
+    },
+    "line_8a_gain_loss": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartII[0].Row8a[0].f1_26[0]",
+      "terminal_name": "f1_26[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [504.0, 216.0, 576.0, 228.0]
+    },
+    "line_8b_proceeds": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_27[0]",
+      "terminal_name": "f1_27[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [288.0, 192.0, 360.0, 204.0],
+      "note": "Line 8b (d) proceeds - from 8949 Part II box D."
+    },
+    "line_8b_cost_basis": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_28[0]",
+      "terminal_name": "f1_28[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [360.0, 192.0, 432.0, 204.0]
+    },
+    "line_8b_adjustment": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_29[0]",
+      "terminal_name": "f1_29[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [432.0, 192.0, 504.0, 204.0]
+    },
+    "line_8b_gain_loss": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_30[0]",
+      "terminal_name": "f1_30[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [504.0, 192.0, 576.0, 204.0]
+    },
+    "line_9_proceeds": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartII[0].Row9[0].f1_31[0]",
+      "terminal_name": "f1_31[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [288.0, 168.0, 360.0, 180.0],
+      "note": "Line 9 (d) proceeds - from 8949 Part II box E."
+    },
+    "line_9_cost_basis": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartII[0].Row9[0].f1_32[0]",
+      "terminal_name": "f1_32[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [360.0, 168.0, 432.0, 180.0]
+    },
+    "line_9_adjustment": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartII[0].Row9[0].f1_33[0]",
+      "terminal_name": "f1_33[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [432.0, 168.0, 504.0, 180.0]
+    },
+    "line_9_gain_loss": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartII[0].Row9[0].f1_34[0]",
+      "terminal_name": "f1_34[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [504.0, 168.0, 576.0, 180.0]
+    },
+    "line_10_proceeds": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartII[0].Row10[0].f1_35[0]",
+      "terminal_name": "f1_35[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [288.0, 144.0, 360.0, 156.0],
+      "note": "Line 10 (d) proceeds - from 8949 Part II box F."
+    },
+    "line_10_cost_basis": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartII[0].Row10[0].f1_36[0]",
+      "terminal_name": "f1_36[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [360.0, 144.0, 432.0, 156.0]
+    },
+    "line_10_adjustment": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartII[0].Row10[0].f1_37[0]",
+      "terminal_name": "f1_37[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [432.0, 144.0, 504.0, 156.0]
+    },
+    "line_10_gain_loss": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_PartII[0].Row10[0].f1_38[0]",
+      "terminal_name": "f1_38[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [504.0, 144.0, 576.0, 156.0]
+    },
+    "line_11_long_term_gain_from_other_forms": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_39[0]",
+      "terminal_name": "f1_39[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [504.0, 120.0, 576.0, 132.0],
+      "note": "Line 11 - long-term gain from Forms 4797, 2439, 6252, 4684, 6781, 8824. Deferred."
+    },
+    "line_12_partnership_long_term": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_40[0]",
+      "terminal_name": "f1_40[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [504.0, 108.0, 576.0, 120.0],
+      "note": "Line 12 - net long-term gain/loss from K-1s. Deferred."
+    },
+    "line_13_capital_gain_distributions": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_41[0]",
+      "terminal_name": "f1_41[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [504.0, 96.0, 576.0, 108.0],
+      "note": "Line 13 - capital gain distributions, from 1099-DIV box 2a sum."
+    },
+    "line_14_long_term_loss_carryover": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_42[0]",
+      "terminal_name": "f1_42[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [507.0, 72.0, 576.0, 84.0],
+      "note": "Line 14 - long-term capital loss carryover (negative)."
+    },
+    "line_15_net_long_term_gain_loss": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_43[0]",
+      "terminal_name": "f1_43[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [504.0, 48.0, 576.0, 60.0],
+      "note": "Line 15 - net long-term capital gain/loss (sum of lines 8a-14)."
+    },
+    "line_16_total_gain_loss": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_1[0]",
+      "terminal_name": "f2_1[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [489.6, 696.0, 576.0, 708.0],
+      "note": "Line 16 - combine lines 7 and 15. Flows to Form 1040 line 7."
+    },
+    "line_18_28pct_rate_gain": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_2[0]",
+      "terminal_name": "f2_2[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [489.6, 528.0, 576.0, 540.0],
+      "note": "Line 18 - 28% rate gain (from 28% Rate Gain Worksheet). Deferred."
+    },
+    "line_19_unrecaptured_1250_gain": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_3[0]",
+      "terminal_name": "f2_3[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [489.6, 492.0, 576.0, 504.0],
+      "note": "Line 19 - unrecaptured Section 1250 gain. Deferred."
+    },
+    "line_21_allowable_loss_capped": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_4[0]",
+      "terminal_name": "f2_4[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [492.6, 360.0, 576.0, 372.0],
+      "note": "Line 21 - allowable loss capped at -$3000 (-$1500 if MFS). Flows to 1040 line 7."
+    }
+  }
+}

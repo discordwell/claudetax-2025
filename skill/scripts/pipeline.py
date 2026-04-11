@@ -410,6 +410,7 @@ def run_pipeline(
     render_schedule_a: bool = True,
     render_schedule_b: bool = True,
     render_schedule_c: bool = True,
+    render_schedule_d: bool = True,
     render_schedule_se: bool = True,
     render_form_6251: bool = True,
     render_form_4562: bool = True,
@@ -436,9 +437,11 @@ def run_pipeline(
         Per-form render gates. Default ``True`` renders every applicable
         federal form. Schedule B is skipped if ``schedule_b_required``
         returns False; Schedule C is skipped if no schedules_c are
-        present; Schedule SE is skipped if SE net earnings are under
-        the $400 filing floor; Form 4562 is rendered per Schedule C
-        that has ``depreciable_assets`` populated.
+        present; Schedule D (and the companion Form 8949 pages) are
+        skipped if there are no 1099-B transactions and no cap gain
+        distributions; Schedule SE is skipped if SE net earnings are
+        under the $400 filing floor; Form 4562 is rendered per
+        Schedule C that has ``depreciable_assets`` populated.
 
     Returns
     -------
@@ -569,6 +572,28 @@ def run_pipeline(
 
         f8829_paths = render_form_8829_pdfs_all(canonical, output_dir)
         rendered.extend(f8829_paths)
+
+    if render_schedule_d:
+        from skill.scripts.output.schedule_d import (
+            compute_schedule_d_fields,
+            render_schedule_d_pdf,
+            schedule_d_required,
+        )
+        from skill.scripts.output.form_8949 import render_form_8949_pdf
+
+        if schedule_d_required(canonical):
+            fields_d = compute_schedule_d_fields(canonical)
+            out_path_d = output_dir / "schedule_d.pdf"
+            render_schedule_d_pdf(fields_d, out_path_d)
+            rendered.append(out_path_d)
+
+            # Render the companion Form 8949 pages (one per box code
+            # present). The renderer returns a list — possibly empty
+            # if Schedule D only has cap gain distributions.
+            f8949_paths = render_form_8949_pdf(
+                fields_d.form_8949_fields, output_dir / "form_8949.pdf"
+            )
+            rendered.extend(f8949_paths)
 
     if render_schedule_se:
         from skill.scripts.output.schedule_se import (

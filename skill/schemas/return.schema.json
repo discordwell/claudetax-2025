@@ -1233,6 +1233,26 @@
           "title": "Description",
           "type": "string"
         },
+        "form_8949_box_code": {
+          "anyOf": [
+            {
+              "enum": [
+                "A",
+                "B",
+                "C",
+                "D",
+                "E",
+                "F"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Form 8949 Box Code"
+        },
         "is_long_term": {
           "title": "Is Long Term",
           "type": "boolean"

@@ -308,6 +308,16 @@ class Form1099BTransaction(_StrictModel):
     basis_reported_to_irs: bool = True
     adjustment_codes: list[str] = Field(default_factory=list)
     adjustment_amount: Money = Decimal("0")
+    form_8949_box_code: Literal["A", "B", "C", "D", "E", "F"] | None = None
+    """Form 8949 box classification. If omitted, the Schedule D / 8949
+    renderer auto-picks based on ``is_long_term`` and
+    ``basis_reported_to_irs``: long-term + basis reported -> D,
+    long-term + not reported -> E, short-term + basis reported -> A,
+    short-term + not reported -> B. Set explicitly to 'C' (short-term)
+    or 'F' (long-term) for a transaction NOT reported on a 1099-B
+    at all (a private sale entered manually). The digital-asset
+    boxes G/H/I/J/K/L are NOT yet modelled — wave 7 will add a
+    Form1099DA model for those."""
 
 
 class Form1099B(_StrictModel):

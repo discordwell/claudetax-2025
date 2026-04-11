@@ -1,0 +1,77 @@
+{
+  "schema_version": "0.1.0",
+  "tax_year": 2025,
+  "filing_status": "single",
+  "taxpayer": {
+    "first_name": "Jordan",
+    "last_name": "Mover",
+    "ssn": "123-45-6789",
+    "date_of_birth": "1985-06-15",
+    "is_blind": false,
+    "is_age_65_or_older": false
+  },
+  "address": {
+    "street1": "500 N Michigan Ave",
+    "city": "Chicago",
+    "state": "IL",
+    "zip": "60611",
+    "country": "US"
+  },
+  "w2s": [
+    {
+      "employer_name": "Philly Corp",
+      "employer_ein": "12-3456789",
+      "employee_is_taxpayer": true,
+      "box1_wages": "30000.00",
+      "box2_federal_income_tax_withheld": "2500.00",
+      "box3_social_security_wages": "30000.00",
+      "box4_social_security_tax_withheld": "1860.00",
+      "box5_medicare_wages": "30000.00",
+      "box6_medicare_tax_withheld": "435.00",
+      "box7_social_security_tips": "0",
+      "box8_allocated_tips": "0",
+      "box10_dependent_care_benefits": "0",
+      "box11_nonqualified_plans": "0",
+      "box12_entries": [],
+      "box13_statutory_employee": false,
+      "box13_retirement_plan": false,
+      "box13_third_party_sick_pay": false,
+      "box14_other": [],
+      "state_rows": [
+        {
+          "state": "PA",
+          "state_wages": "30000.00",
+          "state_tax_withheld": "921.00"
+        }
+      ]
+    },
+    {
+      "employer_name": "Chicago LLC",
+      "employer_ein": "98-7654321",
+      "employee_is_taxpayer": true,
+      "box1_wages": "35000.00",
+      "box2_federal_income_tax_withheld": "4000.00",
+      "box3_social_security_wages": "35000.00",
+      "box4_social_security_tax_withheld": "2170.00",
+      "box5_medicare_wages": "35000.00",
+      "box6_medicare_tax_withheld": "507.50",
+      "box7_social_security_tips": "0",
+      "box8_allocated_tips": "0",
+      "box10_dependent_care_benefits": "0",
+      "box11_nonqualified_plans": "0",
+      "box12_entries": [],
+      "box13_statutory_employee": false,
+      "box13_retirement_plan": false,
+      "box13_third_party_sick_pay": false,
+      "box14_other": [],
+      "state_rows": [
+        {
+          "state": "IL",
+          "state_wages": "35000.00",
+          "state_tax_withheld": "1732.50"
+        }
+      ]
+    }
+  ],
+  "itemize_deductions": false
+}

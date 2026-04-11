@@ -1,0 +1,110 @@
+{
+  "description": "Multi-state part-year fixture: Single filer moves PA -> IL mid-year TY2025. PA resident Jan 1 - Jun 30 (181 days), IL resident Jul 1 - Dec 31 (184 days). Two W-2s: Philly Corp ($30k, $2,500 fed wh, $921 PA wh) and Chicago LLC ($35k, $4,000 fed wh, $1,732.50 IL wh). Standard deduction, no dependents, no OBBBA triggers, no itemized, no Schedule C/E. This is the FIRST golden fixture that exercises the state plugin dispatch layer end-to-end (federal compute -> registry.get(\"PA\")/get(\"IL\") -> per-state StateReturn).",
+  "scenario": {
+    "filing_status": "single",
+    "tax_year": 2025,
+    "taxpayer_age_at_eoy": 40,
+    "moves": "PA -> IL on Jul 1, 2025",
+    "pa_residency_days": 181,
+    "il_residency_days": 184,
+    "total_days": 365,
+    "w2_philly_corp_pa_wages": 30000,
+    "w2_chicago_llc_il_wages": 35000,
+    "philly_pa_state_withheld": 921.00,
+    "chicago_il_state_withheld": 1732.50,
+    "philly_fed_withheld": 2500.00,
+    "chicago_fed_withheld": 4000.00
+  },
+  "authority": [
+    "skill/reference/ty2025-constants.json — OBBBA standard deduction Single = $15,750",
+    "skill/scripts/states/pa.py — PA flat 3.07% on tenforty PA-40 base; v1 nonresident/part-year uses days_in_state/365 proration of resident-basis tax",
+    "skill/scripts/states/il.py — IL flat 4.95% on (federal AGI + Sch M adds - Sch M subs) - exemption; TY2025 personal exemption $2,850; v1 nonresident/part-year uses days_in_state/365 proration of resident-basis tax",
+    "skill/reference/state-reciprocity.json — PA reciprocity partners {IN, MD, NJ, OH, VA, WV}; IL reciprocity partners {IA, KY, MI, WI}; PA<->IL is NOT reciprocal so both states tax the income earned while a resident",
+    "test_golden_simple_w2.py locks Single $65k W-2 -> $5,755 federal income tax for TY2025 (same federal totals as this fixture: $65k AGI, $15,750 std ded, $49,250 TI)"
+  ],
+  "expected_computed_totals": {
+    "total_income": "65000.00",
+    "adjusted_gross_income": "65000.00",
+    "deduction_taken": "15750.00",
+    "taxable_income": "49250.00",
+    "tentative_tax": "5755.00",
+    "total_tax": "5755.00",
+    "total_payments": "6500.00",
+    "refund": "745.00",
+    "amount_owed": null,
+    "marginal_rate": 22.0
+  },
+  "federal_hand_check": {
+    "total_w2_box1": "30000 + 35000 = 65000",
+    "agi_calc": "no adjustments to income -> AGI = total_income = 65000",
+    "standard_deduction_single_ty2025_obbba": 15750,
+    "taxable_income_calc": "65000 - 15750 = 49250",
+    "federal_income_tax": "Locked to simple_w2_standard golden: IRS tax tables Single TY2025 -> 5755 at TI 49250 (10% * 11925 + 12% * 36550 + 22% * 800 = 5754.50 -> 5755 via $50 tax-table midpoint rounding)",
+    "total_payments_calc": "2500 (Philly) + 4000 (Chicago) = 6500 W-2 box 2 fed wh",
+    "refund_calc": "6500 - 5755 = 745"
+  },
+  "expected_pa_state_return": {
+    "state": "PA",
+    "residency": "part_year",
+    "days_in_state": 181,
+    "state_specific": {
+      "state_adjusted_gross_income": "65000.00",
+      "state_taxable_income": "65000.00",
+      "state_total_tax_resident_basis": "1995.50",
+      "state_total_tax": "989.55",
+      "apportionment_fraction_numerator": 181,
+      "apportionment_fraction_denominator": 365
+    }
+  },
+  "pa_hand_check": {
+    "pa_compensation_base": "PA's PA-40 starts from 8 income classes; for a wage-only filer, class 1 (compensation) = $65,000 W-2 sum (BOTH W-2s, because tenforty marshals the canonical w2_income sum and PA does not separate by state row at this layer)",
+    "pa_resident_basis_tax_calc": "65000 * 0.0307 = 1995.50",
+    "pa_apportioned_tax_calc": "1995.50 * (181/365) = 1995.50 * 0.4958904... = 989.55 (ROUND_HALF_UP at the cent)",
+    "pa_withheld": "921.00 (Philly Corp box 17)",
+    "pa_owed_or_refund": "989.55 owed - 921.00 withheld = 68.55 owed (negative refund)",
+    "pa_refund": null,
+    "pa_amount_owed_estimate": "68.55"
+  },
+  "expected_il_state_return": {
+    "state": "IL",
+    "residency": "part_year",
+    "days_in_state": 184,
+    "state_specific": {
+      "state_base_income_approx": "65000.00",
+      "state_base_income_after_adjustments": "65000.00",
+      "il_additions_total": "0.00",
+      "il_subtractions_total": "0.00",
+      "state_exemption_count": 1,
+      "state_exemption_per_person": "2850",
+      "state_exemption_total": "2850.00",
+      "state_taxable_income": "62150.00",
+      "state_total_tax_resident_basis": "3076.43",
+      "state_total_tax": "1550.86",
+      "flat_rate": "0.0495",
+      "apportionment_fraction_numerator": 184,
+      "apportionment_fraction_denominator": 365
+    }
+  },
+  "il_hand_check": {
+    "il_base_income_calc": "federal AGI 65000 + Sch M additions 0 - Sch M subtractions 0 = 65000",
+    "il_additions_detail": "0 — no 1099-INT box 8, no 1099-DIV box 11 (no muni interest)",
+    "il_subtractions_detail": "0 — no SSA-1099 box 5, no 1099-R box 2a, no 1099-INT box 3 (no Treasury interest)",
+    "il_exemption_calc": "1 exemption (Single, no dependents) * $2,850 = $2,850 (TY2025 IL-1040 line 10)",
+    "il_taxable_calc": "65000 - 2850 = 62150",
+    "il_resident_basis_tax_calc": "62150 * 0.0495 = 3076.4250 -> 3076.43 (ROUND_HALF_UP)",
+    "il_apportioned_tax_calc": "3076.43 * (184/365) = 3076.43 * 0.5041095... = 1550.86 (ROUND_HALF_UP at the cent)",
+    "il_withheld": "1732.50 (Chicago LLC box 17)",
+    "il_refund": "1732.50 withheld - 1550.86 owed = 181.64 refund"
+  },
+  "TODO_real_sourcing_logic": {
+    "scope": "The v1 PA and IL plugins use a flat days_in_state/365 proration of the RESIDENT-BASIS tax. The brief's idealized hand-check assumed cleanly-separable income sourcing (PA tax = $30k * 3.07% = $921; IL tax = ($35k - $2,850) * 4.95% = $1,591.43) — but the v1 plugins do NOT implement that. They compute the tax as if the taxpayer were a full-year resident of the state on the entire $65k of wages, then prorate. This OVER-states tax on both sides for a clean PA->IL move because each state ends up taxing a fraction of the OTHER state's wages.",
+    "pa_real_logic_should": "PA Schedule NRH-NR sources class 1 (compensation) to the work location. A clean PA->IL mover with the Philly job ending Jun 30 should owe PA tax on only the $30,000 Philly wages = $30,000 * 0.0307 = $921.00 exactly (zero refund / zero owed because withholding matches). The v1 plugin returns $989.55 owed instead — a $68.55 over-statement and a $68.55 false 'owed' position.",
+    "il_real_logic_should": "IL Schedule NR sources wages to work location. A clean PA->IL mover with the Chicago job starting Jul 1 should owe IL tax on only the $35,000 Chicago wages, less the $2,850 personal exemption = $32,150 * 0.0495 = $1,591.43 exactly. With $1,732.50 withheld, the real refund would be $141.07. The v1 plugin returns $1,550.86 owed and a $181.64 refund — a $40.57 under-statement of tax and a $40.57 over-statement of refund.",
+    "fan_out_followup_pa": "Implement PA Schedule NRH (Apportionment of Business, Profession, or Farm Income) plus class-1 sourcing on PA-40 line 1a using W-2 state_rows[].state == 'PA' and state_wages instead of the canonical box1_wages sum.",
+    "fan_out_followup_il": "Implement IL Schedule NR step-by-step: source wages to W-2 state_rows[].state == 'IL', source interest/dividends to domicile (full Sch B amounts allocated by residency dates), and feed the IL-source AGI into the IL-1040 instead of federal AGI.",
+    "lock_intent": "This fixture LOCKS the v1 day-prorated outputs so any future change to the plugins (including the eventual real sourcing logic implementation) is detected as a regression and surfaced for explicit re-blessing. When real sourcing lands, this fixture's expected_pa_state_return and expected_il_state_return blocks must be updated to the brief's idealized hand-check values: PA $921.00 / IL $1,591.43."
+  },
+  "TODO_il_adds_subs_no_op": {
+    "note": "CP8-D added IL-1040 Line 2 muni-interest addback, IL-1040 Line 5 Social Security + qualified retirement subtraction, and IL Schedule M Step 2 Line 22 U.S. Treasury subtraction. This fixture has ZERO 1099-INT, ZERO 1099-DIV, ZERO SSA-1099, and ZERO 1099-R, so all CP8-D adds/subs evaluate to 0 and the IL base income equals federal AGI. Verify by reading expected_il_state_return.state_specific.il_additions_total and il_subtractions_total — both must be '0.00'. A future fixture should exercise the CP8-D adds/subs with non-zero muni and Treasury interest."
+  }
+}

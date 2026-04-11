@@ -394,114 +394,112 @@ def _compute_from_itemized(
 
 
 # ---------------------------------------------------------------------------
-# Layer 2: reportlab PDF rendering (SCAFFOLD)
+# Layer 2: AcroForm overlay PDF rendering (wave 5)
 # ---------------------------------------------------------------------------
+#
+# Layer 2 was previously a reportlab-based scaffold; wave 5 replaced it
+# with a real AcroForm overlay on the IRS-hosted fillable Schedule A PDF.
+# The widget map at ``skill/reference/schedule-a-acroform-map.json`` ties
+# every numeric Layer 1 field to its widget. The source PDF is locked at
+# ``skill/reference/irs_forms/f1040sa.pdf`` and validated by SHA-256
+# before each fill so a silent IRS re-issue trips an immediate
+# ``RuntimeError``.
+
+# Schedule A semantic-name -> Layer 1 attribute mapping uses identical
+# names (the JSON `mapping` keys ARE the dataclass attribute names) so
+# we iterate the dataclass fields directly without a translation table.
+
+# Path to the widget map JSON. Computed at module import time so test
+# tooling can monkeypatch this constant if needed.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_SCHEDULE_A_MAP_PATH = (
+    _REPO_ROOT / "skill" / "reference" / "schedule-a-acroform-map.json"
+)
+_SCHEDULE_A_PDF_PATH = (
+    _REPO_ROOT / "skill" / "reference" / "irs_forms" / "f1040sa.pdf"
+)
 
 
 def _format_decimal(value: Decimal) -> str:
-    """Format a Decimal as a US currency-ish string ``10,000.00``."""
+    """Format a Decimal as a plain ``"10000.00"`` for AcroForm text fields.
+
+    The IRS PDFs render their own thousands-separators in the appearance
+    stream; we just write a fixed-precision number with two decimals.
+    Zero is rendered as the empty string so the IRS PDF stays visually
+    identical to a freshly-downloaded blank for cells the filer doesn't
+    use.
+    """
     q = value.quantize(Decimal("0.01"))
-    return f"{q:,.2f}"
+    if q == Decimal("0.00"):
+        return ""
+    return f"{q:.2f}"
+
+
+def _format_money_or_blank(value: Decimal | None) -> str:
+    if value is None:
+        return ""
+    if not isinstance(value, Decimal):
+        return str(value)
+    return _format_decimal(value)
+
+
+def _scheduleaa_widget_values(
+    fields: ScheduleAFields,
+    widget_map: dict,
+) -> dict[str, str]:
+    """Translate a ``ScheduleAFields`` snapshot to a widget_name->str dict.
+
+    Iterates Layer 1 dataclass fields and looks up each by semantic name
+    in the widget map's ``mapping`` block. Decimal money is formatted via
+    ``_format_decimal`` (zero -> empty string); the SALT sales-tax
+    elected boolean drives the c1_1 checkbox.
+    """
+    out: dict[str, str] = {}
+    mapping = widget_map["mapping"]
+
+    for f in dc_fields(fields):
+        sem = f.name
+        if sem not in mapping:
+            continue
+        entry = mapping[sem]
+        wname = entry["widget_name"]
+        # Skip the wildcard entries used for repeating-row tables (they
+        # don't have a single concrete widget). Schedule A has none.
+        if "*" in wname:
+            continue
+        value = getattr(fields, sem)
+        if isinstance(value, bool):
+            # Checkbox: "Yes" -> "/1" via the overlay helper
+            out[wname] = "Yes" if value else ""
+        elif isinstance(value, Decimal):
+            out[wname] = _format_decimal(value)
+        elif value is None:
+            out[wname] = ""
+        else:
+            out[wname] = str(value)
+    return out
 
 
 def render_schedule_a_pdf(fields: ScheduleAFields, out_path: Path) -> Path:
-    """Render a Schedule A SCAFFOLD PDF using reportlab.
+    """Render a Schedule A PDF by overlaying ``fields`` on the IRS fillable PDF.
 
-    This writes a tabular PDF listing every line name and its value. It
-    is NOT a filled IRS Schedule A — a real AcroForm overlay on the IRS
-    fillable PDF is a follow-up task that will need a researched widget
-    map.
+    Loads the wave-5 widget map, validates the on-disk source PDF
+    SHA-256, fills the widgets via
+    ``skill.scripts.output._acroform_overlay.fill_acroform_pdf``, and
+    writes to ``out_path``. Raises ``RuntimeError`` if the source PDF is
+    missing or has been re-issued (SHA mismatch).
 
-    Returns the out_path for convenience.
+    Returns ``out_path`` for convenience.
     """
-    # Lazy import so that users who never render PDFs don't pay the
-    # import cost (and test runners without reportlab can still
-    # exercise Layer 1).
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import letter
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.platypus import (
-        Paragraph,
-        SimpleDocTemplate,
-        Spacer,
-        Table,
-        TableStyle,
+    # Lazy import so test tools that only exercise Layer 1 don't pay the
+    # pypdf import cost.
+    from skill.scripts.output._acroform_overlay import (
+        fill_acroform_pdf,
+        load_widget_map_as_dict,
+        verify_pdf_sha256,
     )
 
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    doc = SimpleDocTemplate(
-        str(out_path),
-        pagesize=letter,
-        title="Schedule A (TY2025 SCAFFOLD)",
-    )
-    styles = getSampleStyleSheet()
-
-    story: list = []
-    story.append(
-        Paragraph("Schedule A - Itemized Deductions (TY2025 - SCAFFOLD)", styles["Title"])
-    )
-    story.append(
-        Paragraph(
-            "This is a scaffold rendering, not a filed IRS Schedule A.",
-            styles["Italic"],
-        )
-    )
-    story.append(Spacer(1, 12))
-
-    # Header block
-    header_rows = [
-        ["Filing status", fields.filing_status],
-        ["Taxpayer", fields.taxpayer_name],
-        ["Spouse", fields.spouse_name or ""],
-        [
-            "SALT cap applied",
-            _format_decimal(fields.line_5e_salt_cap_applied),
-        ],
-    ]
-    header_table = Table(header_rows, colWidths=[140, 360])
-    header_table.setStyle(
-        TableStyle(
-            [
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                ("BACKGROUND", (0, 0), (0, -1), colors.lightgrey),
-                ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ]
-        )
-    )
-    story.append(header_table)
-    story.append(Spacer(1, 12))
-
-    # Line-item table
-    line_rows: list[list] = [["Line", "Description", "Amount"]]
-    for f in dc_fields(fields):
-        if f.name in ("filing_status", "taxpayer_name", "spouse_name"):
-            continue
-        value = getattr(fields, f.name)
-        if not isinstance(value, Decimal):
-            continue
-        # Parse "line_5e_salt_capped" -> ("5e", "salt capped")
-        parts = f.name.split("_")
-        line_number = parts[1] if len(parts) >= 2 else ""
-        desc = " ".join(parts[2:]).replace("_", " ")
-        line_rows.append([line_number, desc, _format_decimal(value)])
-
-    line_table = Table(line_rows, colWidths=[50, 350, 100])
-    line_table.setStyle(
-        TableStyle(
-            [
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
-                ("ALIGN", (2, 1), (2, -1), "RIGHT"),
-            ]
-        )
-    )
-    story.append(line_table)
-
-    doc.build(story)
-    return out_path
+    widget_map = load_widget_map_as_dict(_SCHEDULE_A_MAP_PATH)
+    verify_pdf_sha256(_SCHEDULE_A_PDF_PATH, widget_map["source_pdf_sha256"])
+    widget_values = _scheduleaa_widget_values(fields, widget_map)
+    return fill_acroform_pdf(_SCHEDULE_A_PDF_PATH, widget_values, Path(out_path))

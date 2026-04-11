@@ -315,175 +315,194 @@ def compute_schedule_c_fields_all(
 
 
 # ---------------------------------------------------------------------------
-# Layer 2: reportlab PDF rendering (SCAFFOLD)
+# Layer 2: AcroForm overlay PDF rendering (wave 5)
 # ---------------------------------------------------------------------------
+#
+# Layer 2 was previously a reportlab-based scaffold; wave 5 replaced it
+# with a real AcroForm overlay on the IRS fillable Schedule C PDF.
+# The widget map at ``skill/reference/schedule-c-acroform-map.json`` ties
+# every Layer 1 field to its widget on the IRS PDF (page 1 + page 2).
+# Special handling:
+#
+#   * Line F accounting method is a 3-checkbox radio; only the cash /
+#     accrual / other matching the Layer 1 string is set.
+#   * Line 32a / 32b at-risk box is two single checkboxes (mutually
+#     exclusive in Layer 1).
+#   * Line 33 inventory method is a 3-checkbox radio (cost / lower of
+#     cost or market / other).
+#   * Line 43 vehicle date is THREE widgets — Layer 1 stores Optional[str].
+#     This wave splits "mm/dd/yy" if present.
+#   * Part V other expenses is a 9-row repeating block exposed via
+#     ``part_v_other_expenses_widgets`` in the map.
+#
+# Multi-business dispatch (``render_schedule_c_pdfs_all``) is preserved:
+# one filled PDF per Schedule C on the return.
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_SCHEDULE_C_MAP_PATH = (
+    _REPO_ROOT / "skill" / "reference" / "schedule-c-acroform-map.json"
+)
+_SCHEDULE_C_PDF_PATH = (
+    _REPO_ROOT / "skill" / "reference" / "irs_forms" / "f1040sc.pdf"
+)
 
 
 def _format_decimal(value: Decimal) -> str:
-    """Format a Decimal as a US currency-ish string ``27,000.00``."""
+    """Format a Decimal as a plain ``"27000.00"`` for AcroForm text fields.
+
+    Zero is rendered as the empty string so the IRS PDF stays visually
+    blank for cells the filer doesn't use. Negative values are rendered
+    with a leading minus.
+    """
     q = value.quantize(Decimal("0.01"))
-    return f"{q:,.2f}"
+    if q == Decimal("0.00"):
+        return ""
+    return f"{q:.2f}"
 
 
-_HEADER_FIELD_NAMES = {
-    "proprietor_name",
-    "proprietor_ssn",
-    "line_a_principal_business_or_profession",
-    "line_b_principal_business_code",
-    "line_c_business_name",
-    "line_d_ein",
-    "line_e_business_address",
-    "line_f_accounting_method",
-    "line_g_material_participation",
-    "line_h_started_or_acquired_this_year",
-    "line_i_made_1099_payments_required",
-    "line_j_filed_required_1099s",
-}
+def _format_bool_optional(value: bool | None) -> str:
+    if value is None:
+        return ""
+    return "Yes" if value else "No"
 
-_PART_V_FIELD_NAMES = {"part_v_other_expenses", "part_v_total"}
+
+def _build_widget_values(
+    fields: ScheduleCFields,
+    widget_map: dict,
+) -> dict[str, str]:
+    """Translate a ``ScheduleCFields`` snapshot to a widget_name->str dict."""
+    out: dict[str, str] = {}
+    mapping = widget_map["mapping"]
+
+    def text(sem: str, value) -> None:
+        if sem not in mapping:
+            return
+        wn = mapping[sem]["widget_name"]
+        if "*" in wn:
+            return
+        if value is None:
+            out[wn] = ""
+        elif isinstance(value, Decimal):
+            out[wn] = _format_decimal(value)
+        else:
+            out[wn] = str(value)
+
+    def checkbox(sem: str, on: bool) -> None:
+        if sem not in mapping:
+            return
+        wn = mapping[sem]["widget_name"]
+        out[wn] = "Yes" if on else ""
+
+    # Header
+    text("proprietor_name", fields.proprietor_name)
+    text("line_a_principal_business_or_profession", fields.line_a_principal_business_or_profession)
+    text("line_b_principal_business_code", fields.line_b_principal_business_code)
+    text("line_c_business_name", fields.line_c_business_name)
+    text("line_d_ein", fields.line_d_ein)
+    text("line_e_business_address", fields.line_e_business_address)
+    # Accounting method radio: select the matching cash/accrual/other terminal
+    method = (fields.line_f_accounting_method or "").lower()
+    method_map = {"cash": "c1_1[0]", "accrual": "c1_1[1]", "other": "c1_1[2]"}
+    selected_terminal = method_map.get(method, "c1_1[0]")
+    # The mapping stores the cash entry as line_f_accounting_method; we
+    # need to fetch the right widget by terminal_name lookup against
+    # mapping AND unmapped_widgets (the alternates live in unmapped).
+    for entry in [mapping.get("line_f_accounting_method", {})] + widget_map.get(
+        "unmapped_widgets", []
+    ):
+        if entry.get("terminal_name") == selected_terminal:
+            out[entry["widget_name"]] = "Yes"
+            break
+    checkbox("line_g_material_participation", fields.line_g_material_participation)
+    checkbox("line_h_started_or_acquired_this_year", fields.line_h_started_or_acquired_this_year)
+    if fields.line_i_made_1099_payments_required is True:
+        checkbox("line_i_made_1099_payments_required", True)
+    if fields.line_j_filed_required_1099s is True:
+        checkbox("line_j_filed_required_1099s", True)
+
+    # Part I income
+    text("line_1_gross_receipts", fields.line_1_gross_receipts)
+    text("line_2_returns_and_allowances", fields.line_2_returns_and_allowances)
+    text("line_3_net_receipts", fields.line_3_net_receipts)
+    text("line_4_cost_of_goods_sold", fields.line_4_cost_of_goods_sold)
+    text("line_5_gross_profit", fields.line_5_gross_profit)
+    text("line_6_other_income", fields.line_6_other_income)
+    text("line_7_gross_income", fields.line_7_gross_income)
+
+    # Part II expenses
+    text("line_8_advertising", fields.line_8_advertising)
+    text("line_9_car_and_truck", fields.line_9_car_and_truck)
+    text("line_10_commissions_and_fees", fields.line_10_commissions_and_fees)
+    text("line_11_contract_labor", fields.line_11_contract_labor)
+    text("line_12_depletion", fields.line_12_depletion)
+    text("line_13_depreciation_section_179", fields.line_13_depreciation_section_179)
+    text("line_14_employee_benefit_programs", fields.line_14_employee_benefit_programs)
+    text("line_15_insurance_not_health", fields.line_15_insurance_not_health)
+    text("line_16a_mortgage_interest", fields.line_16a_mortgage_interest)
+    text("line_16b_other_interest", fields.line_16b_other_interest)
+    text("line_17_legal_and_professional", fields.line_17_legal_and_professional)
+    text("line_18_office_expense", fields.line_18_office_expense)
+    text("line_19_pension_and_profit_sharing", fields.line_19_pension_and_profit_sharing)
+    text("line_20a_rent_vehicles_machinery_equipment", fields.line_20a_rent_vehicles_machinery_equipment)
+    text("line_20b_rent_other_business_property", fields.line_20b_rent_other_business_property)
+    text("line_21_repairs_and_maintenance", fields.line_21_repairs_and_maintenance)
+    text("line_22_supplies", fields.line_22_supplies)
+    text("line_23_taxes_and_licenses", fields.line_23_taxes_and_licenses)
+    text("line_24a_travel", fields.line_24a_travel)
+    text("line_24b_meals_50pct_deductible", fields.line_24b_meals_50pct_deductible)
+    text("line_25_utilities", fields.line_25_utilities)
+    text("line_26_wages_less_employment_credits", fields.line_26_wages_less_employment_credits)
+    text("line_27a_other_expenses", fields.line_27a_other_expenses)
+    text("line_28_total_expenses", fields.line_28_total_expenses)
+    text("line_29_tentative_profit_or_loss", fields.line_29_tentative_profit_or_loss)
+    text("line_30_home_office_expense", fields.line_30_home_office_expense)
+    text("line_31_net_profit_or_loss", fields.line_31_net_profit_or_loss)
+    checkbox("line_32a_all_investment_at_risk", fields.line_32a_all_investment_at_risk)
+    checkbox("line_32b_some_investment_not_at_risk", fields.line_32b_some_investment_not_at_risk)
+
+    # Part III COGS (passthrough; line 42 = line 4 by Layer 1 design)
+    text("line_35_beginning_inventory", _ZERO)  # always 0 in scaffold
+    text("line_36_purchases_less_personal_use", _ZERO)
+    text("line_37_cost_of_labor", _ZERO)
+    text("line_38_materials_and_supplies", _ZERO)
+    text("line_39_other_costs", _ZERO)
+    text("line_40_sum_35_through_39", _ZERO)
+    text("line_41_ending_inventory", _ZERO)
+    text("line_42_cost_of_goods_sold", fields.line_42_cost_of_goods_sold)
+
+    # Part V — other expenses (9-row repeating)
+    part_v_widgets = widget_map.get("part_v_other_expenses_widgets", [])
+    for i, (label, amount) in enumerate(fields.part_v_other_expenses):
+        if i >= len(part_v_widgets):
+            break
+        slot = part_v_widgets[i]
+        out[slot["description_widget"]["widget_name"]] = label
+        out[slot["amount_widget"]["widget_name"]] = _format_decimal(amount)
+    text("part_v_total", fields.part_v_total)
+
+    return out
 
 
 def render_schedule_c_pdf(fields: ScheduleCFields, out_path: Path) -> Path:
-    """Render a single-business Schedule C SCAFFOLD PDF using reportlab.
+    """Render a single-business Schedule C PDF by AcroForm overlay.
 
-    This writes a tabular PDF listing the Schedule C header block, every
-    Part I/II/III/IV line, and the Part V other-expenses detail. It is
-    NOT a filled IRS Schedule C — real AcroForm overlay on the IRS
-    fillable PDF is a follow-up task.
+    Loads the wave-5 widget map, validates the on-disk source PDF
+    SHA-256, fills the widgets, and writes to ``out_path``. Raises
+    ``RuntimeError`` if the source PDF is missing or has been re-issued
+    (SHA mismatch).
 
-    Returns the ``out_path`` for convenience.
+    Returns ``out_path`` for convenience.
     """
-    # Lazy import so callers that never render PDFs don't pay the cost
-    # and test runners without reportlab can still exercise Layer 1.
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import letter
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.platypus import (
-        Paragraph,
-        SimpleDocTemplate,
-        Spacer,
-        Table,
-        TableStyle,
+    from skill.scripts.output._acroform_overlay import (
+        fill_acroform_pdf,
+        load_widget_map_as_dict,
+        verify_pdf_sha256,
     )
 
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    doc = SimpleDocTemplate(
-        str(out_path),
-        pagesize=letter,
-        title=f"Schedule C — {fields.line_c_business_name} (TY2025 SCAFFOLD)",
-    )
-    styles = getSampleStyleSheet()
-
-    story: list = []
-    story.append(
-        Paragraph(
-            f"Schedule C (TY2025 - SCAFFOLD) — {fields.line_c_business_name}",
-            styles["Title"],
-        )
-    )
-    story.append(
-        Paragraph(
-            "This is a scaffold rendering, not a filed IRS form.",
-            styles["Italic"],
-        )
-    )
-    story.append(Spacer(1, 12))
-
-    # ---- Header block ------------------------------------------------
-    header_rows = [
-        ["A. Principal business or profession", fields.line_a_principal_business_or_profession],
-        ["B. Principal business code", fields.line_b_principal_business_code or ""],
-        ["C. Business name", fields.line_c_business_name],
-        ["D. EIN", fields.line_d_ein or ""],
-        ["E. Business address", fields.line_e_business_address],
-        ["F. Accounting method", fields.line_f_accounting_method],
-        ["G. Materially participated", "Yes" if fields.line_g_material_participation else "No"],
-        [
-            "H. Started or acquired this year",
-            "Yes" if fields.line_h_started_or_acquired_this_year else "No",
-        ],
-        [
-            "I. Required to file 1099s",
-            _format_bool_optional(fields.line_i_made_1099_payments_required),
-        ],
-        [
-            "J. Will file required 1099s",
-            _format_bool_optional(fields.line_j_filed_required_1099s),
-        ],
-    ]
-    header_table = Table(header_rows, colWidths=[180, 320])
-    header_table.setStyle(
-        TableStyle(
-            [
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                ("BACKGROUND", (0, 0), (0, -1), colors.lightgrey),
-                ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ]
-        )
-    )
-    story.append(header_table)
-    story.append(Spacer(1, 12))
-
-    # ---- Line-item table (Parts I-IV) --------------------------------
-    line_rows: list[list] = [["Line", "Description", "Amount"]]
-    for f in dc_fields(fields):
-        if f.name in _HEADER_FIELD_NAMES or f.name in _PART_V_FIELD_NAMES:
-            continue
-        value = getattr(fields, f.name)
-        if not isinstance(value, Decimal):
-            # Skip booleans / strings on Parts I-IV (e.g. line_32a/b, line_33).
-            continue
-        parts = f.name.split("_")
-        # parts == ["line", "27a", "other", "expenses"]
-        line_number = parts[1] if len(parts) >= 2 else ""
-        desc = " ".join(parts[2:]).replace("_", " ")
-        line_rows.append([line_number, desc, _format_decimal(value)])
-
-    line_table = Table(line_rows, colWidths=[60, 340, 100])
-    line_table.setStyle(
-        TableStyle(
-            [
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
-                ("ALIGN", (2, 1), (2, -1), "RIGHT"),
-            ]
-        )
-    )
-    story.append(line_table)
-    story.append(Spacer(1, 12))
-
-    # ---- Part V — other expenses detail ------------------------------
-    story.append(Paragraph("Part V — Other Expenses", styles["Heading3"]))
-    part_v_rows: list[list] = [["Description", "Amount"]]
-    for label, amount in fields.part_v_other_expenses:
-        part_v_rows.append([label, _format_decimal(amount)])
-    if not fields.part_v_other_expenses:
-        part_v_rows.append(["(none)", _format_decimal(_ZERO)])
-    part_v_rows.append(["Total (to Part II, line 48)", _format_decimal(fields.part_v_total)])
-
-    part_v_table = Table(part_v_rows, colWidths=[340, 100])
-    part_v_table.setStyle(
-        TableStyle(
-            [
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
-                ("ALIGN", (1, 1), (1, -1), "RIGHT"),
-            ]
-        )
-    )
-    story.append(part_v_table)
-
-    doc.build(story)
-    return out_path
+    widget_map = load_widget_map_as_dict(_SCHEDULE_C_MAP_PATH)
+    verify_pdf_sha256(_SCHEDULE_C_PDF_PATH, widget_map["source_pdf_sha256"])
+    widget_values = _build_widget_values(fields, widget_map)
+    return fill_acroform_pdf(_SCHEDULE_C_PDF_PATH, widget_values, Path(out_path))
 
 
 def render_schedule_c_pdfs_all(

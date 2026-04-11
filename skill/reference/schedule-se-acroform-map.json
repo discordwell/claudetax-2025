@@ -1,0 +1,376 @@
+{
+  "source_pdf_url": "https://www.irs.gov/pub/irs-pdf/f1040sse.pdf",
+  "source_pdf_sha256": "05bc2b3e1dfca65d8c6fc6d652af4fa3736e953c6575d6e9f82590484677d347",
+  "source_pdf_bytes": 80290,
+  "source_pdf_title": "2025 Schedule SE (Form 1040)",
+  "fetched_at": "2026-04-11",
+  "pypdf_version": "5.9.0",
+  "form_year": 2025,
+  "schedule": "SE",
+  "total_widgets": 27,
+  "mapped_count": 22,
+  "unmapped_count": 5,
+  "notes": [
+    "Schedule SE (Form 1040) AcroForm widget map for the IRS-hosted TY2025 PDF (PDF /Title metadata: '2025 Schedule SE (Form 1040)').",
+    "TY2024-vs-TY2025 deltas: none observed for the line layout. Schedule SE has not had substantive line changes since the 2020 restructure that combined the long/short forms. The SS wage base on line 7 increases yearly (TY2025: $176,100; SSA 2024-10-10 press release).",
+    "Page 1 carries Part I (lines 1a-13) \u2014 the taxpayer-facing SE tax calculation. Layer 1 ScheduleSEFields covers all 22 line widgets on page 1.",
+    "Page 2 (Part II \u2014 optional methods, lines 14-17) is left in unmapped_widgets. Most filers never elect optional methods; modeling them is a follow-up.",
+    "Layer 1 always writes ZERO to lines 1a, 1b, 4b, 5a, 5b, 8b, 8c (deferred features: farm income, CRP payments, optional methods, church employee income, Form 4137 tips, Form 8919 wages). The widgets are mapped so the renderer writes a 0 \u2014 same convention as Form 1040 widgets that Layer 1 has a value for but always 0.",
+    "Line 7 (SS wage base) is a CONSTANT for TY2025 ($176,100). Layer 1 writes the constant. Future years require updating SS_WAGE_BASE_TY2025 in skill/scripts/output/schedule_se.py."
+  ],
+  "mapping": {
+    "taxpayer_name": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_1[0]",
+      "terminal_name": "f1_1[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        36.0,
+        684.0,
+        359.25,
+        698.001
+      ],
+      "note": "Name of person with self-employment income."
+    },
+    "taxpayer_ssn": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_2[0]",
+      "terminal_name": "f1_2[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        489.6,
+        684.0,
+        576.0,
+        707.001
+      ],
+      "note": "SSN of the SE filer (Schedule SE is per-person; on MFJ each spouse files their own)."
+    },
+    "line_1a_net_farm_profit": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_3[0]",
+      "terminal_name": "f1_3[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        588.002,
+        576.0,
+        600.001
+      ],
+      "note": "Schedule F line 34 / K-1 box 14 code A; Layer 1 always 0 (Sch F not modeled)."
+    },
+    "line_1b_ss_farm_optional": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_4[0]",
+      "terminal_name": "f1_4[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        508.0,
+        564.001,
+        573.0,
+        576.0
+      ],
+      "note": "Conservation Reserve Program payments included on Schedule F line 4b; Layer 1 always 0."
+    },
+    "line_2_net_profit_schedule_c": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_5[0]",
+      "terminal_name": "f1_5[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        528.001,
+        576.0,
+        540.0
+      ],
+      "note": "Schedule C line 31 (taxpayer's businesses only on this Schedule SE)."
+    },
+    "line_3_combine_1a_1b_2": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_6[0]",
+      "terminal_name": "f1_6[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        516.002,
+        576.0,
+        528.001
+      ],
+      "note": "Combine 1a, 1b, 2."
+    },
+    "line_4a_net_earnings_times_9235": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_7[0]",
+      "terminal_name": "f1_7[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        504.0,
+        576.0,
+        515.999
+      ],
+      "note": "Line 3 \u00d7 92.35%."
+    },
+    "line_4b_optional_methods": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_8[0]",
+      "terminal_name": "f1_8[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        480.002,
+        576.0,
+        492.001
+      ],
+      "note": "From line 17 (optional methods); Layer 1 always 0."
+    },
+    "line_4c_combine_4a_4b": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_9[0]",
+      "terminal_name": "f1_9[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        456.001,
+        576.0,
+        468.0
+      ],
+      "note": "4a + 4b."
+    },
+    "line_5a_church_employee_income": {
+      "widget_name": "topmostSubform[0].Page1[0].Line5a_ReadOrder[0].f1_10[0]",
+      "terminal_name": "f1_10[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        432.0,
+        481.65,
+        443.999
+      ],
+      "note": "From W-2 box 14 (church employee income); Layer 1 always 0."
+    },
+    "line_5b_church_times_9235": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_11[0]",
+      "terminal_name": "f1_11[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        420.001,
+        576.0,
+        432.0
+      ],
+      "note": "5a \u00d7 92.35%."
+    },
+    "line_6_net_earnings_from_se": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_12[0]",
+      "terminal_name": "f1_12[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        408.002,
+        576.0,
+        420.001
+      ],
+      "note": "4c + 5b."
+    },
+    "line_7_ss_wage_base": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_13[0]",
+      "terminal_name": "f1_13[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        575.0,
+        384.001,
+        576.0,
+        396.0
+      ],
+      "note": "Maximum income subject to SS \u2014 TY2025 is $176,100. The IRS PDF has a widget here even though the value is fixed; we write the constant from `SS_WAGE_BASE_TY2025`."
+    },
+    "line_8a_w2_ss_wages_and_tips": {
+      "widget_name": "topmostSubform[0].Page1[0].Line8a_ReadOrder[0].f1_14[0]",
+      "terminal_name": "f1_14[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        348.001,
+        481.65,
+        360.0
+      ],
+      "note": "From W-2 box 3 + box 7 (taxpayer's W-2s only)."
+    },
+    "line_8b_unreported_tips": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_15[0]",
+      "terminal_name": "f1_15[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        336.002,
+        481.65,
+        348.001
+      ],
+      "note": "From Form 4137; Layer 1 always 0."
+    },
+    "line_8c_wages_8919": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_16[0]",
+      "terminal_name": "f1_16[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        324.0,
+        481.65,
+        335.999
+      ],
+      "note": "From Form 8919; Layer 1 always 0."
+    },
+    "line_8d_sum_8a_8b_8c": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_17[0]",
+      "terminal_name": "f1_17[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        312.001,
+        576.0,
+        324.0
+      ],
+      "note": "8a + 8b + 8c."
+    },
+    "line_9_subtract_8d_from_7": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_18[0]",
+      "terminal_name": "f1_18[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        300.002,
+        576.0,
+        312.001
+      ],
+      "note": "Line 7 - line 8d (room under SS wage base)."
+    },
+    "line_10_ss_portion": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_19[0]",
+      "terminal_name": "f1_19[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        288.0,
+        576.0,
+        299.999
+      ],
+      "note": "min(line 6, line 9) \u00d7 12.4%."
+    },
+    "line_11_medicare_portion": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_20[0]",
+      "terminal_name": "f1_20[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        276.001,
+        576.0,
+        288.0
+      ],
+      "note": "Line 6 \u00d7 2.9% (no cap)."
+    },
+    "line_12_se_tax": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_21[0]",
+      "terminal_name": "f1_21[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        252.0,
+        576.0,
+        263.999
+      ],
+      "note": "Line 10 + line 11 = total SE tax."
+    },
+    "line_13_deductible_half_se_tax": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_22[0]",
+      "terminal_name": "f1_22[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        216.0,
+        481.65,
+        227.999
+      ],
+      "note": "Line 12 \u00d7 50% \u2014 above-the-line adjustment per IRC \u00a7164(f)."
+    }
+  },
+  "unmapped_widgets": [
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_1[0]",
+      "terminal_name": "c1_1[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        565.0,
+        626.002,
+        573.0,
+        634.002
+      ],
+      "reason": "header_optional_method_checkbox \u2014 checkbox 'You had church employee income of $108.28 or more' (Schedule SE intro flag); not in Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_1[0]",
+      "terminal_name": "f2_1[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        575.0,
+        696.002,
+        576.0,
+        708.001
+      ],
+      "reason": "page2_optional_methods_part_ii \u2014 Schedule SE Part II (lines 14-17 farm/non-farm optional methods); Layer 1 does not model optional methods."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_2[0]",
+      "terminal_name": "f2_2[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        672.001,
+        576.0,
+        684.0
+      ],
+      "reason": "page2_optional_methods_part_ii \u2014 Schedule SE Part II (lines 14-17 farm/non-farm optional methods); Layer 1 does not model optional methods."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_3[0]",
+      "terminal_name": "f2_3[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        624.002,
+        576.0,
+        636.001
+      ],
+      "reason": "page2_optional_methods_part_ii \u2014 Schedule SE Part II (lines 14-17 farm/non-farm optional methods); Layer 1 does not model optional methods."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_4[0]",
+      "terminal_name": "f2_4[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        600.001,
+        576.0,
+        612.0
+      ],
+      "reason": "page2_optional_methods_part_ii \u2014 Schedule SE Part II (lines 14-17 farm/non-farm optional methods); Layer 1 does not model optional methods."
+    }
+  ]
+}

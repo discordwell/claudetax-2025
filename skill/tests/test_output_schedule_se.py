@@ -529,13 +529,22 @@ def test_se_home_office_cross_verify_against_engine_other_taxes(
 
 
 # ---------------------------------------------------------------------------
-# Layer 2: PDF rendering scaffold
+# Layer 2: AcroForm overlay PDF rendering (wave 5)
 # ---------------------------------------------------------------------------
 
 
-def test_render_scaffold_produces_readable_pdf(tmp_path: Path) -> None:
+def _load_widget_value(out_path: Path, terminal_substring: str):
     pypdf = pytest.importorskip("pypdf")
+    reader = pypdf.PdfReader(str(out_path))
+    fields = reader.get_fields() or {}
+    for k, v in fields.items():
+        if terminal_substring in k:
+            return v.get("/V")
+    return None
 
+
+def test_render_layer2_produces_non_empty_pdf(tmp_path: Path) -> None:
+    """The filled IRS Schedule SE PDF must be substantially-sized and on disk."""
     return_ = _return_with_net_profit("90000.00")
     fields = compute_schedule_se_fields(return_)
 
@@ -544,17 +553,84 @@ def test_render_scaffold_produces_readable_pdf(tmp_path: Path) -> None:
 
     assert result_path == out_path
     assert out_path.exists()
-    assert out_path.stat().st_size > 0
+    # IRS f1040sse.pdf is ~80 KB; the filled output is comparable.
+    assert out_path.stat().st_size > 50_000
 
-    reader = pypdf.PdfReader(str(out_path))
-    assert len(reader.pages) >= 1
-    text = "".join(page.extract_text() or "" for page in reader.pages)
 
-    assert "Schedule SE" in text
-    assert "SCAFFOLD" in text
-    # Should show at least one numeric value from the computed lines
-    # (90,000 schedule C net profit, or 12,716 SE tax).
-    assert ("90,000" in text) or ("12,716" in text) or ("176,100" in text)
+def test_render_layer2_round_trip_line_2_net_profit(tmp_path: Path) -> None:
+    """Line 2 (Schedule C net profit) must round-trip through the filled PDF."""
+    return_ = _return_with_net_profit("90000.00")
+    fields = compute_schedule_se_fields(return_)
+    assert fields.line_2_net_profit_schedule_c == Decimal("90000.00")
+
+    out_path = tmp_path / "round_trip_line_2.pdf"
+    render_schedule_se_pdf(fields, out_path)
+
+    # f1_5 = line 2
+    assert _load_widget_value(out_path, "f1_5[") == "90000.00"
+
+
+def test_render_layer2_round_trip_line_12_se_tax(tmp_path: Path) -> None:
+    """Line 12 (total SE tax) must round-trip through the filled PDF."""
+    return_ = _return_with_net_profit("90000.00")
+    fields = compute_schedule_se_fields(return_)
+    # Hand-computed: 12,716.595 → quantized to 12716.60
+    assert fields.line_12_se_tax == Decimal("12716.59500000")
+
+    out_path = tmp_path / "round_trip_line_12.pdf"
+    render_schedule_se_pdf(fields, out_path)
+
+    # f1_21 = line 12 SE tax
+    assert _load_widget_value(out_path, "f1_21[") == "12716.60"
+
+
+def test_render_layer2_round_trip_line_13_half_se_tax(tmp_path: Path) -> None:
+    """Line 13 (½ SE tax above-the-line deduction) must round-trip."""
+    return_ = _return_with_net_profit("90000.00")
+    fields = compute_schedule_se_fields(return_)
+
+    out_path = tmp_path / "round_trip_line_13.pdf"
+    render_schedule_se_pdf(fields, out_path)
+
+    # f1_22 = line 13 deductible half SE tax
+    assert _load_widget_value(out_path, "f1_22[") == "6358.30"
+
+
+def test_render_layer2_round_trip_line_7_ss_wage_base(tmp_path: Path) -> None:
+    """Line 7 (SS wage base) is the TY2025 constant $176,100; should round-trip."""
+    return_ = _return_with_net_profit("90000.00")
+    fields = compute_schedule_se_fields(return_)
+    assert fields.line_7_ss_wage_base == Decimal("176100")
+
+    out_path = tmp_path / "round_trip_line_7.pdf"
+    render_schedule_se_pdf(fields, out_path)
+
+    # f1_13 = line 7
+    assert _load_widget_value(out_path, "f1_13[") == "176100.00"
+
+
+def test_render_layer2_round_trip_taxpayer_name_and_ssn(tmp_path: Path) -> None:
+    return_ = _return_with_net_profit("5000.00")
+    fields = compute_schedule_se_fields(return_)
+
+    out_path = tmp_path / "name_ssn.pdf"
+    render_schedule_se_pdf(fields, out_path)
+
+    assert _load_widget_value(out_path, "f1_1[") == "Pat Testerson"
+    assert _load_widget_value(out_path, "f1_2[") == "333-22-1111"
+
+
+def test_render_layer2_zero_se_tax_blank_widgets(tmp_path: Path) -> None:
+    """When net profit is 0, line 12 SE tax should be blank (not '0.00')."""
+    return_ = _return_with_net_profit("0.00")
+    fields = compute_schedule_se_fields(return_)
+    assert fields.line_12_se_tax == Decimal("0")
+
+    out_path = tmp_path / "zero_se.pdf"
+    render_schedule_se_pdf(fields, out_path)
+
+    # f1_21 = line 12; should be blank (None) for zero values
+    assert _load_widget_value(out_path, "f1_21[") in (None, "")
 
 
 def test_render_creates_parent_dirs(tmp_path: Path) -> None:
@@ -566,6 +642,24 @@ def test_render_creates_parent_dirs(tmp_path: Path) -> None:
     assert not nested.parent.exists()
     render_schedule_se_pdf(fields, nested)
     assert nested.exists()
+
+
+def test_render_layer2_raises_on_sha_mismatch(monkeypatch, tmp_path: Path) -> None:
+    """If the IRS PDF SHA-256 changes (silent re-issue), raise RuntimeError."""
+    from skill.scripts.output import schedule_se as sse
+
+    bad_sha = "deadbeef" * 8
+    real_map = json.loads(sse._SCHEDULE_SE_MAP_PATH.read_text())
+    real_map["source_pdf_sha256"] = bad_sha
+    fake_map_path = tmp_path / "fake_map.json"
+    fake_map_path.write_text(json.dumps(real_map))
+    monkeypatch.setattr(sse, "_SCHEDULE_SE_MAP_PATH", fake_map_path)
+
+    return_ = _return_with_net_profit("10000.00")
+    fields = compute_schedule_se_fields(return_)
+
+    with pytest.raises(RuntimeError, match="SHA-256 mismatch"):
+        sse.render_schedule_se_pdf(fields, tmp_path / "out.pdf")
 
 
 def test_fields_is_frozen_dataclass() -> None:

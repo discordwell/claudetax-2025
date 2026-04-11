@@ -382,15 +382,24 @@ def test_simple_w2_standard_fixture_has_no_schedule_b(fixtures_dir: Path) -> Non
 
 
 # ---------------------------------------------------------------------------
-# Layer 2: PDF rendering (reportlab scaffold)
+# Layer 2: AcroForm overlay PDF rendering (wave 5)
 # ---------------------------------------------------------------------------
 
 
-def test_render_scaffold_produces_readable_pdf(
+def _load_widget_value(out_path: Path, terminal_substring: str):
+    pypdf = pytest.importorskip("pypdf")
+    reader = pypdf.PdfReader(str(out_path))
+    fields = reader.get_fields() or {}
+    for k, v in fields.items():
+        if terminal_substring in k:
+            return v.get("/V")
+    return None
+
+
+def test_render_layer2_produces_non_empty_pdf(
     fixtures_dir: Path, tmp_path: Path
 ) -> None:
-    pypdf = pytest.importorskip("pypdf")
-
+    """The filled IRS Schedule B PDF must be substantially-sized and on disk."""
     r = _load_fixture(fixtures_dir, "w2_investments_itemized")
     fields = compute_schedule_b_fields(r)
 
@@ -399,29 +408,80 @@ def test_render_scaffold_produces_readable_pdf(
 
     assert result_path == out_path
     assert out_path.exists()
-    assert out_path.stat().st_size > 0
-
-    reader = pypdf.PdfReader(str(out_path))
-    assert len(reader.pages) >= 1
-    text = "".join(page.extract_text() or "" for page in reader.pages)
-
-    assert "Schedule B" in text
-    assert "Part I" in text
-    assert "Part II" in text
-    assert "Part III" in text
-    # Payer names from the fixture should appear in the rendered text.
-    assert "Big Bank" in text
-    assert "Index Fund" in text
-    # At least one line-amount should render in thousands-separator format.
-    assert ("3,000" in text) or ("3000" in text)
+    # IRS f1040sb.pdf is ~76 KB; the filled output is comparable.
+    assert out_path.stat().st_size > 50_000
 
 
-def test_render_empty_schedule_b_still_renders(tmp_path: Path) -> None:
-    """Even when Schedule B is NOT required, Layer 2 must not crash on
-    an empty-rows scaffold — callers may still want to dump a blank
-    scaffold for QA purposes."""
-    pypdf = pytest.importorskip("pypdf")
+def test_render_layer2_round_trip_line_4_taxable_interest(
+    fixtures_dir: Path, tmp_path: Path
+) -> None:
+    """Line 4 (taxable interest) must round-trip through the filled PDF."""
+    r = _load_fixture(fixtures_dir, "w2_investments_itemized")
+    fields = compute_schedule_b_fields(r)
+    assert fields.part_i_line_4_taxable_interest == Decimal("3000.00")
 
+    out_path = tmp_path / "round_trip_line_4.pdf"
+    render_schedule_b_pdf(fields, out_path)
+
+    assert _load_widget_value(out_path, "f1_33[") == "3000.00"
+
+
+def test_render_layer2_round_trip_line_6_total_dividends(
+    fixtures_dir: Path, tmp_path: Path
+) -> None:
+    """Line 6 (total dividends) must round-trip through the filled PDF."""
+    r = _load_fixture(fixtures_dir, "w2_investments_itemized")
+    fields = compute_schedule_b_fields(r)
+    assert fields.part_ii_line_6_total_ordinary_dividends == Decimal("5000.00")
+
+    out_path = tmp_path / "round_trip_line_6.pdf"
+    render_schedule_b_pdf(fields, out_path)
+
+    assert _load_widget_value(out_path, "f1_64[") == "5000.00"
+
+
+def test_render_layer2_part_i_row_widgets_filled(
+    fixtures_dir: Path, tmp_path: Path
+) -> None:
+    """Each Part I row should land in the indexed payer/amount widget pair."""
+    r = _load_fixture(fixtures_dir, "w2_investments_itemized")
+    fields = compute_schedule_b_fields(r)
+    assert len(fields.part_i_line_1_rows) >= 1
+    assert fields.part_i_line_1_rows[0].payer_name == "Big Bank"
+    assert fields.part_i_line_1_rows[0].amount == Decimal("3000.00")
+
+    out_path = tmp_path / "row_widgets.pdf"
+    render_schedule_b_pdf(fields, out_path)
+
+    # Row 0 in the JSON map: payer = f1_03, amount = f1_04.
+    assert _load_widget_value(out_path, "f1_03[") == "Big Bank"
+    assert _load_widget_value(out_path, "f1_04[") == "3000.00"
+
+
+def test_render_layer2_part_iii_foreign_account_yes(tmp_path: Path) -> None:
+    """When Part III line 7a foreign account is True, the Yes checkbox is set."""
+    r = CanonicalReturn.model_validate({
+        **_base_return_payload(),
+        "has_foreign_financial_account_over_10k": True,
+        "foreign_account_countries": ["FR"],
+    })
+    fields = compute_schedule_b_fields(r)
+    assert fields.part_iii_line_7a_foreign_account is True
+    assert fields.part_iii_line_7b_fincen114_country == "FR"
+
+    out_path = tmp_path / "foreign_account.pdf"
+    render_schedule_b_pdf(fields, out_path)
+
+    # f1_65 = country widget
+    assert _load_widget_value(out_path, "f1_65[") == "FR"
+
+
+def test_render_layer2_empty_schedule_b_renders_blank(tmp_path: Path) -> None:
+    """An empty Schedule B should still produce a valid filled PDF (blank lines).
+
+    Even when Schedule B is NOT required, callers may still want a blank
+    PDF for QA purposes — Layer 2 should not crash on empty rows.
+    """
     r = _return_with()
     fields = compute_schedule_b_fields(r)
     assert fields.is_required is False
@@ -429,11 +489,41 @@ def test_render_empty_schedule_b_still_renders(tmp_path: Path) -> None:
     out_path = tmp_path / "empty_schedule_b.pdf"
     render_schedule_b_pdf(fields, out_path)
     assert out_path.exists()
-    assert out_path.stat().st_size > 0
+    assert out_path.stat().st_size > 50_000
 
-    reader = pypdf.PdfReader(str(out_path))
-    text = "".join(page.extract_text() or "" for page in reader.pages)
-    assert "Schedule B" in text
+    # All numeric line widgets should remain blank.
+    assert _load_widget_value(out_path, "f1_33[") in (None, "")
+    assert _load_widget_value(out_path, "f1_64[") in (None, "")
+
+
+def test_render_layer2_taxpayer_name_round_trip(tmp_path: Path) -> None:
+    r = _return_with(
+        forms_1099_int=[
+            {"payer_name": "Big Bank", "box1_interest_income": "100.00"},
+        ],
+    )
+    fields = compute_schedule_b_fields(r)
+    out_path = tmp_path / "name.pdf"
+    render_schedule_b_pdf(fields, out_path)
+    assert _load_widget_value(out_path, "f1_01[") == "Ivy Investor"
+
+
+def test_render_layer2_raises_on_sha_mismatch(monkeypatch, tmp_path: Path) -> None:
+    """If the IRS PDF SHA-256 changes (silent re-issue), raise RuntimeError."""
+    from skill.scripts.output import schedule_b as sb
+
+    bad_sha = "deadbeef" * 8
+    real_map = json.loads(sb._SCHEDULE_B_MAP_PATH.read_text())
+    real_map["source_pdf_sha256"] = bad_sha
+    fake_map_path = tmp_path / "fake_map.json"
+    fake_map_path.write_text(json.dumps(real_map))
+    monkeypatch.setattr(sb, "_SCHEDULE_B_MAP_PATH", fake_map_path)
+
+    r = _return_with()
+    fields = compute_schedule_b_fields(r)
+
+    with pytest.raises(RuntimeError, match="SHA-256 mismatch"):
+        sb.render_schedule_b_pdf(fields, tmp_path / "out.pdf")
 
 
 # ---------------------------------------------------------------------------

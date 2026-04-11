@@ -430,71 +430,175 @@ def test_simple_w2_standard_fixture_has_no_itemized(fixtures_dir: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Layer 2: PDF rendering (reportlab scaffold)
+# Layer 2: AcroForm overlay PDF rendering (wave 5)
 # ---------------------------------------------------------------------------
 
 
-def test_render_scaffold_produces_non_empty_pdf(tmp_path: Path) -> None:
-    """Render a scaffold PDF at a tempfile path and assert it's non-empty."""
+def _load_widget_value(out_path: Path, terminal_substring: str):
+    """Look up a filled widget value from a freshly-written Schedule A PDF.
+
+    Returns the string value (or None) of the first widget whose
+    pypdf-reported field key contains ``terminal_substring`` (e.g.
+    ``"f1_11["`` for line 5e).
+    """
+    pypdf = pytest.importorskip("pypdf")
+    reader = pypdf.PdfReader(str(out_path))
+    fields = reader.get_fields() or {}
+    for k, v in fields.items():
+        if terminal_substring in k:
+            return v.get("/V")
+    return None
+
+
+def test_render_layer2_produces_non_empty_pdf(tmp_path: Path) -> None:
+    """Render via the AcroForm overlay and assert the output is non-empty."""
     it = ItemizedDeductions(
         state_and_local_income_tax=Decimal("15000"),
         real_estate_tax=Decimal("8000"),
         home_mortgage_interest=Decimal("20000"),
         gifts_to_charity_cash=Decimal("5000"),
     )
-    r = _minimal_return(filing_status=FilingStatus.MFJ, itemized=it, spouse=_person("Spouse", "Two"))
+    r = _minimal_return(
+        filing_status=FilingStatus.MFJ, itemized=it, spouse=_person("Spouse", "Two")
+    )
     fields = compute_schedule_a_fields(r)
 
-    out_path = tmp_path / "schedule_a_scaffold.pdf"
+    out_path = tmp_path / "schedule_a_overlay.pdf"
     result = render_schedule_a_pdf(fields, out_path)
 
     assert result == out_path
     assert out_path.exists()
-    assert out_path.stat().st_size > 0
+    # The IRS source PDF is ~79 KB; a filled PDF is comparable in size.
+    assert out_path.stat().st_size > 50_000
 
 
-def test_render_scaffold_pdf_is_readable(fixtures_dir: Path, tmp_path: Path) -> None:
-    """Reopen the scaffold PDF with pypdf and check the header + a value."""
-    pypdf = pytest.importorskip("pypdf")
+def test_render_layer2_round_trip_line_5e_salt_cap(tmp_path: Path) -> None:
+    """SALT cap on line 5e must round-trip through the filled IRS PDF.
 
+    Hand-crafted MFJ return with $15k state income + $8k real estate
+    -> raw SALT 23000 -> capped 10000. The widget at line 5e
+    (terminal f1_11) must read back as ``"10000.00"``.
+    """
+    it = ItemizedDeductions(
+        state_and_local_income_tax=Decimal("15000"),
+        real_estate_tax=Decimal("8000"),
+    )
+    r = _minimal_return(filing_status=FilingStatus.MFJ, itemized=it)
+    fields = compute_schedule_a_fields(r)
+    assert fields.line_5e_salt_capped == Decimal("10000")
+
+    out_path = tmp_path / "round_trip_5e.pdf"
+    render_schedule_a_pdf(fields, out_path)
+
+    assert _load_widget_value(out_path, "f1_11[") == "10000.00"
+
+
+def test_render_layer2_round_trip_w2_itemized_fixture(
+    fixtures_dir: Path, tmp_path: Path
+) -> None:
+    """Golden fixture: round-trip multiple lines through the filled PDF.
+
+    The shipped ``w2_investments_itemized`` MFJ fixture lands at:
+        line 5a 15000, line 5b 8000, line 5d 23000, line 5e 10000,
+        line 7 10000, line 8a 20000, line 17 35000.
+    Each of those values should appear in the filled PDF.
+    """
     return_ = _load_fixture(fixtures_dir, "w2_investments_itemized")
     computed = compute(return_)
     fields = compute_schedule_a_fields(computed)
 
-    out_path = tmp_path / "test_schedule_a.pdf"
+    out_path = tmp_path / "fixture_round_trip.pdf"
     render_schedule_a_pdf(fields, out_path)
 
-    reader = pypdf.PdfReader(str(out_path))
-    assert len(reader.pages) >= 1
-    text = "".join(page.extract_text() or "" for page in reader.pages)
+    # f1_7 = line 5a state/local income, f1_8 = 5b real estate,
+    # f1_10 = 5d, f1_11 = 5e, f1_14 = line 7, f1_15 = 8a, f1_30 = line 17
+    assert _load_widget_value(out_path, "f1_7[") == "15000.00"
+    assert _load_widget_value(out_path, "f1_8[") == "8000.00"
+    assert _load_widget_value(out_path, "f1_10[") == "23000.00"
+    assert _load_widget_value(out_path, "f1_11[") == "10000.00"
+    assert _load_widget_value(out_path, "f1_14[") == "10000.00"
+    assert _load_widget_value(out_path, "f1_15[") == "20000.00"
+    assert _load_widget_value(out_path, "f1_30[") == "35000.00"
 
-    assert "Schedule A" in text
-    # SALT cap label should appear in the header block.
-    assert "SALT" in text
-    # Should show the SALT-capped amount somewhere.
-    assert ("10,000" in text) or ("10000" in text)
 
+def test_render_layer2_zero_lines_blank(tmp_path: Path) -> None:
+    """Lines that Layer 1 leaves at 0 should produce blank widgets, not '0.00'.
 
-def test_render_scaffold_pdf_lists_all_line_fields(fixtures_dir: Path, tmp_path: Path) -> None:
-    """The scaffold table should list every Decimal field as a row."""
-    pypdf = pytest.importorskip("pypdf")
+    This keeps the printed form visually identical to a freshly-downloaded
+    blank in cells the filer doesn't use (e.g. casualty and theft on most
+    returns).
+    """
+    it = ItemizedDeductions(
+        state_and_local_income_tax=Decimal("5000"),
+    )
+    r = _minimal_return(filing_status=FilingStatus.SINGLE, itemized=it)
+    fields = compute_schedule_a_fields(r)
+    assert fields.line_15_casualty_and_theft == Decimal("0")
 
-    return_ = _load_fixture(fixtures_dir, "w2_investments_itemized")
-    computed = compute(return_)
-    fields = compute_schedule_a_fields(computed)
-
-    out_path = tmp_path / "test_schedule_a_lines.pdf"
+    out_path = tmp_path / "blank_lines.pdf"
     render_schedule_a_pdf(fields, out_path)
 
-    reader = pypdf.PdfReader(str(out_path))
-    text = "".join(page.extract_text() or "" for page in reader.pages)
+    # Line 15 should be blank (None), not "0.00".
+    assert _load_widget_value(out_path, "f1_27[") in (None, "")
 
-    # Spot-check a few line numbers / descriptions from the parsed header.
-    assert "Line" in text
-    assert "Description" in text
-    assert "Amount" in text
-    # Total line should appear.
-    assert "17" in text
+
+def test_render_layer2_taxpayer_name_round_trip(tmp_path: Path) -> None:
+    """The header name widget should carry the Layer 1 taxpayer_name string."""
+    it = ItemizedDeductions(state_and_local_income_tax=Decimal("5000"))
+    r = _minimal_return(filing_status=FilingStatus.SINGLE, itemized=it)
+    fields = compute_schedule_a_fields(r)
+    assert fields.taxpayer_name == "Test Payer"
+
+    out_path = tmp_path / "name.pdf"
+    render_schedule_a_pdf(fields, out_path)
+
+    assert _load_widget_value(out_path, "f1_1[") == "Test Payer"
+
+
+def test_render_layer2_raises_when_source_pdf_missing(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Pre-flight check: if the IRS source PDF is missing, raise RuntimeError."""
+    from skill.scripts.output import schedule_a as sa
+
+    bogus = tmp_path / "missing.pdf"
+    monkeypatch.setattr(sa, "_SCHEDULE_A_PDF_PATH", bogus)
+
+    it = ItemizedDeductions(state_and_local_income_tax=Decimal("5000"))
+    r = _minimal_return(filing_status=FilingStatus.SINGLE, itemized=it)
+    fields = compute_schedule_a_fields(r)
+
+    with pytest.raises(RuntimeError, match="missing"):
+        sa.render_schedule_a_pdf(fields, tmp_path / "out.pdf")
+
+
+def test_render_layer2_raises_on_sha_mismatch(monkeypatch, tmp_path: Path) -> None:
+    """If the IRS PDF SHA-256 changes (silent re-issue), raise RuntimeError."""
+    from skill.scripts.output import schedule_a as sa
+    from skill.scripts.output._acroform_overlay import verify_pdf_sha256
+
+    # A wrong SHA: should never match a real PDF.
+    bad_sha = "deadbeef" * 8
+
+    def _bad_verify(pdf, sha):
+        return verify_pdf_sha256(pdf, bad_sha)
+
+    monkeypatch.setattr(sa, "verify_pdf_sha256", _bad_verify, raising=False)
+    # We'll instead force the map JSON's SHA to bad value.
+    import json as _json
+
+    real_map = _json.loads(sa._SCHEDULE_A_MAP_PATH.read_text())
+    real_map["source_pdf_sha256"] = bad_sha
+    fake_map_path = tmp_path / "fake_map.json"
+    fake_map_path.write_text(_json.dumps(real_map))
+    monkeypatch.setattr(sa, "_SCHEDULE_A_MAP_PATH", fake_map_path)
+
+    it = ItemizedDeductions(state_and_local_income_tax=Decimal("5000"))
+    r = _minimal_return(filing_status=FilingStatus.SINGLE, itemized=it)
+    fields = compute_schedule_a_fields(r)
+
+    with pytest.raises(RuntimeError, match="SHA-256 mismatch"):
+        sa.render_schedule_a_pdf(fields, tmp_path / "out.pdf")
 
 
 # ---------------------------------------------------------------------------

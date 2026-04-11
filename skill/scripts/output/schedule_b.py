@@ -300,197 +300,127 @@ def schedule_b_required(return_: CanonicalReturn) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Layer 2: reportlab PDF rendering (SCAFFOLD)
+# Layer 2: AcroForm overlay PDF rendering (wave 5)
 # ---------------------------------------------------------------------------
+#
+# Layer 2 was previously a reportlab tabular scaffold; wave 5 replaced
+# it with a real AcroForm overlay on the IRS fillable Schedule B PDF.
+# The widget map at ``skill/reference/schedule-b-acroform-map.json``
+# provides:
+#
+#   * ``mapping`` — single-cell line widgets (line 2/3/4 totals,
+#     line 6 total, Part III foreign-account / FinCEN / trust checkboxes,
+#     header taxpayer name).
+#   * ``part_i_line_1_rows_widgets`` — 14 indexed payer/amount widget
+#     pairs for Part I line 1.
+#   * ``part_ii_line_5_rows_widgets`` — 15 indexed payer/amount widget
+#     pairs for Part II line 5.
+#
+# Rows beyond the 14/15-row limit need a continuation statement and are
+# tracked as a follow-up.
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_SCHEDULE_B_MAP_PATH = (
+    _REPO_ROOT / "skill" / "reference" / "schedule-b-acroform-map.json"
+)
+_SCHEDULE_B_PDF_PATH = (
+    _REPO_ROOT / "skill" / "reference" / "irs_forms" / "f1040sb.pdf"
+)
 
 
 def _format_decimal(value: Decimal) -> str:
-    """Format a Decimal as a US currency-ish string ``1,500.00``."""
+    """Format a Decimal as a plain ``"1500.00"`` for AcroForm text fields.
+
+    Zero is rendered as the empty string so the IRS PDF stays visually
+    blank for cells the filer doesn't use.
+    """
     q = value.quantize(Decimal("0.01"))
-    return f"{q:,.2f}"
+    if q == Decimal("0.00"):
+        return ""
+    return f"{q:.2f}"
+
+
+def _build_widget_values(
+    fields: ScheduleBFields,
+    widget_map: dict,
+) -> dict[str, str]:
+    """Translate a ``ScheduleBFields`` snapshot to a widget_name->str dict."""
+    out: dict[str, str] = {}
+    mapping = widget_map["mapping"]
+
+    # Single-cell numeric / string lines
+    out[mapping["taxpayer_name"]["widget_name"]] = fields.taxpayer_name
+    out[mapping["part_i_line_2_total_interest"]["widget_name"]] = _format_decimal(
+        fields.part_i_line_2_total_interest
+    )
+    out[mapping["part_i_line_3_excludable_savings_bond_interest"]["widget_name"]] = (
+        _format_decimal(fields.part_i_line_3_excludable_savings_bond_interest)
+    )
+    out[mapping["part_i_line_4_taxable_interest"]["widget_name"]] = _format_decimal(
+        fields.part_i_line_4_taxable_interest
+    )
+    out[mapping["part_ii_line_6_total_ordinary_dividends"]["widget_name"]] = (
+        _format_decimal(fields.part_ii_line_6_total_ordinary_dividends)
+    )
+    out[mapping["part_iii_line_7b_fincen114_country"]["widget_name"]] = (
+        fields.part_iii_line_7b_fincen114_country or ""
+    )
+
+    # Part III checkboxes — Yes box only. Filling "" leaves it blank.
+    out[mapping["part_iii_line_7a_foreign_account"]["widget_name"]] = (
+        "Yes" if fields.part_iii_line_7a_foreign_account else ""
+    )
+    out[mapping["part_iii_line_7a_fincen114_required"]["widget_name"]] = (
+        "Yes" if fields.part_iii_line_7a_fincen114_required else ""
+    )
+    out[mapping["part_iii_line_8_foreign_trust"]["widget_name"]] = (
+        "Yes" if fields.part_iii_line_8_foreign_trust else ""
+    )
+
+    # Part I line 1 repeating rows
+    part_i_row_widgets = widget_map.get("part_i_line_1_rows_widgets", [])
+    for i, row in enumerate(fields.part_i_line_1_rows):
+        if i >= len(part_i_row_widgets):
+            # Continuation statement needed; bail out (do not raise — the
+            # IRS PDF can still be rendered with the first 14 rows).
+            break
+        slot = part_i_row_widgets[i]
+        out[slot["payer_widget"]["widget_name"]] = row.payer_name
+        out[slot["amount_widget"]["widget_name"]] = _format_decimal(row.amount)
+
+    # Part II line 5 repeating rows
+    part_ii_row_widgets = widget_map.get("part_ii_line_5_rows_widgets", [])
+    for i, row in enumerate(fields.part_ii_line_5_rows):
+        if i >= len(part_ii_row_widgets):
+            break
+        slot = part_ii_row_widgets[i]
+        out[slot["payer_widget"]["widget_name"]] = row.payer_name
+        out[slot["amount_widget"]["widget_name"]] = _format_decimal(row.amount)
+
+    return out
 
 
 def render_schedule_b_pdf(fields: ScheduleBFields, out_path: Path) -> Path:
-    """Render a Schedule B SCAFFOLD PDF using reportlab.
+    """Render a Schedule B PDF by overlaying ``fields`` on the IRS fillable PDF.
 
-    This writes a tabular PDF listing Part I, Part II, and Part III. It
-    is NOT a filled IRS Schedule B — real AcroForm overlay on the IRS
-    fillable PDF is a follow-up task that will need a researched widget
-    map.
+    Loads the wave-5 widget map, validates the on-disk source PDF
+    SHA-256, fills the widgets via
+    ``skill.scripts.output._acroform_overlay.fill_acroform_pdf``, and
+    writes to ``out_path``. Raises ``RuntimeError`` if the source PDF is
+    missing or has been re-issued (SHA mismatch).
 
     Returns ``out_path`` for convenience.
     """
-    # Lazy import so Layer 1 can be exercised without reportlab.
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import letter
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.platypus import (
-        Paragraph,
-        SimpleDocTemplate,
-        Spacer,
-        Table,
-        TableStyle,
+    from skill.scripts.output._acroform_overlay import (
+        fill_acroform_pdf,
+        load_widget_map_as_dict,
+        verify_pdf_sha256,
     )
 
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    doc = SimpleDocTemplate(
-        str(out_path),
-        pagesize=letter,
-        title="Schedule B (TY2025 SCAFFOLD)",
-    )
-    styles = getSampleStyleSheet()
-
-    story: list = []
-    story.append(
-        Paragraph("Schedule B (Form 1040) - TY2025 SCAFFOLD", styles["Title"])
-    )
-    story.append(
-        Paragraph(
-            "This is a scaffold rendering, not a filed IRS form.",
-            styles["Italic"],
-        )
-    )
-    story.append(Spacer(1, 12))
-
-    # Header
-    header_rows = [
-        ["Taxpayer", fields.taxpayer_name],
-        ["SSN", fields.taxpayer_ssn],
-        ["Required?", "Yes" if fields.is_required else "No"],
-    ]
-    header_table = Table(header_rows, colWidths=[140, 360])
-    header_table.setStyle(
-        TableStyle(
-            [
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                ("BACKGROUND", (0, 0), (0, -1), colors.lightgrey),
-                ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ]
-        )
-    )
-    story.append(header_table)
-    story.append(Spacer(1, 12))
-
-    # Part I — Interest
-    story.append(Paragraph("Part I - Interest", styles["Heading2"]))
-    part_i_rows: list[list[str]] = [["Line", "Payer / Description", "Amount"]]
-    if fields.part_i_line_1_rows:
-        for row in fields.part_i_line_1_rows:
-            part_i_rows.append(["1", row.payer_name, _format_decimal(row.amount)])
-    else:
-        part_i_rows.append(["1", "(no interest reported)", _format_decimal(_ZERO)])
-    part_i_rows.append(
-        ["2", "Add the amounts on line 1",
-         _format_decimal(fields.part_i_line_2_total_interest)]
-    )
-    part_i_rows.append(
-        ["3", "Excludable US savings bond interest (Form 8815) [DEFERRED]",
-         _format_decimal(fields.part_i_line_3_excludable_savings_bond_interest)]
-    )
-    part_i_rows.append(
-        ["4", "Subtract line 3 from line 2 (to Form 1040 line 2b)",
-         _format_decimal(fields.part_i_line_4_taxable_interest)]
-    )
-    part_i_table = Table(part_i_rows, colWidths=[40, 360, 100])
-    part_i_table.setStyle(
-        TableStyle(
-            [
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
-                ("ALIGN", (2, 1), (2, -1), "RIGHT"),
-            ]
-        )
-    )
-    story.append(part_i_table)
-    story.append(Spacer(1, 12))
-
-    # Part II — Ordinary Dividends
-    story.append(Paragraph("Part II - Ordinary Dividends", styles["Heading2"]))
-    part_ii_rows: list[list[str]] = [["Line", "Payer / Description", "Amount"]]
-    if fields.part_ii_line_5_rows:
-        for row in fields.part_ii_line_5_rows:
-            part_ii_rows.append(["5", row.payer_name, _format_decimal(row.amount)])
-    else:
-        part_ii_rows.append(
-            ["5", "(no ordinary dividends reported)", _format_decimal(_ZERO)]
-        )
-    part_ii_rows.append(
-        ["6", "Add the amounts on line 5 (to Form 1040 line 3b)",
-         _format_decimal(fields.part_ii_line_6_total_ordinary_dividends)]
-    )
-    part_ii_table = Table(part_ii_rows, colWidths=[40, 360, 100])
-    part_ii_table.setStyle(
-        TableStyle(
-            [
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
-                ("ALIGN", (2, 1), (2, -1), "RIGHT"),
-            ]
-        )
-    )
-    story.append(part_ii_table)
-    story.append(Spacer(1, 12))
-
-    # Part III — Foreign Accounts and Trusts
-    story.append(
-        Paragraph("Part III - Foreign Accounts and Trusts", styles["Heading2"])
-    )
-    story.append(
-        Paragraph(
-            "SCAFFOLD: canonical model does not yet carry foreign account "
-            "flags; all Part III values default to No.",
-            styles["Italic"],
-        )
-    )
-    part_iii_rows: list[list[str]] = [
-        ["Line", "Question", "Answer"],
-        [
-            "7a",
-            "Foreign financial account at any time?",
-            "Yes" if fields.part_iii_line_7a_foreign_account else "No",
-        ],
-        [
-            "7a",
-            "FinCEN Form 114 required?",
-            "Yes" if fields.part_iii_line_7a_fincen114_required else "No",
-        ],
-        [
-            "7b",
-            "FinCEN 114 country name",
-            fields.part_iii_line_7b_fincen114_country or "-",
-        ],
-        [
-            "8",
-            "Foreign trust distribution / grantor / transferor?",
-            "Yes" if fields.part_iii_line_8_foreign_trust else "No",
-        ],
-    ]
-    part_iii_table = Table(part_iii_rows, colWidths=[40, 360, 100])
-    part_iii_table.setStyle(
-        TableStyle(
-            [
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
-                ("ALIGN", (2, 1), (2, -1), "LEFT"),
-            ]
-        )
-    )
-    story.append(part_iii_table)
-
-    doc.build(story)
-    return out_path
+    widget_map = load_widget_map_as_dict(_SCHEDULE_B_MAP_PATH)
+    verify_pdf_sha256(_SCHEDULE_B_PDF_PATH, widget_map["source_pdf_sha256"])
+    widget_values = _build_widget_values(fields, widget_map)
+    return fill_acroform_pdf(_SCHEDULE_B_PDF_PATH, widget_values, Path(out_path))
 
 
 __all__ = [

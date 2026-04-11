@@ -1,0 +1,445 @@
+{
+  "source_pdf_url": "https://www.irs.gov/pub/irs-pdf/f1040sa.pdf",
+  "source_pdf_sha256": "c14acf3478f4c33f27ac6e8ecd9f94b6fb25b16745b341728bd27847d2ef56bb",
+  "source_pdf_bytes": 79008,
+  "source_pdf_title": "2025 Schedule A (Form 1040)",
+  "fetched_at": "2026-04-11",
+  "pypdf_version": "5.9.0",
+  "form_year": 2025,
+  "schedule": "A",
+  "total_widgets": 33,
+  "mapped_count": 27,
+  "unmapped_count": 6,
+  "notes": [
+    "Schedule A (Form 1040) AcroForm widget map for the IRS-hosted TY2025 PDF (PDF /Title metadata is '2025 Schedule A (Form 1040)'). The IRS has already published the TY2025 fillable form at the canonical URL.",
+    "Widget enumeration walks /Annots on each page (NOT reader.get_fields(), which over-reports non-terminal containers). Sorted into visual reading order (page asc, rect_top desc, rect_left asc) before correlation.",
+    "TY2024-vs-TY2025 deltas: none observed for Schedule A line layout. Lines 1-17 match TY2024 verbatim. Line 5e SALT cap is permanent under OBBBA (was scheduled to sunset post-TY2025 under TCJA \u2014 see skill/scripts/calc/engine.SALT_CAP_NORMAL).",
+    "Schedule A uses TWO amount columns: an INTERMEDIATE column (x ~410-481) for sublines that feed into a section subtotal (e.g. 5a, 5b, 5c, 5d, 5e, 8a-8e, etc.) and a GRAND column (x ~504-576) for section subtotals that flow into line 17 (lines 4, 7, 10, 14, 15, and 17 itself). The widget map preserves this distinction in the rect coordinates.",
+    "Three widgets that pair a left-wide text descriptor with an amount input are scaffolded as 'descriptor' unmapped: f1_12 (line 6 descriptor), f1_16 (line 8b name/address), f1_28 (line 16 descriptor). Layer 1 ScheduleAFields only carries the amount; populating the descriptor is a follow-up.",
+    "Layer 1 stores 'filing_status' as a string but Schedule A has no filing-status widgets \u2014 the filing status is carried over from Form 1040. Likewise the SSN widget f1_2 is unmapped because Layer 1 does not duplicate the Form 1040 SSN here."
+  ],
+  "mapping": {
+    "taxpayer_name": {
+      "widget_name": "form1[0].Page1[0].f1_1[0]",
+      "terminal_name": "f1_1[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        36.0,
+        684.0,
+        474.45,
+        698.001
+      ],
+      "note": "Taxpayer name(s) shown on Form 1040 \u2014 schedule A header. Layer 1 stores 'taxpayer_name' as a single string; the PDF widget accepts the whole string."
+    },
+    "line_1_medical_and_dental": {
+      "widget_name": "form1[0].Page1[0].f1_3[0]",
+      "terminal_name": "f1_3[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        660.002,
+        481.65,
+        672.001
+      ]
+    },
+    "line_2_agi": {
+      "widget_name": "form1[0].Page1[0].Line2_ReadOrder[0].f1_4[0]",
+      "terminal_name": "f1_4[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        316.8,
+        636.001,
+        388.05,
+        648.0
+      ],
+      "note": "AGI carried from Form 1040 line 11; intermediate column."
+    },
+    "line_3_agi_floor": {
+      "widget_name": "form1[0].Page1[0].f1_5[0]",
+      "terminal_name": "f1_5[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        624.002,
+        481.65,
+        636.001
+      ],
+      "note": "Line 2 \u00d7 7.5%."
+    },
+    "line_4_medical_deductible": {
+      "widget_name": "form1[0].Page1[0].f1_6[0]",
+      "terminal_name": "f1_6[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        612.0,
+        576.0,
+        623.999
+      ],
+      "note": "Subtotal column (right-most)."
+    },
+    "line_5a_state_and_local_taxes": {
+      "widget_name": "form1[0].Page1[0].f1_7[0]",
+      "terminal_name": "f1_7[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        558.0,
+        481.65,
+        569.999
+      ],
+      "note": "State and local INCOME or SALES taxes; the elected_sales_tax flag drives the c1_1 checkbox."
+    },
+    "line_5a_elected_sales_tax": {
+      "widget_name": "form1[0].Page1[0].c1_1[0]",
+      "terminal_name": "c1_1[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        373.6,
+        560.0,
+        381.6,
+        568.0
+      ],
+      "note": "Check if line 5a is sales tax (not income tax)."
+    },
+    "line_5b_real_estate_taxes": {
+      "widget_name": "form1[0].Page1[0].f1_8[0]",
+      "terminal_name": "f1_8[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        546.001,
+        481.65,
+        558.0
+      ]
+    },
+    "line_5c_personal_property_taxes": {
+      "widget_name": "form1[0].Page1[0].f1_9[0]",
+      "terminal_name": "f1_9[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        534.002,
+        481.65,
+        546.001
+      ]
+    },
+    "line_5d_salt_subtotal": {
+      "widget_name": "form1[0].Page1[0].f1_10[0]",
+      "terminal_name": "f1_10[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        522.0,
+        481.65,
+        533.999
+      ],
+      "note": "Sum 5a-5c (intermediate column)."
+    },
+    "line_5e_salt_capped": {
+      "widget_name": "form1[0].Page1[0].f1_11[0]",
+      "terminal_name": "f1_11[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        474.001,
+        481.65,
+        486.0
+      ],
+      "note": "Smaller of line 5d or $10,000 ($5,000 MFS) \u2014 SALT cap, IRC \u00a7164(b)(6) (intermediate column)."
+    },
+    "line_6_other_taxes": {
+      "widget_name": "form1[0].Page1[0].f1_13[0]",
+      "terminal_name": "f1_13[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        438.001,
+        481.65,
+        450.0
+      ],
+      "note": "Amount column for line 6 'Other taxes'. The companion descriptor text input is f1_12[0] (left wide, scaffolded but not in Layer 1)."
+    },
+    "line_7_total_taxes": {
+      "widget_name": "form1[0].Page1[0].f1_14[0]",
+      "terminal_name": "f1_14[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        426.002,
+        576.0,
+        438.001
+      ],
+      "note": "Subtotal column: 5e + 6."
+    },
+    "line_8a_home_mortgage_interest_on_1098": {
+      "widget_name": "form1[0].Page1[0].f1_15[0]",
+      "terminal_name": "f1_15[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        366.001,
+        481.65,
+        378.0
+      ]
+    },
+    "line_8b_home_mortgage_interest_not_on_1098": {
+      "widget_name": "form1[0].Page1[0].f1_17[0]",
+      "terminal_name": "f1_17[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        324.0,
+        481.65,
+        335.999
+      ],
+      "note": "Amount column for line 8b. The companion name/address text widget is f1_16[0] (left wide, scaffolded)."
+    },
+    "line_8c_points_not_on_1098": {
+      "widget_name": "form1[0].Page1[0].f1_18[0]",
+      "terminal_name": "f1_18[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        276.001,
+        481.65,
+        288.0
+      ]
+    },
+    "line_8d_mortgage_insurance_premiums": {
+      "widget_name": "form1[0].Page1[0].f1_19[0]",
+      "terminal_name": "f1_19[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        264.002,
+        481.65,
+        276.001
+      ],
+      "note": "Reserved for future use; expired post-TY2021 \u2014 Layer 1 always writes 0."
+    },
+    "line_8e_total_home_mortgage_interest": {
+      "widget_name": "form1[0].Page1[0].f1_20[0]",
+      "terminal_name": "f1_20[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        252.0,
+        481.65,
+        263.999
+      ],
+      "note": "Sum 8a-8c (intermediate column)."
+    },
+    "line_9_investment_interest": {
+      "widget_name": "form1[0].Page1[0].f1_21[0]",
+      "terminal_name": "f1_21[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        240.001,
+        481.65,
+        252.0
+      ]
+    },
+    "line_10_total_interest": {
+      "widget_name": "form1[0].Page1[0].f1_22[0]",
+      "terminal_name": "f1_22[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        228.002,
+        576.0,
+        240.001
+      ],
+      "note": "Subtotal column: 8e + 9."
+    },
+    "line_11_gifts_cash": {
+      "widget_name": "form1[0].Page1[0].f1_23[0]",
+      "terminal_name": "f1_23[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        204.001,
+        481.65,
+        216.0
+      ]
+    },
+    "line_12_gifts_noncash": {
+      "widget_name": "form1[0].Page1[0].f1_24[0]",
+      "terminal_name": "f1_24[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        180.0,
+        481.65,
+        191.999
+      ]
+    },
+    "line_13_carryover": {
+      "widget_name": "form1[0].Page1[0].f1_25[0]",
+      "terminal_name": "f1_25[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        168.001,
+        481.65,
+        180.0
+      ]
+    },
+    "line_14_total_gifts": {
+      "widget_name": "form1[0].Page1[0].f1_26[0]",
+      "terminal_name": "f1_26[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        156.002,
+        576.0,
+        168.001
+      ],
+      "note": "Subtotal column: 11 + 12 + 13."
+    },
+    "line_15_casualty_and_theft": {
+      "widget_name": "form1[0].Page1[0].f1_27[0]",
+      "terminal_name": "f1_27[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        120.002,
+        576.0,
+        132.001
+      ],
+      "note": "Federal disaster declaration only post-TCJA."
+    },
+    "line_16_other_itemized": {
+      "widget_name": "form1[0].Page1[0].f1_29[0]",
+      "terminal_name": "f1_29[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        84.002,
+        576.0,
+        96.001
+      ],
+      "note": "Amount column for line 16. Companion descriptor f1_28[0] is the left-wide text descriptor; Layer 1 only carries the amount."
+    },
+    "line_17_total_itemized": {
+      "widget_name": "form1[0].Page1[0].f1_30[0]",
+      "terminal_name": "f1_30[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        60.001,
+        576.0,
+        72.0
+      ],
+      "note": "Grand total: 4 + 7 + 10 + 14 + 15 + 16."
+    }
+  },
+  "unmapped_widgets": [
+    {
+      "widget_name": "form1[0].Page1[0].f1_2[0]",
+      "terminal_name": "f1_2[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        684.0,
+        576.0,
+        698.001
+      ],
+      "reason": "header_ssn \u2014 Schedule A header SSN; Layer 1 ScheduleAFields does not carry a separate SSN (it's the same as Form 1040)."
+    },
+    {
+      "widget_name": "form1[0].Page1[0].f1_12[0]",
+      "terminal_name": "f1_12[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        122.4,
+        437.998,
+        381.6,
+        461.999
+      ],
+      "reason": "line_6_other_taxes_descriptor \u2014 text descriptor for 'Other taxes' (line 6); Layer 1 only carries the amount, not the descriptor text."
+    },
+    {
+      "widget_name": "form1[0].Page1[0].Line8_ReadOrder[0].c1_2[0]",
+      "terminal_name": "c1_2[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        373.6,
+        392.002,
+        381.6,
+        400.002
+      ],
+      "reason": "line_8a_caution_box \u2014 caution checkbox 'If you don't itemize check here'/'home mortgage interest deduction limited' marker; not in Layer 1."
+    },
+    {
+      "widget_name": "form1[0].Page1[0].Line8b_ReadOrder[0].f1_16[0]",
+      "terminal_name": "f1_16[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        122.4,
+        299.999,
+        381.6,
+        324.0
+      ],
+      "reason": "line_8b_payee_name_address \u2014 name/address descriptor for line 8b mortgage interest not reported on 1098; Layer 1 carries only the amount."
+    },
+    {
+      "widget_name": "form1[0].Page1[0].f1_28[0]",
+      "terminal_name": "f1_28[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        122.4,
+        83.999,
+        475.2,
+        108.0
+      ],
+      "reason": "line_16_descriptor \u2014 text descriptor for 'Other itemized deductions' (line 16); Layer 1 carries only the amount."
+    },
+    {
+      "widget_name": "form1[0].Page1[0].Line18_ReadOrder[0].c1_3[0]",
+      "terminal_name": "c1_3[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        467.2,
+        38.25,
+        475.2,
+        46.25
+      ],
+      "reason": "line_18_elect_to_itemize \u2014 checkbox 'If you elect to itemize deductions even though they are less than your standard deduction'; not in Layer 1."
+    }
+  ]
+}

@@ -1,0 +1,1366 @@
+{
+  "source_pdf_url": "https://www.irs.gov/pub/irs-pdf/f1040sc.pdf",
+  "source_pdf_sha256": "ddf401dbe060467d39f90ad2abf645df1de31512821a150dc68a3882bbf19716",
+  "source_pdf_bytes": 122589,
+  "source_pdf_title": "2025 Schedule C (Form 1040)",
+  "fetched_at": "2026-04-11",
+  "pypdf_version": "5.9.0",
+  "form_year": 2025,
+  "schedule": "C",
+  "total_widgets": 105,
+  "mapped_count": 86,
+  "unmapped_count": 19,
+  "notes": [
+    "Schedule C (Form 1040) AcroForm widget map for the IRS-hosted TY2025 PDF (PDF /Title metadata: '2025 Schedule C (Form 1040)').",
+    "TY2024-vs-TY2025 deltas: line 27 was split into 27a (Other expenses, the Layer 1 field) and 27b (Energy efficient commercial buildings deduction \u00a7179D). Layer 1 ScheduleCFields carries only 27a; the 27b widget f1_39[0] is unmapped. Sum line 28 still includes both 27a and 27b on the IRS form.",
+    "Schedule C Part II expense lines 8-27a are laid out in TWO columns: lines 8-17 in the LEFT column (x ~194-294), lines 18-27b in the RIGHT column (x ~475-576). The IRS f-number sequence INTERLEAVES left-col and right-col widgets in a non-monotonic way (e.g. f1_28 is line 18, f1_17 is line 8, f1_22 is line 13, f1_33 is line 22). The map is keyed by the semantic Layer 1 field name so callers do NOT need to know the f-number ordering.",
+    "Line 27a is f1_40[0], not f1_39[0]. f1_39[0] is line 27b energy efficient buildings deduction.",
+    "Part V 'Other Expenses' detail is a 9-row table on page 2 (lines 48 description). The map exposes it via `part_v_other_expenses_widgets` arrays so Layer 2 can iterate. Rows beyond index 8 require an attached statement (continuation).",
+    "Line F (accounting method) is a RADIO group of three checkboxes (Cash/Accrual/Other). The Layer 1 string 'cash'/'accrual'/'other' selects exactly one. The 'Other (specify)' text widget f1_9 is unmapped.",
+    "Line 43 vehicle placed-in-service date is split across THREE date widgets (month/day/year). Layer 1 stores a single string; the renderer must split mm/dd/yy across f2_9, f2_10, f2_11.",
+    "Multi-business dispatch: Layer 2 produces ONE filled PDF per ScheduleC on the return (`render_schedule_c_pdfs_all`). Each fill is independent and uses this same widget map."
+  ],
+  "mapping": {
+    "proprietor_name": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_1[0]",
+      "terminal_name": "f1_1[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        36.0,
+        684.0,
+        445.65,
+        698.001
+      ],
+      "note": "Name of proprietor (line A on Schedule C the proprietor's name is in the top header)."
+    },
+    "line_a_principal_business_or_profession": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_3[0]",
+      "terminal_name": "f1_3[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        36.0,
+        659.999,
+        444.4,
+        674.0
+      ]
+    },
+    "line_b_principal_business_code": {
+      "widget_name": "topmostSubform[0].Page1[0].BComb[0].f1_4[0]",
+      "terminal_name": "f1_4[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        460.8,
+        661.002,
+        547.2,
+        672.001
+      ],
+      "note": "6-digit principal business code (right of line A)."
+    },
+    "line_c_business_name": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_5[0]",
+      "terminal_name": "f1_5[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        36.0,
+        635.998,
+        445.65,
+        649.999
+      ]
+    },
+    "line_d_ein": {
+      "widget_name": "topmostSubform[0].Page1[0].DComb[0].f1_6[0]",
+      "terminal_name": "f1_6[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        446.4,
+        635.998,
+        576.0,
+        649.999
+      ]
+    },
+    "line_e_business_address": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_7[0]",
+      "terminal_name": "f1_7[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        230.4,
+        624.002,
+        576.0,
+        636.001
+      ],
+      "note": "Line E street address (street1). Companion city/state/zip widget f1_8[0] is unmapped \u2014 Layer 1 'line_e_business_address' is a single-string concatenation; future filling should split it across f1_7 and f1_8."
+    },
+    "line_f_accounting_method": {
+      "widget_name": "topmostSubform[0].Page1[0].c1_1[0]",
+      "terminal_name": "c1_1[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        168.8,
+        601.001,
+        176.8,
+        609.001
+      ],
+      "note": "Accounting method radio group: c1_1[0]=Cash, c1_1[1]=Accrual, c1_1[2]=Other. Layer 1 stores 'cash'/'accrual'/'other' as a string and the renderer must select the matching checkbox. The 'Other' free-text widget f1_9[0] is unmapped (Layer 1 doesn't capture the descriptor)."
+    },
+    "line_g_material_participation": {
+      "widget_name": "topmostSubform[0].Page1[0].c1_2[0]",
+      "terminal_name": "c1_2[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        514.4,
+        590.002,
+        522.4,
+        598.002
+      ],
+      "note": "Yes box for line G material participation. Companion No box is c1_2[1]."
+    },
+    "line_h_started_or_acquired_this_year": {
+      "widget_name": "topmostSubform[0].Page1[0].c1_3[0]",
+      "terminal_name": "c1_3[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        514.4,
+        578.0,
+        522.4,
+        586.0
+      ],
+      "note": "Single checkbox for line H 'check if you started or acquired this business in 2025'."
+    },
+    "line_i_made_1099_payments_required": {
+      "widget_name": "topmostSubform[0].Page1[0].c1_4[0]",
+      "terminal_name": "c1_4[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        514.4,
+        566.001,
+        522.4,
+        574.001
+      ],
+      "note": "Yes box for line I 'Did you make any payments in 2025 that would require you to file Form(s) 1099?'. Companion No box is c1_4[1]."
+    },
+    "line_j_filed_required_1099s": {
+      "widget_name": "topmostSubform[0].Page1[0].c1_5[0]",
+      "terminal_name": "c1_5[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        514.4,
+        554.002,
+        522.4,
+        562.002
+      ],
+      "note": "Yes box for line J 'If \"Yes\", did you or will you file required Form(s) 1099?'. Companion No box is c1_5[1]."
+    },
+    "line_1_gross_receipts": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_10[0]",
+      "terminal_name": "f1_10[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        516.002,
+        576.0,
+        528.001
+      ],
+      "note": "Companion 'statutory employee' check c1_6[0] is unmapped."
+    },
+    "line_2_returns_and_allowances": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_11[0]",
+      "terminal_name": "f1_11[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        504.0,
+        576.0,
+        515.999
+      ]
+    },
+    "line_3_net_receipts": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_12[0]",
+      "terminal_name": "f1_12[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        492.001,
+        576.0,
+        504.0
+      ],
+      "note": "Line 1 - line 2."
+    },
+    "line_4_cost_of_goods_sold": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_13[0]",
+      "terminal_name": "f1_13[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        480.002,
+        576.0,
+        492.001
+      ],
+      "note": "From Part III line 42."
+    },
+    "line_5_gross_profit": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_14[0]",
+      "terminal_name": "f1_14[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        468.0,
+        576.0,
+        479.999
+      ],
+      "note": "Line 3 - line 4."
+    },
+    "line_6_other_income": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_15[0]",
+      "terminal_name": "f1_15[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        456.001,
+        576.0,
+        468.0
+      ]
+    },
+    "line_7_gross_income": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_16[0]",
+      "terminal_name": "f1_16[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        444.002,
+        576.0,
+        456.001
+      ],
+      "note": "Line 5 + line 6."
+    },
+    "line_8_advertising": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines8-17[0].f1_17[0]",
+      "terminal_name": "f1_17[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        194.4,
+        420.001,
+        294.45,
+        432.0
+      ],
+      "note": "Left column."
+    },
+    "line_9_car_and_truck": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines8-17[0].f1_18[0]",
+      "terminal_name": "f1_18[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        194.4,
+        396.0,
+        294.45,
+        407.999
+      ],
+      "note": "Left column."
+    },
+    "line_10_commissions_and_fees": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines8-17[0].f1_19[0]",
+      "terminal_name": "f1_19[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        194.4,
+        384.001,
+        294.45,
+        396.0
+      ],
+      "note": "Left column."
+    },
+    "line_11_contract_labor": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines8-17[0].f1_20[0]",
+      "terminal_name": "f1_20[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        194.4,
+        372.002,
+        294.45,
+        384.001
+      ],
+      "note": "Left column."
+    },
+    "line_12_depletion": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines8-17[0].f1_21[0]",
+      "terminal_name": "f1_21[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        194.4,
+        360.0,
+        294.45,
+        371.999
+      ],
+      "note": "Left column."
+    },
+    "line_13_depreciation_section_179": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines8-17[0].f1_22[0]",
+      "terminal_name": "f1_22[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        194.4,
+        324.0,
+        294.45,
+        335.999
+      ],
+      "note": "Left column. Description label spans two visual lines because the IRS form text is multi-line."
+    },
+    "line_14_employee_benefit_programs": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines8-17[0].f1_23[0]",
+      "terminal_name": "f1_23[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        194.4,
+        300.002,
+        294.45,
+        312.001
+      ],
+      "note": "Left column."
+    },
+    "line_15_insurance_not_health": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines8-17[0].f1_24[0]",
+      "terminal_name": "f1_24[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        194.4,
+        288.0,
+        294.45,
+        299.999
+      ],
+      "note": "Left column."
+    },
+    "line_16a_mortgage_interest": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines8-17[0].f1_25[0]",
+      "terminal_name": "f1_25[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        194.4,
+        264.002,
+        294.45,
+        276.001
+      ],
+      "note": "Left column."
+    },
+    "line_16b_other_interest": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines8-17[0].f1_26[0]",
+      "terminal_name": "f1_26[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        194.4,
+        252.0,
+        294.45,
+        263.999
+      ],
+      "note": "Left column."
+    },
+    "line_17_legal_and_professional": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines8-17[0].f1_27[0]",
+      "terminal_name": "f1_27[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        194.4,
+        240.001,
+        294.45,
+        252.0
+      ],
+      "note": "Left column."
+    },
+    "line_18_office_expense": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines18-27[0].f1_28[0]",
+      "terminal_name": "f1_28[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        420.001,
+        576.0,
+        432.0
+      ],
+      "note": "Right column."
+    },
+    "line_19_pension_and_profit_sharing": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines18-27[0].f1_29[0]",
+      "terminal_name": "f1_29[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        408.002,
+        576.0,
+        420.001
+      ],
+      "note": "Right column."
+    },
+    "line_20a_rent_vehicles_machinery_equipment": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines18-27[0].f1_30[0]",
+      "terminal_name": "f1_30[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        384.001,
+        576.0,
+        396.0
+      ],
+      "note": "Right column."
+    },
+    "line_20b_rent_other_business_property": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines18-27[0].f1_31[0]",
+      "terminal_name": "f1_31[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        372.002,
+        576.0,
+        384.001
+      ],
+      "note": "Right column."
+    },
+    "line_21_repairs_and_maintenance": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines18-27[0].f1_32[0]",
+      "terminal_name": "f1_32[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        360.0,
+        576.0,
+        371.999
+      ],
+      "note": "Right column."
+    },
+    "line_22_supplies": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines18-27[0].f1_33[0]",
+      "terminal_name": "f1_33[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        348.001,
+        576.0,
+        360.0
+      ],
+      "note": "Right column."
+    },
+    "line_23_taxes_and_licenses": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines18-27[0].f1_34[0]",
+      "terminal_name": "f1_34[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        336.002,
+        576.0,
+        348.001
+      ],
+      "note": "Right column."
+    },
+    "line_24a_travel": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines18-27[0].f1_35[0]",
+      "terminal_name": "f1_35[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        312.001,
+        576.0,
+        324.0
+      ],
+      "note": "Right column."
+    },
+    "line_24b_meals_50pct_deductible": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines18-27[0].f1_36[0]",
+      "terminal_name": "f1_36[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        300.002,
+        576.0,
+        312.001
+      ],
+      "note": "Right column."
+    },
+    "line_25_utilities": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines18-27[0].f1_37[0]",
+      "terminal_name": "f1_37[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        288.0,
+        576.0,
+        299.999
+      ],
+      "note": "Right column."
+    },
+    "line_26_wages_less_employment_credits": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines18-27[0].f1_38[0]",
+      "terminal_name": "f1_38[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        276.001,
+        576.0,
+        288.0
+      ],
+      "note": "Right column."
+    },
+    "line_27a_other_expenses": {
+      "widget_name": "topmostSubform[0].Page1[0].Lines18-27[0].f1_40[0]",
+      "terminal_name": "f1_40[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        252.0,
+        576.0,
+        263.999
+      ],
+      "note": "Right column. Note IRS f-number jumps: 27a is f1_40, not f1_39 \u2014 f1_39 is line 27b 'Energy efficient commercial buildings deduction' which is not in Layer 1."
+    },
+    "line_28_total_expenses": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_41[0]",
+      "terminal_name": "f1_41[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        228.002,
+        576.0,
+        240.001
+      ],
+      "note": "Sum of lines 8-27a (and 27b)."
+    },
+    "line_29_tentative_profit_or_loss": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_42[0]",
+      "terminal_name": "f1_42[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        216.0,
+        576.0,
+        227.999
+      ],
+      "note": "Line 7 - line 28."
+    },
+    "line_30_home_office_expense": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_45[0]",
+      "terminal_name": "f1_45[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        156.002,
+        576.0,
+        168.001
+      ],
+      "note": "Home office expense from Form 8829 OR simplified method. Companion widgets f1_43 (square footage) and f1_44 (part of home) are unmapped \u2014 Layer 1 only carries the dollar amount."
+    },
+    "line_31_net_profit_or_loss": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_46[0]",
+      "terminal_name": "f1_46[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        120.002,
+        576.0,
+        132.001
+      ],
+      "note": "Line 29 - line 30."
+    },
+    "line_32a_all_investment_at_risk": {
+      "widget_name": "topmostSubform[0].Page1[0].c1_7[0]",
+      "terminal_name": "c1_7[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        475.2,
+        73.999,
+        483.2,
+        81.999
+      ],
+      "note": "32a 'All investment is at risk' checkbox."
+    },
+    "line_32b_some_investment_not_at_risk": {
+      "widget_name": "topmostSubform[0].Page1[0].c1_7[1]",
+      "terminal_name": "c1_7[1]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        475.2,
+        61.5,
+        483.2,
+        69.5
+      ],
+      "note": "32b 'Some investment is not at risk' checkbox."
+    },
+    "line_33_inventory_valuation_method": {
+      "widget_name": "topmostSubform[0].Page2[0].c2_1[0]",
+      "terminal_name": "c2_1[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        187.2,
+        697.502,
+        195.2,
+        705.502
+      ],
+      "note": "Method radio: c2_1[0]=Cost, c2_2[0]=Lower of cost or market, c2_3[0]=Other. Layer 1 stores 'cost' as a string."
+    },
+    "line_34_inventory_method_change": {
+      "widget_name": "topmostSubform[0].Page2[0].c2_4[0]",
+      "terminal_name": "c2_4[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        482.4,
+        674.501,
+        490.4,
+        682.501
+      ],
+      "note": "Yes box for line 34 'Was there any change in determining quantities, costs, or valuations between opening and closing inventory?'. Companion No box is c2_4[1]."
+    },
+    "line_35_beginning_inventory": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_1[0]",
+      "terminal_name": "f2_1[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        468.0,
+        648.0,
+        576.0,
+        659.999
+      ]
+    },
+    "line_36_purchases_less_personal_use": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_2[0]",
+      "terminal_name": "f2_2[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        468.0,
+        624.002,
+        576.0,
+        636.001
+      ]
+    },
+    "line_37_cost_of_labor": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_3[0]",
+      "terminal_name": "f2_3[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        468.0,
+        600.001,
+        576.0,
+        612.0
+      ]
+    },
+    "line_38_materials_and_supplies": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_4[0]",
+      "terminal_name": "f2_4[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        468.0,
+        576.0,
+        576.0,
+        587.999
+      ]
+    },
+    "line_39_other_costs": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_5[0]",
+      "terminal_name": "f2_5[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        468.0,
+        552.002,
+        576.0,
+        564.001
+      ]
+    },
+    "line_40_sum_35_through_39": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_6[0]",
+      "terminal_name": "f2_6[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        468.0,
+        528.001,
+        576.0,
+        540.0
+      ]
+    },
+    "line_41_ending_inventory": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_7[0]",
+      "terminal_name": "f2_7[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        468.0,
+        504.0,
+        576.0,
+        515.999
+      ]
+    },
+    "line_42_cost_of_goods_sold": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_8[0]",
+      "terminal_name": "f2_8[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        468.0,
+        480.002,
+        576.0,
+        492.001
+      ],
+      "note": "Line 40 - line 41. Layer 1 currently scaffolds this as a passthrough of line 4."
+    },
+    "part_v_other_expenses": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_NN[*]",
+      "terminal_name": "f2_15..f2_32 (9 row pairs)",
+      "type": "text",
+      "page": 2,
+      "note": "Part V 'Other Expenses' detail is a 9-row table. Each row has a description (left) and an amount (right). Layer 1 stores it as tuple[(str, Decimal), ...]; see `part_v_other_expenses_widgets` for the indexed widget pairs."
+    },
+    "part_v_total": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_33[0]",
+      "terminal_name": "f2_33[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        468.0,
+        36.0,
+        576.0,
+        47.999
+      ],
+      "note": "Line 48: total of Part V; flows to line 27a."
+    },
+    "line_45_vehicle_available_for_personal_use": {
+      "widget_name": "topmostSubform[0].Page2[0].c2_5[0]",
+      "terminal_name": "c2_5[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        489.6,
+        349.779,
+        498.044,
+        358.223
+      ],
+      "note": "Yes box for line 45. Companion No is c2_5[1]."
+    },
+    "line_46_another_vehicle_available": {
+      "widget_name": "topmostSubform[0].Page2[0].c2_6[0]",
+      "terminal_name": "c2_6[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        489.6,
+        325.778,
+        498.044,
+        334.222
+      ],
+      "note": "Yes box for line 46. Companion No is c2_6[1]."
+    },
+    "line_47a_have_evidence": {
+      "widget_name": "topmostSubform[0].Page2[0].c2_7[0]",
+      "terminal_name": "c2_7[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        489.6,
+        301.779,
+        498.045,
+        310.224
+      ],
+      "note": "Yes box for line 47a. Companion No is c2_7[1]."
+    },
+    "line_47b_evidence_written": {
+      "widget_name": "topmostSubform[0].Page2[0].c2_8[0]",
+      "terminal_name": "c2_8[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        489.6,
+        277.778,
+        498.045,
+        286.223
+      ],
+      "note": "Yes box for line 47b. Companion No is c2_8[1]."
+    },
+    "line_44a_business_miles": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_12[0]",
+      "terminal_name": "f2_12[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        100.8,
+        372.002,
+        201.6,
+        384.001
+      ],
+      "note": "Line 44a business miles."
+    },
+    "line_44b_commuting_miles": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_13[0]",
+      "terminal_name": "f2_13[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        331.2,
+        372.002,
+        424.8,
+        384.001
+      ],
+      "note": "Line 44b commute miles."
+    },
+    "line_44c_other_miles": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_14[0]",
+      "terminal_name": "f2_14[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        468.0,
+        372.002,
+        576.0,
+        384.001
+      ],
+      "note": "Line 44c other miles."
+    },
+    "line_43_vehicle_placed_in_service_date": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_9..f2_11[0]",
+      "terminal_name": "f2_9[0],f2_10[0],f2_11[0]",
+      "type": "text",
+      "page": 2,
+      "note": "Line 43 vehicle placed-in-service date is split across THREE widgets (month/day/year). Layer 1 stores a single Optional[str] date; renderer must split mm/dd/yy."
+    }
+  },
+  "part_v_other_expenses_widgets": [
+    {
+      "index": 0,
+      "description_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item1[0].f2_15[0]",
+        "terminal_name": "f2_15[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          36.0,
+          239.998,
+          460.8,
+          251.999
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item1[0].f2_16[0]",
+        "terminal_name": "f2_16[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          468.0,
+          239.998,
+          576.0,
+          251.999
+        ]
+      }
+    },
+    {
+      "index": 1,
+      "description_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item2[0].f2_17[0]",
+        "terminal_name": "f2_17[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          36.0,
+          215.997,
+          460.8,
+          227.998
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item2[0].f2_18[0]",
+        "terminal_name": "f2_18[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          468.0,
+          215.997,
+          576.0,
+          227.998
+        ]
+      }
+    },
+    {
+      "index": 2,
+      "description_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item3[0].f2_19[0]",
+        "terminal_name": "f2_19[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          36.0,
+          191.996,
+          460.8,
+          203.997
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item3[0].f2_20[0]",
+        "terminal_name": "f2_20[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          468.0,
+          191.996,
+          576.0,
+          203.997
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "description_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item4[0].f2_21[0]",
+        "terminal_name": "f2_21[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          36.0,
+          167.995,
+          460.8,
+          179.996
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item4[0].f2_22[0]",
+        "terminal_name": "f2_22[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          468.0,
+          167.995,
+          576.0,
+          179.996
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "description_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item5[0].f2_23[0]",
+        "terminal_name": "f2_23[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          36.0,
+          143.994,
+          460.8,
+          155.995
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item5[0].f2_24[0]",
+        "terminal_name": "f2_24[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          468.0,
+          143.994,
+          576.0,
+          155.995
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "description_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item6[0].f2_25[0]",
+        "terminal_name": "f2_25[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          36.0,
+          119.993,
+          460.8,
+          131.994
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item6[0].f2_26[0]",
+        "terminal_name": "f2_26[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          468.0,
+          119.993,
+          576.0,
+          131.994
+        ]
+      }
+    },
+    {
+      "index": 6,
+      "description_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item7[0].f2_27[0]",
+        "terminal_name": "f2_27[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          36.0,
+          95.992,
+          460.8,
+          107.993
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item7[0].f2_28[0]",
+        "terminal_name": "f2_28[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          468.0,
+          95.992,
+          576.0,
+          107.993
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "description_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item8[0].f2_29[0]",
+        "terminal_name": "f2_29[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          36.0,
+          71.991,
+          460.8,
+          83.992
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item8[0].f2_30[0]",
+        "terminal_name": "f2_30[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          468.0,
+          71.991,
+          576.0,
+          83.992
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "description_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item9[0].f2_31[0]",
+        "terminal_name": "f2_31[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          36.0,
+          47.99,
+          460.8,
+          59.991
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page2[0].PartVTable[0].Item9[0].f2_32[0]",
+        "terminal_name": "f2_32[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          468.0,
+          47.99,
+          576.0,
+          59.991
+        ]
+      }
+    }
+  ],
+  "unmapped_widgets": [
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_2[0]",
+      "terminal_name": "f1_2[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        446.4,
+        685.0,
+        576.0,
+        698.001
+      ],
+      "reason": "header_ssn \u2014 proprietor SSN; Layer 1 doesn't carry it (it's the same as Form 1040)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_8[0]",
+      "terminal_name": "f1_8[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        230.4,
+        612.0,
+        576.0,
+        623.999
+      ],
+      "reason": "line_e_city_state_zip \u2014 companion to f1_7 street; Layer 1 stores the whole address as one string."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_1[1]",
+      "terminal_name": "c1_1[1]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        233.6,
+        601.001,
+        241.6,
+        609.001
+      ],
+      "reason": "uncategorized"
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_1[2]",
+      "terminal_name": "c1_1[2]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        305.6,
+        601.001,
+        313.6,
+        609.001
+      ],
+      "reason": "uncategorized"
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_9[0]",
+      "terminal_name": "f1_9[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        374.4,
+        600.001,
+        576.0,
+        612.0
+      ],
+      "reason": "line_f_other_specify \u2014 text field for accounting method 'Other (specify)'; Layer 1 stores the method as an enum without a free-text descriptor."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_2[1]",
+      "terminal_name": "c1_2[1]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        550.4,
+        590.002,
+        558.4,
+        598.002
+      ],
+      "reason": "page1_no_companion \u2014 companion 'No' checkbox for the corresponding Yes mapping (c1_2[1])."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_4[1]",
+      "terminal_name": "c1_4[1]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        550.4,
+        566.001,
+        558.4,
+        574.001
+      ],
+      "reason": "page1_no_companion \u2014 companion 'No' checkbox for the corresponding Yes mapping (c1_4[1])."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_5[1]",
+      "terminal_name": "c1_5[1]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        550.4,
+        554.002,
+        558.4,
+        562.002
+      ],
+      "reason": "page1_no_companion \u2014 companion 'No' checkbox for the corresponding Yes mapping (c1_5[1])."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Line1_ReadOrder[0].c1_6[0]",
+      "terminal_name": "c1_6[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        433.999,
+        518.002,
+        441.999,
+        526.002
+      ],
+      "reason": "line_1_statutory_employee_box \u2014 'check if you received Form W-2 and the Statutory employee box was checked' \u2014 not in Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Lines18-27[0].f1_39[0]",
+      "terminal_name": "f1_39[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        475.2,
+        240.001,
+        576.0,
+        252.0
+      ],
+      "reason": "line_27b_energy_efficient_commercial_buildings_deduction \u2014 IRC \u00a7179D deduction added to Schedule C TY2024+; not in Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Line30_ReadOrder[0].f1_43[0]",
+      "terminal_name": "f1_43[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        352.8,
+        180.0,
+        446.4,
+        191.999
+      ],
+      "reason": "line_30_simplified_method_total_square_footage \u2014 simplified method square footage; Layer 1 stores only the dollar amount of home office."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Line30_ReadOrder[0].f1_44[0]",
+      "terminal_name": "f1_44[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        237.6,
+        168.001,
+        367.2,
+        180.0
+      ],
+      "reason": "line_30_simplified_method_business_square_footage \u2014 companion to f1_43; Layer 1 doesn't model the simplified-method worksheet."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_2[0]",
+      "terminal_name": "c2_2[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        259.2,
+        697.502,
+        267.2,
+        705.502
+      ],
+      "reason": "line_33_method_alternate \u2014 alternate inventory valuation method radio (c2_2=lower of cost or market, c2_3=other); Layer 1 string defaults to 'cost'."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_3[0]",
+      "terminal_name": "c2_3[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        396.0,
+        697.502,
+        404.0,
+        705.502
+      ],
+      "reason": "line_33_method_alternate \u2014 alternate inventory valuation method radio (c2_2=lower of cost or market, c2_3=other); Layer 1 string defaults to 'cost'."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_4[1]",
+      "terminal_name": "c2_4[1]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        540.0,
+        674.501,
+        548.0,
+        682.501
+      ],
+      "reason": "page2_no_companion \u2014 companion 'No' checkbox for Part III/IV question (c2_4[1])."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_5[1]",
+      "terminal_name": "c2_5[1]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        540.0,
+        349.779,
+        548.444,
+        358.223
+      ],
+      "reason": "page2_no_companion \u2014 companion 'No' checkbox for Part III/IV question (c2_5[1])."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_6[1]",
+      "terminal_name": "c2_6[1]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        540.0,
+        325.778,
+        548.444,
+        334.222
+      ],
+      "reason": "page2_no_companion \u2014 companion 'No' checkbox for Part III/IV question (c2_6[1])."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_7[1]",
+      "terminal_name": "c2_7[1]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        540.0,
+        301.78,
+        548.444,
+        310.224
+      ],
+      "reason": "page2_no_companion \u2014 companion 'No' checkbox for Part III/IV question (c2_7[1])."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_8[1]",
+      "terminal_name": "c2_8[1]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        540.0,
+        277.779,
+        548.444,
+        286.223
+      ],
+      "reason": "page2_no_companion \u2014 companion 'No' checkbox for Part III/IV question (c2_8[1])."
+    }
+  ]
+}

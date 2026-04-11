@@ -201,6 +201,31 @@ def load_widget_map(map_json_path: Path) -> WidgetMap:
     )
 
 
+def load_widget_map_as_dict(map_json_path: Path) -> dict:
+    """Load a wave-4 widget-map JSON as a plain dict.
+
+    Used by the Schedule A/B/C/SE renderers (wave 5 B2) which need
+    direct access to schedule-specific table structures (e.g.
+    ``part_i_line_1_rows_widgets`` for Schedule B) that the opinionated
+    :class:`WidgetMap` dataclass does not expose. The Form 1040 renderer
+    still uses :func:`load_widget_map` because it can work entirely
+    from the curated ``semantic_to_widget`` view.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the JSON file does not exist.
+    """
+    map_json_path = Path(map_json_path)
+    if not map_json_path.exists():
+        raise FileNotFoundError(
+            f"widget map JSON not found: {map_json_path}. "
+            "See skill/reference/form-1040-acroform-methodology.md "
+            "for the regeneration steps."
+        )
+    return json.loads(map_json_path.read_text())
+
+
 # ---------------------------------------------------------------------------
 # Source PDF cache: fetch + SHA-256 verification
 # ---------------------------------------------------------------------------
@@ -288,6 +313,37 @@ def ensure_source_pdf(
         source_url,
         expected_sha256,
     )
+
+
+def verify_pdf_sha256(pdf_path: Path, expected_sha256: str) -> None:
+    """Verify an on-disk PDF's SHA-256 matches ``expected_sha256``.
+
+    Used by the Schedule A/B/C/SE renderers (wave 5 B2) as a pre-flight
+    check before each AcroForm fill. Raises ``RuntimeError`` with a
+    message containing the word "missing" if the file is absent, or
+    "SHA-256 mismatch" if the file exists but its digest differs. The
+    message text is load-bearing — the B2 test suite matches on these
+    specific substrings.
+
+    This function does NOT fetch. It only verifies a cached file. For
+    fetch-or-verify semantics use :func:`fetch_and_verify_source_pdf`.
+    """
+    p = Path(pdf_path)
+    if not p.exists():
+        raise RuntimeError(
+            f"source PDF missing at {p}. Bundled IRS forms live under "
+            f"skill/reference/irs_forms/; re-fetch via "
+            f"fetch_and_verify_source_pdf or place the file manually."
+        )
+    actual = _sha256_of_file(p)
+    if actual != expected_sha256:
+        raise RuntimeError(
+            f"SHA-256 mismatch for {p}: got {actual}, expected "
+            f"{expected_sha256}. The IRS may have re-issued the form; "
+            f"regenerate the widget map (see skill/reference/"
+            f"form-1040-acroform-methodology.md) before trusting the "
+            f"renderer."
+        )
 
 
 # ---------------------------------------------------------------------------

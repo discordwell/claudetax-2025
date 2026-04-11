@@ -1,0 +1,1007 @@
+{
+  "source_pdf_url": "https://www.irs.gov/pub/irs-pdf/f1040sb.pdf",
+  "source_pdf_sha256": "dd1ec3719954532bd219343d81385a2ada3c8e9573fc755a3893f1fbbecc63e2",
+  "source_pdf_bytes": 76411,
+  "source_pdf_title": "2025 Schedule B (Form 1040)",
+  "fetched_at": "2026-04-11",
+  "pypdf_version": "5.9.0",
+  "form_year": 2025,
+  "schedule": "B",
+  "total_widgets": 72,
+  "mapped_count": 67,
+  "unmapped_count": 5,
+  "notes": [
+    "Schedule B (Form 1040) AcroForm widget map for the IRS-hosted TY2025 PDF (PDF /Title metadata: '2025 Schedule B (Form 1040)').",
+    "TY2024-vs-TY2025 deltas: none observed. Schedule B has not changed line numbering since the 2020 restructure that introduced the foreign-account / foreign-trust questions in Part III.",
+    "Part I line 1 and Part II line 5 are REPEATING-ROW tables: 14 payer rows in Part I and 15 payer rows in Part II. Each row has a payer-name widget (left/wide) and an amount widget (right/narrow). The map exposes these as `part_i_line_1_rows_widgets` and `part_ii_line_5_rows_widgets` arrays so Layer 2 can iterate.",
+    "Schedule B Part III foreign-account / foreign-trust checkboxes are Yes/No PAIRS. Each Layer 1 boolean (`part_iii_line_7a_foreign_account`, `part_iii_line_7a_fincen114_required`, `part_iii_line_8_foreign_trust`) maps to the YES checkbox; the companion NO checkbox is in `unmapped_widgets`. Filling the form requires setting exactly ONE of each pair (callers' responsibility).",
+    "Continuation: rows beyond Part I row 13 (or Part II row 14) cannot fit on the IRS PDF and require an attached statement \u2014 a follow-up."
+  ],
+  "mapping": {
+    "taxpayer_name": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_01[0]",
+      "terminal_name": "f1_01[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        36.0,
+        684.0,
+        467.25,
+        698.001
+      ],
+      "note": "Taxpayer name(s) as shown on Form 1040 \u2014 same string Layer 1 carries."
+    },
+    "part_i_line_2_total_interest": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_31[0]",
+      "terminal_name": "f1_31[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        489.6,
+        468.0,
+        576.0,
+        479.999
+      ],
+      "note": "Sum of Part I line 1 amounts."
+    },
+    "part_i_line_3_excludable_savings_bond_interest": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_32[0]",
+      "terminal_name": "f1_32[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        489.6,
+        444.002,
+        576.0,
+        456.001
+      ],
+      "note": "Form 8815 excludable interest; Layer 1 always 0 (Form 8815 not modeled)."
+    },
+    "part_i_line_4_taxable_interest": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_33[0]",
+      "terminal_name": "f1_33[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        489.6,
+        432.0,
+        576.0,
+        443.999
+      ],
+      "note": "Line 2 - line 3; flows to Form 1040 line 2b."
+    },
+    "part_ii_line_6_total_ordinary_dividends": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_64[0]",
+      "terminal_name": "f1_64[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        489.6,
+        228.002,
+        576.0,
+        240.001
+      ],
+      "note": "Sum of Part II line 5 amounts; flows to Form 1040 line 3b."
+    },
+    "part_iii_line_7a_foreign_account": {
+      "widget_name": "topmostSubform[0].Page1[0].TagcorrectingSubform[0].c1_1[0]",
+      "terminal_name": "c1_1[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        539.4,
+        133.001,
+        549.4,
+        143.001
+      ],
+      "note": "Yes box for line 7a 'Did you have a financial interest in or signature authority over a foreign financial account?'. The companion No box is c1_1[1] \u2014 exactly one should be set."
+    },
+    "part_iii_line_7a_fincen114_required": {
+      "widget_name": "topmostSubform[0].Page1[0].c1_2[0]",
+      "terminal_name": "c1_2[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        539.4,
+        97.001,
+        549.4,
+        107.001
+      ],
+      "note": "Yes box for line 7a 'are you required to file FinCEN Form 114?'. Companion No box is c1_2[1]."
+    },
+    "part_iii_line_7b_fincen114_country": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_65[0]",
+      "terminal_name": "f1_65[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        273.6,
+        72.0,
+        525.6,
+        83.999
+      ],
+      "note": "Country name on line 7b. Companion second-country widget f1_66[0] is unmapped (Layer 1 stores only the first country; multi-country is handled by FinCEN 114 itself)."
+    },
+    "part_iii_line_8_foreign_trust": {
+      "widget_name": "topmostSubform[0].Page1[0].c1_3[0]",
+      "terminal_name": "c1_3[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        539.4,
+        37.0,
+        549.4,
+        47.0
+      ],
+      "note": "Yes box for line 8 'distribution from / grantor of / transferor to a foreign trust?'. Companion No box is c1_3[1]."
+    },
+    "part_i_line_1_rows": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_NN[*]",
+      "terminal_name": "f1_03..f1_30 (14 row pairs)",
+      "type": "text",
+      "page": 1,
+      "note": "Schedule B Part I line 1 is a repeating-row table. Layer 1 stores it as tuple[ScheduleBPayerRow, ...]; this map provides 14 row pairs in `part_i_line_1_rows_widgets`. To fill the form, iterate the tuple and write to row index i's payer/amount widgets. Rows beyond index 13 are not representable on the IRS PDF and require Form 1099-INT continuation (an attached statement) which is a follow-up."
+    },
+    "part_ii_line_5_rows": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_NN[*]",
+      "terminal_name": "f1_34..f1_63 (15 row pairs)",
+      "type": "text",
+      "page": 1,
+      "note": "Schedule B Part II line 5 is a repeating-row table. Layer 1 stores it as tuple[ScheduleBPayerRow, ...]; this map provides 15 row pairs in `part_ii_line_5_rows_widgets`. Rows beyond index 14 require continuation."
+    }
+  },
+  "part_i_line_1_rows_widgets": [
+    {
+      "index": 0,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].Line1_ReadOrder[0].f1_03[0]",
+        "terminal_name": "f1_03[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          636.001,
+          460.8,
+          648.0
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_04[0]",
+        "terminal_name": "f1_04[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          636.001,
+          576.0,
+          648.0
+        ]
+      }
+    },
+    {
+      "index": 1,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_05[0]",
+        "terminal_name": "f1_05[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          624.002,
+          460.8,
+          636.001
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_06[0]",
+        "terminal_name": "f1_06[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          624.002,
+          576.0,
+          636.001
+        ]
+      }
+    },
+    {
+      "index": 2,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_07[0]",
+        "terminal_name": "f1_07[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          612.0,
+          460.8,
+          623.999
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_08[0]",
+        "terminal_name": "f1_08[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          612.0,
+          576.0,
+          623.999
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_09[0]",
+        "terminal_name": "f1_09[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          600.001,
+          460.8,
+          612.0
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_10[0]",
+        "terminal_name": "f1_10[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          600.001,
+          576.0,
+          612.0
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_11[0]",
+        "terminal_name": "f1_11[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          588.002,
+          460.8,
+          600.001
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_12[0]",
+        "terminal_name": "f1_12[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          588.002,
+          576.0,
+          600.001
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_13[0]",
+        "terminal_name": "f1_13[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          576.0,
+          460.8,
+          587.999
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_14[0]",
+        "terminal_name": "f1_14[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          576.0,
+          576.0,
+          587.999
+        ]
+      }
+    },
+    {
+      "index": 6,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_15[0]",
+        "terminal_name": "f1_15[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          564.001,
+          460.8,
+          576.0
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_16[0]",
+        "terminal_name": "f1_16[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          564.001,
+          576.0,
+          576.0
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_17[0]",
+        "terminal_name": "f1_17[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          552.002,
+          460.8,
+          564.001
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_18[0]",
+        "terminal_name": "f1_18[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          552.002,
+          576.0,
+          564.001
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_19[0]",
+        "terminal_name": "f1_19[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          540.0,
+          460.8,
+          551.999
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_20[0]",
+        "terminal_name": "f1_20[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          540.0,
+          576.0,
+          551.999
+        ]
+      }
+    },
+    {
+      "index": 9,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_21[0]",
+        "terminal_name": "f1_21[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          528.001,
+          460.8,
+          540.0
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_22[0]",
+        "terminal_name": "f1_22[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          528.001,
+          576.0,
+          540.0
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_23[0]",
+        "terminal_name": "f1_23[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          516.002,
+          460.8,
+          528.001
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_24[0]",
+        "terminal_name": "f1_24[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          516.002,
+          576.0,
+          528.001
+        ]
+      }
+    },
+    {
+      "index": 11,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_25[0]",
+        "terminal_name": "f1_25[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          504.0,
+          460.8,
+          515.999
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_26[0]",
+        "terminal_name": "f1_26[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          504.0,
+          576.0,
+          515.999
+        ]
+      }
+    },
+    {
+      "index": 12,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_27[0]",
+        "terminal_name": "f1_27[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          492.001,
+          460.8,
+          504.0
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_28[0]",
+        "terminal_name": "f1_28[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          492.001,
+          576.0,
+          504.0
+        ]
+      }
+    },
+    {
+      "index": 13,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_29[0]",
+        "terminal_name": "f1_29[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          480.002,
+          460.8,
+          492.001
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_30[0]",
+        "terminal_name": "f1_30[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          480.002,
+          576.0,
+          492.001
+        ]
+      }
+    }
+  ],
+  "part_ii_line_5_rows_widgets": [
+    {
+      "index": 0,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].ReadOrderControl[0].f1_34[0]",
+        "terminal_name": "f1_34[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          201.6,
+          408.002,
+          460.8,
+          420.001
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_35[0]",
+        "terminal_name": "f1_35[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          408.002,
+          576.0,
+          420.001
+        ]
+      }
+    },
+    {
+      "index": 1,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_36[0]",
+        "terminal_name": "f1_36[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          396.0,
+          460.8,
+          407.999
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_37[0]",
+        "terminal_name": "f1_37[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          396.0,
+          576.0,
+          407.999
+        ]
+      }
+    },
+    {
+      "index": 2,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_38[0]",
+        "terminal_name": "f1_38[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          384.001,
+          460.8,
+          396.0
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_39[0]",
+        "terminal_name": "f1_39[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          384.001,
+          576.0,
+          396.0
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_40[0]",
+        "terminal_name": "f1_40[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          372.002,
+          460.8,
+          384.001
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_41[0]",
+        "terminal_name": "f1_41[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          372.002,
+          576.0,
+          384.001
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_42[0]",
+        "terminal_name": "f1_42[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          360.0,
+          460.8,
+          371.999
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_43[0]",
+        "terminal_name": "f1_43[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          360.0,
+          576.0,
+          371.999
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_44[0]",
+        "terminal_name": "f1_44[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          348.001,
+          460.8,
+          360.0
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_45[0]",
+        "terminal_name": "f1_45[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          348.001,
+          576.0,
+          360.0
+        ]
+      }
+    },
+    {
+      "index": 6,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_46[0]",
+        "terminal_name": "f1_46[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          336.002,
+          460.8,
+          348.001
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_47[0]",
+        "terminal_name": "f1_47[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          336.002,
+          576.0,
+          348.001
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_48[0]",
+        "terminal_name": "f1_48[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          324.0,
+          460.8,
+          335.999
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_49[0]",
+        "terminal_name": "f1_49[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          324.0,
+          576.0,
+          335.999
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_50[0]",
+        "terminal_name": "f1_50[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          312.001,
+          460.8,
+          324.0
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_51[0]",
+        "terminal_name": "f1_51[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          312.001,
+          576.0,
+          324.0
+        ]
+      }
+    },
+    {
+      "index": 9,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_52[0]",
+        "terminal_name": "f1_52[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          300.002,
+          460.8,
+          312.001
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_53[0]",
+        "terminal_name": "f1_53[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          300.002,
+          576.0,
+          312.001
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_54[0]",
+        "terminal_name": "f1_54[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          288.0,
+          460.8,
+          299.999
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_55[0]",
+        "terminal_name": "f1_55[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          288.0,
+          576.0,
+          299.999
+        ]
+      }
+    },
+    {
+      "index": 11,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_56[0]",
+        "terminal_name": "f1_56[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          276.001,
+          460.8,
+          288.0
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_57[0]",
+        "terminal_name": "f1_57[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          276.001,
+          576.0,
+          288.0
+        ]
+      }
+    },
+    {
+      "index": 12,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_58[0]",
+        "terminal_name": "f1_58[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          264.002,
+          460.8,
+          276.001
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_59[0]",
+        "terminal_name": "f1_59[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          264.002,
+          576.0,
+          276.001
+        ]
+      }
+    },
+    {
+      "index": 13,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_60[0]",
+        "terminal_name": "f1_60[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          252.0,
+          460.8,
+          263.999
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_61[0]",
+        "terminal_name": "f1_61[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          252.0,
+          576.0,
+          263.999
+        ]
+      }
+    },
+    {
+      "index": 14,
+      "payer_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_62[0]",
+        "terminal_name": "f1_62[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          129.6,
+          240.001,
+          460.8,
+          252.0
+        ]
+      },
+      "amount_widget": {
+        "widget_name": "topmostSubform[0].Page1[0].f1_63[0]",
+        "terminal_name": "f1_63[0]",
+        "type": "text",
+        "page": 1,
+        "rect": [
+          489.6,
+          240.001,
+          576.0,
+          252.0
+        ]
+      }
+    }
+  ],
+  "unmapped_widgets": [
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_02[0]",
+      "terminal_name": "f1_02[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        468.0,
+        684.0,
+        576.0,
+        698.001
+      ],
+      "reason": "header_ssn \u2014 Schedule B header SSN; Layer 1 carries it via Form 1040 not separately."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].TagcorrectingSubform[0].c1_1[1]",
+      "terminal_name": "c1_1[1]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        561.0,
+        133.001,
+        571.0,
+        143.001
+      ],
+      "reason": "line_7a_foreign_account_no \u2014 companion 'No' checkbox for line 7a foreign account question."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_2[1]",
+      "terminal_name": "c1_2[1]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        561.0,
+        97.001,
+        571.0,
+        107.001
+      ],
+      "reason": "line_7a_fincen114_no \u2014 companion 'No' checkbox for FinCEN 114 question."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_66[0]",
+      "terminal_name": "f1_66[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        129.6,
+        60.001,
+        525.6,
+        72.0
+      ],
+      "reason": "line_7b_country_continuation \u2014 second country widget; Layer 1 stores only one country (FinCEN 114 handles multi-country enumeration)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_3[1]",
+      "terminal_name": "c1_3[1]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        561.0,
+        37.0,
+        571.0,
+        47.0
+      ],
+      "reason": "line_8_foreign_trust_no \u2014 companion 'No' checkbox for line 8 foreign trust question."
+    }
+  ]
+}

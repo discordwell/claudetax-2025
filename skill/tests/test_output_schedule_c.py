@@ -367,15 +367,24 @@ def test_no_schedules_c_returns_empty_list() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Layer 2 — scaffold PDF rendering
+# Layer 2 — AcroForm overlay PDF rendering (wave 5)
 # ---------------------------------------------------------------------------
 
 
-def test_render_scaffold_produces_readable_pdf(
+def _load_widget_value(out_path: Path, terminal_substring: str):
+    pypdf = pytest.importorskip("pypdf")
+    reader = pypdf.PdfReader(str(out_path))
+    fields = reader.get_fields() or {}
+    for k, v in fields.items():
+        if terminal_substring in k:
+            return v.get("/V")
+    return None
+
+
+def test_render_layer2_produces_non_empty_pdf(
     fixtures_dir: Path, tmp_path: Path
 ) -> None:
-    pypdf = pytest.importorskip("pypdf")
-
+    """The filled IRS Schedule C PDF must be substantially-sized and on disk."""
     return_ = _load_return(fixtures_dir, "se_home_office")
     fields = compute_schedule_c_fields_all(return_)[0]
 
@@ -384,25 +393,128 @@ def test_render_scaffold_produces_readable_pdf(
 
     assert result_path == out_path
     assert out_path.exists()
-    assert out_path.stat().st_size > 0
+    # IRS f1040sc.pdf is ~120 KB; the filled output is comparable.
+    assert out_path.stat().st_size > 100_000
 
-    reader = pypdf.PdfReader(str(out_path))
-    assert len(reader.pages) >= 1
-    text = "".join(page.extract_text() or "" for page in reader.pages)
 
-    assert "Schedule C" in text
-    assert "Freeman Consulting LLC" in text
-    # One of the hand-checked amounts must show up
-    assert ("120,000" in text) or ("120000" in text)
-    # Home office line must appear in scaffold output
-    assert ("3,000" in text) or ("3000" in text)
-    # Scaffold notice
-    assert "scaffold" in text.lower()
+def test_render_layer2_round_trip_line_1_gross_receipts(
+    fixtures_dir: Path, tmp_path: Path
+) -> None:
+    """Line 1 gross receipts must round-trip through the filled PDF."""
+    return_ = _load_return(fixtures_dir, "se_home_office")
+    fields = compute_schedule_c_fields_all(return_)[0]
+
+    out_path = tmp_path / "round_trip_line_1.pdf"
+    render_schedule_c_pdf(fields, out_path)
+
+    # f1_10 = line 1 gross receipts
+    assert _load_widget_value(out_path, "f1_10[") == "120000.00"
+
+
+def test_render_layer2_round_trip_line_31_net_profit(
+    fixtures_dir: Path, tmp_path: Path
+) -> None:
+    """Line 31 net profit must round-trip through the filled PDF."""
+    return_ = _load_return(fixtures_dir, "se_home_office")
+    fields = compute_schedule_c_fields_all(return_)[0]
+    assert fields.line_31_net_profit_or_loss == Decimal("90000.00")
+
+    out_path = tmp_path / "round_trip_line_31.pdf"
+    render_schedule_c_pdf(fields, out_path)
+
+    # f1_46 = line 31 net profit
+    assert _load_widget_value(out_path, "f1_46[") == "90000.00"
+
+
+def test_render_layer2_round_trip_line_28_total_expenses(
+    fixtures_dir: Path, tmp_path: Path
+) -> None:
+    """Line 28 total expenses must round-trip through the filled PDF."""
+    return_ = _load_return(fixtures_dir, "se_home_office")
+    fields = compute_schedule_c_fields_all(return_)[0]
+    assert fields.line_28_total_expenses == Decimal("27000.00")
+
+    out_path = tmp_path / "round_trip_line_28.pdf"
+    render_schedule_c_pdf(fields, out_path)
+
+    # f1_41 = line 28 total expenses
+    assert _load_widget_value(out_path, "f1_41[") == "27000.00"
+
+
+def test_render_layer2_part_ii_left_column_round_trip(
+    fixtures_dir: Path, tmp_path: Path
+) -> None:
+    """Left column line 8 (advertising) must round-trip via f1_17."""
+    return_ = _load_return(fixtures_dir, "se_home_office")
+    fields = compute_schedule_c_fields_all(return_)[0]
+    assert fields.line_8_advertising == Decimal("3000.00")
+
+    out_path = tmp_path / "left_col.pdf"
+    render_schedule_c_pdf(fields, out_path)
+
+    assert _load_widget_value(out_path, "f1_17[") == "3000.00"
+
+
+def test_render_layer2_round_trip_business_name_header(tmp_path: Path) -> None:
+    """Business name and EIN should land in their header widgets."""
+    sc = _minimal_schedule_c(
+        business_name="Headered Biz",
+        principal_business_or_profession="Consulting",
+        principal_business_code="541611",
+        ein="98-7654321",
+    )
+    fields = compute_schedule_c_fields(sc)
+
+    out_path = tmp_path / "headered.pdf"
+    render_schedule_c_pdf(fields, out_path)
+
+    # f1_3 = line A (business or profession), f1_4 = line B (code),
+    # f1_5 = line C (business name), f1_6 = line D (EIN)
+    assert _load_widget_value(out_path, "f1_3[") == "Consulting"
+    assert _load_widget_value(out_path, "f1_4[") == "541611"
+    assert _load_widget_value(out_path, "f1_5[") == "Headered Biz"
+    assert _load_widget_value(out_path, "f1_6[") == "98-7654321"
+
+
+def test_render_layer2_part_v_other_expenses_round_trip(tmp_path: Path) -> None:
+    """Part V other expenses detail should land in the indexed row widgets."""
+    sc = _minimal_schedule_c(
+        business_name="Part V Test Co",
+        line1_gross_receipts="50000.00",
+        expenses={
+            "other_expense_detail": {
+                "merchant_fees": "123.45",
+            },
+        },
+    )
+    fields = compute_schedule_c_fields(sc)
+
+    out_path = tmp_path / "part_v.pdf"
+    render_schedule_c_pdf(fields, out_path)
+
+    # First row: f2_15 = description, f2_16 = amount
+    assert _load_widget_value(out_path, "f2_15[") == "merchant_fees"
+    assert _load_widget_value(out_path, "f2_16[") == "123.45"
+
+
+def test_render_layer2_net_loss_renders_with_negative_sign(tmp_path: Path) -> None:
+    """Net loss (line 31 < 0) should round-trip with the negative sign."""
+    sc = _minimal_schedule_c(
+        line1_gross_receipts="10000.00",
+        expenses={"line22_supplies": "25000.00"},
+        line30_home_office_expense="500.00",
+    )
+    fields = compute_schedule_c_fields(sc)
+    assert fields.line_31_net_profit_or_loss == Decimal("-15500.00")
+
+    out_path = tmp_path / "loss.pdf"
+    render_schedule_c_pdf(fields, out_path)
+
+    assert _load_widget_value(out_path, "f1_46[") == "-15500.00"
 
 
 def test_render_all_writes_one_file_per_business(tmp_path: Path) -> None:
-    pypdf = pytest.importorskip("pypdf")
-
+    """Multi-business dispatch must write one filled PDF per Schedule C."""
     return_ = _canonical_with_schedules_c(
         [
             {
@@ -425,14 +537,12 @@ def test_render_all_writes_one_file_per_business(tmp_path: Path) -> None:
     assert paths[0] != paths[1]
     assert len({p.name for p in paths}) == 2
 
-    # Verify each PDF contains its own business name.
-    names = []
-    for p in paths:
-        reader = pypdf.PdfReader(str(p))
-        text = "".join(page.extract_text() or "" for page in reader.pages)
-        names.append(text)
-    assert "Consulting Pros" in names[0]
-    assert "Pie Shop" in names[1]
+    # Verify each PDF carries the correct business name in its widget.
+    assert _load_widget_value(paths[0], "f1_5[") == "Consulting Pros"
+    assert _load_widget_value(paths[1], "f1_5[") == "Pie Shop"
+    # And the right gross receipts.
+    assert _load_widget_value(paths[0], "f1_10[") == "40000.00"
+    assert _load_widget_value(paths[1], "f1_10[") == "20000.00"
 
 
 def test_render_all_empty_schedules_c_writes_nothing(tmp_path: Path) -> None:
@@ -441,50 +551,22 @@ def test_render_all_empty_schedules_c_writes_nothing(tmp_path: Path) -> None:
     assert paths == []
 
 
-def test_render_pdf_includes_part_v_detail(tmp_path: Path) -> None:
-    pypdf = pytest.importorskip("pypdf")
+def test_render_layer2_raises_on_sha_mismatch(monkeypatch, tmp_path: Path) -> None:
+    """If the IRS PDF SHA-256 changes (silent re-issue), raise RuntimeError."""
+    from skill.scripts.output import schedule_c as sc_mod
 
-    sc = _minimal_schedule_c(
-        business_name="Part V Test Co",
-        line1_gross_receipts="50000.00",
-        expenses={
-            "other_expense_detail": {
-                "merchant_fees": "123.45",
-            },
-        },
-    )
+    bad_sha = "deadbeef" * 8
+    real_map = json.loads(sc_mod._SCHEDULE_C_MAP_PATH.read_text())
+    real_map["source_pdf_sha256"] = bad_sha
+    fake_map_path = tmp_path / "fake_map.json"
+    fake_map_path.write_text(json.dumps(real_map))
+    monkeypatch.setattr(sc_mod, "_SCHEDULE_C_MAP_PATH", fake_map_path)
+
+    sc = _minimal_schedule_c()
     fields = compute_schedule_c_fields(sc)
 
-    out_path = tmp_path / "part_v.pdf"
-    render_schedule_c_pdf(fields, out_path)
-
-    reader = pypdf.PdfReader(str(out_path))
-    text = "".join(page.extract_text() or "" for page in reader.pages)
-    # Label from other_expense_detail must reach the rendered output
-    assert "merchant_fees" in text
-    assert ("123.45" in text) or ("123" in text)
-    assert "Part V" in text
-
-
-def test_render_pdf_header_shows_ein_and_code(tmp_path: Path) -> None:
-    pypdf = pytest.importorskip("pypdf")
-
-    sc = _minimal_schedule_c(
-        business_name="Headered Biz",
-        principal_business_or_profession="Consulting",
-        principal_business_code="541611",
-        ein="98-7654321",
-    )
-    fields = compute_schedule_c_fields(sc)
-
-    out_path = tmp_path / "headered.pdf"
-    render_schedule_c_pdf(fields, out_path)
-
-    reader = pypdf.PdfReader(str(out_path))
-    text = "".join(page.extract_text() or "" for page in reader.pages)
-    assert "Headered Biz" in text
-    assert "541611" in text
-    assert "98-7654321" in text
+    with pytest.raises(RuntimeError, match="SHA-256 mismatch"):
+        sc_mod.render_schedule_c_pdf(fields, tmp_path / "out.pdf")
 
 
 # ---------------------------------------------------------------------------

@@ -15,6 +15,12 @@ for TY2025 because the remaining excess state revenues after the property tax
 exemption reimbursement (~$111.2M) fell below the $300 million threshold
 required to activate the income tax rate reduction mechanism (SB24-228).
 
+Wave 4 upgrade (2026-04-11): the previous v1 flat-approximation layer
+(federal taxable income → flat rate) has been extended with a real CO
+DR 0104 additions + DR 0104AD subtractions pass. See the block labeled
+"Wave 4 adds/subs implemented" below for exactly what is now modeled and
+the "v1 LIMITATIONS STILL OPEN" list for what is still deferred.
+
 Sources (verified 2026-04-11):
 
 - Colorado OSA "Schedule of TABOR Revenue — Fiscal Year 2025 Performance
@@ -41,14 +47,106 @@ Sources (verified 2026-04-11):
   point is **federal taxable income**, not federal AGI.
   https://tax.colorado.gov/sites/tax/files/documents/DR0104_2025.pdf
 
+- Colorado Department of Revenue, "DR 0104AD 2025 Subtractions from Income
+  Schedule" — authoritative list of CO subtractions. Lines verified via
+  WebFetch:
+      Line 1 — State Income Tax Refund from federal Schedule 1
+      Line 2 — U.S. Government Interest (e.g. Treasury interest)
+      Line 3 — Primary Taxpayer Pension and Annuity Subtraction (age-capped)
+      Line 4 — Spouse Pension and Annuity Subtraction (age-capped, MFJ)
+  https://tax.colorado.gov/sites/tax/files/documents/DR0104AD_2025.pdf
+
+- Colorado Department of Revenue, "Income Tax Topics: Social Security,
+  Pensions and Annuities" — "If you were age 65 or older as of December 31,
+  2025, you may subtract $24,000... If you were at least 55 years old, but
+  not yet 65, you may subtract $20,000... This subtraction is allowed only
+  for pension or annuity income that is included in your federal taxable
+  income." Confirms the SS-benefits-reduces-the-pension-cap interaction.
+  https://tax.colorado.gov/income-tax-topics-social-security-pensions-and-annuities
+
 Starting point: ``StateStartingPoint.FEDERAL_TAXABLE_INCOME``. CO takes the
 federal taxable income number (after the federal standard or itemized
 deduction), then applies CO additions (state tax add-back, nonqualified
 CollegeInvest/ABLE distributions, out-of-state muni bond interest, etc.) and
 CO subtractions (DR 0104AD: social security, pension exclusion, military
-pension, CollegeInvest contributions, etc.). v1 approximates CO taxable
-income as **federal taxable income itself** with an explicit ``v1_limitations``
-list locked into tests.
+pension, CollegeInvest contributions, etc.). Wave 4 implements a
+first-order set of these adds/subs; see "Wave 4 adds/subs implemented"
+below.
+
+Wave 4 adds/subs implemented (TY2025):
+
+- DR 0104 Line 2 addition — State Income Tax deducted federally. If the
+  taxpayer itemized on the federal return (``return_.itemize_deductions``
+  is True), the state-and-local income tax component of federal SALT
+  (``return_.itemized.state_and_local_income_tax``) is added back to CO
+  base income. Note this is BEFORE the $10,000 SALT cap: CO requires the
+  add-back of the state INCOME tax component ONLY, and the full amount
+  the federal return deducted on Schedule A, not just the state-income-
+  tax share of the post-cap total. A refinement would pro-rate the cap
+  across income/property/sales tax, but v1 assumes 100% of the state
+  income tax line was the addback amount.
+
+- DR 0104 Line 2 addition — Non-CO municipal bond interest. Pulled from
+  1099-INT box 8 + 1099-DIV box 11 (conservative: treats ALL muni interest
+  as non-CO). Taxpayers with in-state CO muni holdings can override.
+
+- DR 0104AD Line 1 subtraction — State Income Tax Refund from federal
+  Schedule 1 (Form 1099-G box 2 that got included in federal AGI and
+  therefore in federal taxable income). Pulled from
+  ``forms_1099_g[].box2_state_or_local_income_tax_refund``.
+
+- DR 0104AD Line 2 subtraction — U.S. Government Interest. Pulled from
+  ``forms_1099_int[].box3_us_savings_bond_and_treasury_interest``.
+  CO cannot tax federal obligation interest per the Supremacy Clause.
+
+- DR 0104AD Lines 3+4 subtraction — Pension and Annuity Subtraction with
+  age-based caps. Per the CO DOR Income Tax Topics guidance and
+  DR 0104AD 2025 instructions:
+      age 55-64: up to $20,000 per taxpayer/spouse (reduced by any
+                 Social Security benefit subtraction claimed on Line 3)
+      age 65+:   up to $24,000 per taxpayer/spouse (same reduction rule)
+  Age is computed at 12/31 of the tax year (matching CO DOR convention).
+  Pension/annuity income is pulled from
+  ``forms_1099_r[].box2a_taxable_amount`` and split by
+  ``recipient_is_taxpayer`` so the taxpayer and spouse each get their own
+  age cap. Taxpayers under 55 get $0 pension subtraction.
+
+- DR 0104AD Social Security Subtraction. Pulled from
+  ``forms_ssa_1099[].box5_net_benefits`` up to the age cap. The SS
+  subtraction reduces the pension cap dollar-for-dollar per CO rules
+  (the single combined $20,000 / $24,000 cap covers BOTH SS and pension
+  per filer). v1 routes SS benefits through the pension cap helper so
+  the cap interaction is handled in one place.
+
+v1 LIMITATIONS STILL OPEN (wave 4):
+
+- DR 0104 Line 2 SALT add-back assumes the full federal
+  ``state_and_local_income_tax`` line went onto Schedule A without any
+  pro-rata SALT cap haircut. Taxpayers whose federal SALT exceeded the
+  $10,000 cap (or $5,000 MFS) may see CO over-add the state income tax
+  component. A proper fix pro-rates the deductible SALT total across
+  income/property/sales tax. Documented in ``CO_V1_LIMITATIONS``.
+
+- DR 0104 Line 2 muni interest addback is 100% of federal tax-exempt
+  muni interest, including any CO-source muni that should in fact be
+  subtractable. Override via ``state_specific.co_non_co_muni_interest``.
+
+- Form 1099-R distribution-code gating NOT modeled for CO pension
+  subtraction: ``box2a_taxable_amount`` is summed wholesale.
+
+- DR 0104 QBI add-back (line 3), standard/itemized federal deduction
+  add-back (line 4), business meals under IRC §274(k) (line 5), non-
+  qualified CollegeInvest/ABLE distributions (lines 6-7), and other
+  additions (line 9) — NOT modeled.
+
+- DR 0104AD other subtractions NOT modeled: military retirement
+  exclusion, CollegeInvest contributions, ABLE contributions, non-
+  itemizer charitable subtraction, wildfire mitigation, conservation
+  easement, first-time homebuyer savings.
+
+- DR 0104CR credits (CO CTC, EITC match, etc.) — NOT modeled.
+
+- DR 0104AMT — NOT modeled.
 
 Reciprocity: CO has **no** bilateral reciprocity agreements with any other
 state. Verified against ``skill/reference/state-reciprocity.json`` — the
@@ -68,6 +166,7 @@ the real DR 0104PN ratio is fan-out follow-up work.
 """
 from __future__ import annotations
 
+import datetime as dt
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
@@ -75,6 +174,8 @@ from typing import Any
 
 from skill.scripts.models import (
     CanonicalReturn,
+    FilingStatus,
+    Person,
     ResidencyStatus,
     StateReturn,
 )
@@ -113,19 +214,39 @@ Source: https://content.leg.colorado.gov/sites/default/files/documents/audits/25
 
 
 CO_V1_LIMITATIONS: tuple[str, ...] = (
-    "CO additions not applied: state income tax add-back (DR 0104 line 2), "
-    "QBI deduction add-back (line 3), standard/itemized federal deduction "
+    # Wave 4 PARTIALLY closed the adds/subs gap: state income tax addback,
+    # non-CO muni interest addback, state refund subtraction, US Treasury
+    # subtraction, and age-capped pension/annuity + Social Security
+    # subtraction are now modeled. What's still missing:
+    "CO additions partially modeled (wave 4): state income tax add-back "
+    "(DR 0104 line 2 state income tax component) and non-CO municipal "
+    "bond interest addback are IMPLEMENTED. Still NOT modeled: QBI "
+    "deduction add-back (line 3), standard/itemized federal deduction "
     "add-back (line 4), business meals deducted under IRC §274(k) (line 5), "
     "nonqualified CollegeInvest Tuition Savings Account distributions "
     "(line 6), nonqualified Colorado ABLE Account distributions (line 7), "
     "other additions (line 9).",
-    "CO subtractions not applied (DR 0104AD): US government interest, "
-    "pension and annuity exclusion (up to $20k age 55-64 / $24k age 65+), "
-    "military retirement exclusion, social security benefits (taxed for "
-    "federal but deductible for CO up to the pension cap), CollegeInvest "
-    "contributions, ABLE account contributions, charitable contribution "
-    "subtraction for non-itemizers, wildfire mitigation measures, "
-    "conservation easement deduction, first-time home buyer savings.",
+    "CO subtractions partially modeled (wave 4, DR 0104AD): state income "
+    "tax refund subtraction (Line 1), U.S. government interest subtraction "
+    "(Line 2), and pension/annuity + Social Security subtraction with "
+    "age-based caps ($20k age 55-64 / $24k age 65+ per taxpayer+spouse, "
+    "Lines 3-4) are IMPLEMENTED. Still NOT modeled: military retirement "
+    "exclusion, CollegeInvest contributions, ABLE account contributions, "
+    "charitable contribution subtraction for non-itemizers, wildfire "
+    "mitigation measures, conservation easement deduction, first-time "
+    "home buyer savings.",
+    "DR 0104 Line 2 state income tax add-back uses the full pre-SALT-cap "
+    "federal state_and_local_income_tax value; taxpayers whose federal "
+    "SALT exceeded the $10k cap may see CO over-add the state income "
+    "tax component because the v1 does NOT pro-rate the SALT cap "
+    "reduction across income/property/sales tax.",
+    "DR 0104 Line 2 non-CO muni interest add-back treats 100% of federal "
+    "tax-exempt muni interest as non-CO; taxpayers with CO muni holdings "
+    "are currently over-taxed (override via state_specific).",
+    "Form 1099-R distribution-code gating NOT modeled for CO pension "
+    "subtraction: box2a_taxable_amount is summed wholesale without "
+    "consulting box7 codes for non-qualifying rollover/disability/"
+    "premature-distribution codes.",
     "CO credits not applied (DR 0104CR): CO CTC, state EITC (match of "
     "federal EITC), child care expenses credit, nonrefundable credits "
     "(DR 0104CR lines 1-26 list), innovative motor vehicle credit "
@@ -139,6 +260,17 @@ CO_V1_LIMITATIONS: tuple[str, ...] = (
     "Nonresident / part-year apportionment uses day-based proration "
     "(days / 365) instead of the DR 0104PN income-source ratio.",
 )
+
+
+# TY2025 CO age-based pension + annuity + Social Security subtraction caps.
+# Source: Colorado DOR Income Tax Topics — Social Security, Pensions and
+# Annuities and DR 0104AD 2025 Subtractions from Income Schedule.
+# The $20k and $24k caps are a SINGLE combined cap per filer that covers
+# BOTH Social Security benefits and pension/annuity income. Claiming the
+# SS subtraction reduces the remaining pension cap dollar-for-dollar.
+CO_PENSION_CAP_AGE_55_TO_64: Decimal = Decimal("20000")
+CO_PENSION_CAP_AGE_65_PLUS: Decimal = Decimal("24000")
+CO_PENSION_MIN_AGE: int = 55
 
 
 _CENTS = Decimal("0.01")
@@ -176,18 +308,160 @@ def _apportionment_fraction(
 
 
 def _co_base_income_from_federal(federal: FederalTotals) -> Decimal:
-    """Approximate CO base income.
+    """CO starting point = federal taxable income (DR 0104 line 1).
 
-    v1: CO base income = federal taxable income (DR 0104 line 1).
-
-    A real DR 0104 computation applies CO additions (lines 2-9) and CO
-    subtractions (DR 0104AD line 22) before computing tax at line 13. None
-    of those adjustments are modeled in v1 — they are enumerated in
-    ``CO_V1_LIMITATIONS`` so downstream consumers can warn the taxpayer.
     Negative federal taxable income (e.g. large itemized deductions)
     clamps to zero.
     """
     return max(Decimal("0"), federal.taxable_income)
+
+
+def _person_age_at_end_of_year(person: Person, tax_year: int) -> int:
+    """Age of ``person`` on 12/31/``tax_year``.
+
+    Mirrors the convention used in ``calc.engine._person_age_at_end_of_year``
+    without importing that helper (keeps the plugin self-contained and
+    avoids a circular-ish dependency on the federal engine). This is the
+    age used for the CO pension cap age tier.
+    """
+    dob = person.date_of_birth
+    end_of_year = dt.date(tax_year, 12, 31)
+    years = end_of_year.year - dob.year
+    if (end_of_year.month, end_of_year.day) < (dob.month, dob.day):
+        years -= 1
+    return years
+
+
+def _co_pension_cap_for_age(age: int) -> Decimal:
+    """Return the CO combined SS+pension cap for the given age.
+
+    - age < 55:        no subtraction ($0)
+    - age 55-64:       $20,000
+    - age 65+:         $24,000
+
+    Source: Colorado DOR "Income Tax Topics: Social Security, Pensions and
+    Annuities". Verified 2026-04-11.
+    """
+    if age >= 65:
+        return CO_PENSION_CAP_AGE_65_PLUS
+    if age >= CO_PENSION_MIN_AGE:
+        return CO_PENSION_CAP_AGE_55_TO_64
+    return Decimal("0")
+
+
+def _co_additions(
+    return_: CanonicalReturn, federal: FederalTotals
+) -> dict[str, Decimal]:
+    """Compute DR 0104 additions (line 2 state income tax add-back,
+    non-CO muni interest addback). Returns itemized dict + total.
+
+    Wave 4 v1:
+    - State income tax add-back: iff taxpayer itemized federally, add back
+      ``return_.itemized.state_and_local_income_tax`` (no SALT cap pro-rata,
+      see v1 limitations).
+    - Non-CO muni addback: 1099-INT box 8 + 1099-DIV box 11, conservatively
+      treated as 100% non-CO.
+    """
+    state_tax_addback = Decimal("0")
+    if return_.itemize_deductions and return_.itemized is not None:
+        # Only the income-tax component of SALT is added back; CO taxpayers
+        # who elected sales tax on Schedule A are NOT adding back income
+        # tax (they deducted none).
+        if not return_.itemized.elect_sales_tax_over_income_tax:
+            state_tax_addback = return_.itemized.state_and_local_income_tax
+
+    muni_addback = Decimal("0")
+    for form in return_.forms_1099_int:
+        muni_addback += form.box8_tax_exempt_interest
+    for form in return_.forms_1099_div:
+        muni_addback += form.box11_exempt_interest_dividends
+
+    total = state_tax_addback + muni_addback
+    return {
+        "co_dr0104_line2_state_income_tax_addback": _cents(state_tax_addback),
+        "co_dr0104_line2_non_co_muni_interest_addback": _cents(muni_addback),
+        "co_additions_total": _cents(total),
+    }
+
+
+def _co_subtractions(
+    return_: CanonicalReturn, federal: FederalTotals
+) -> dict[str, Decimal]:
+    """Compute DR 0104AD subtractions.
+
+    Wave 4 v1:
+    - Line 1 State Income Tax Refund: 1099-G box 2 amounts.
+    - Line 2 U.S. Government Interest: 1099-INT box 3.
+    - Lines 3-4 Pension + Annuity with age-based cap, split by
+      recipient_is_taxpayer. Social Security from SSA-1099 is routed
+      through the SAME cap (SS reduces the pension cap dollar-for-
+      dollar per CO rules). We apply the combined cap once per filer.
+    """
+    # Line 1: state income tax refund from Form 1099-G box 2
+    state_refund_sub = Decimal("0")
+    for form in return_.forms_1099_g:
+        state_refund_sub += form.box2_state_or_local_income_tax_refund
+
+    # Line 2: U.S. Government interest
+    us_treasury_sub = Decimal("0")
+    for form in return_.forms_1099_int:
+        us_treasury_sub += form.box3_us_savings_bond_and_treasury_interest
+
+    # Lines 3-4: pension + annuity + SS, combined per-filer age cap.
+    # Determine ages.
+    tp_age = _person_age_at_end_of_year(return_.taxpayer, return_.tax_year)
+    sp_age: int | None = None
+    if return_.spouse is not None:
+        sp_age = _person_age_at_end_of_year(return_.spouse, return_.tax_year)
+
+    tp_cap = _co_pension_cap_for_age(tp_age)
+    sp_cap = _co_pension_cap_for_age(sp_age) if sp_age is not None else Decimal("0")
+
+    # Split SS benefits by recipient.
+    tp_ss = Decimal("0")
+    sp_ss = Decimal("0")
+    for form in return_.forms_ssa_1099:
+        if form.recipient_is_taxpayer:
+            tp_ss += form.box5_net_benefits
+        else:
+            sp_ss += form.box5_net_benefits
+
+    # Split 1099-R pension/annuity taxable amounts by recipient.
+    tp_pension = Decimal("0")
+    sp_pension = Decimal("0")
+    for form in return_.forms_1099_r:
+        if form.recipient_is_taxpayer:
+            tp_pension += form.box2a_taxable_amount
+        else:
+            sp_pension += form.box2a_taxable_amount
+
+    # Apply the combined cap per filer: SS first, then pension up to
+    # remaining cap. This matches "the SS subtraction reduces the
+    # remaining pension cap dollar-for-dollar" language from CO DOR.
+    def _apply_cap(ss: Decimal, pension: Decimal, cap: Decimal) -> tuple[Decimal, Decimal]:
+        ss_allowed = min(ss, cap)
+        remaining = cap - ss_allowed
+        pension_allowed = min(pension, remaining)
+        return ss_allowed, pension_allowed
+
+    tp_ss_allowed, tp_pension_allowed = _apply_cap(tp_ss, tp_pension, tp_cap)
+    sp_ss_allowed, sp_pension_allowed = _apply_cap(sp_ss, sp_pension, sp_cap)
+
+    ss_sub_total = tp_ss_allowed + sp_ss_allowed
+    pension_sub_total = tp_pension_allowed + sp_pension_allowed
+
+    total = state_refund_sub + us_treasury_sub + ss_sub_total + pension_sub_total
+    return {
+        "co_dr0104ad_line1_state_income_tax_refund": _cents(state_refund_sub),
+        "co_dr0104ad_line2_us_government_interest": _cents(us_treasury_sub),
+        "co_dr0104ad_social_security_subtraction": _cents(ss_sub_total),
+        "co_dr0104ad_pension_annuity_subtraction": _cents(pension_sub_total),
+        "co_dr0104ad_taxpayer_age": Decimal(tp_age),
+        "co_dr0104ad_taxpayer_cap": _cents(tp_cap),
+        "co_dr0104ad_spouse_age": Decimal(sp_age) if sp_age is not None else Decimal(-1),
+        "co_dr0104ad_spouse_cap": _cents(sp_cap),
+        "co_subtractions_total": _cents(total),
+    }
 
 
 def _co_tax(co_base_income: Decimal) -> Decimal:
@@ -221,8 +495,26 @@ class ColoradoPlugin:
         residency: ResidencyStatus,
         days_in_state: int,
     ) -> StateReturn:
-        co_base = _co_base_income_from_federal(federal)
-        co_tax_full = _co_tax(co_base)
+        # Step 1: start from federal taxable income (DR 0104 line 1).
+        co_base_line1 = _co_base_income_from_federal(federal)
+
+        # Step 2: DR 0104 additions (state income tax addback + non-CO
+        # muni interest). Line 2 on DR 0104.
+        additions = _co_additions(return_, federal)
+        additions_total = additions["co_additions_total"]
+
+        # Step 3: DR 0104AD subtractions (US Treasury, state refund,
+        # age-capped pension/annuity + Social Security).
+        subtractions = _co_subtractions(return_, federal)
+        subtractions_total = subtractions["co_subtractions_total"]
+
+        # Step 4: CO taxable income after adjustments.
+        co_base_adjusted = co_base_line1 + additions_total - subtractions_total
+        if co_base_adjusted < 0:
+            co_base_adjusted = Decimal("0")
+        co_base_adjusted = _cents(co_base_adjusted)
+
+        co_tax_full = _co_tax(co_base_adjusted)
 
         # Apportion tax for nonresident / part-year. TODO: replace with
         # real DR 0104PN income-source ratio in fan-out.
@@ -230,7 +522,17 @@ class ColoradoPlugin:
         co_tax_apportioned = _cents(co_tax_full * fraction)
 
         state_specific: dict[str, Any] = {
-            "state_base_income_approx": _cents(co_base),
+            # "state_base_income_approx" is preserved for backward
+            # compatibility with wave 3 tests: it equals federal taxable
+            # income (DR 0104 line 1) pre-adds/subs. Wave 4 adds the
+            # post-adjustment base under
+            # "state_base_income_after_adjustments".
+            "state_base_income_approx": _cents(co_base_line1),
+            "state_base_income_after_adjustments": co_base_adjusted,
+            "co_additions": additions,
+            "co_subtractions": subtractions,
+            "co_additions_total": additions_total,
+            "co_subtractions_total": subtractions_total,
             "state_total_tax": co_tax_apportioned,
             "state_total_tax_resident_basis": co_tax_full,
             "flat_rate": CO_TY2025_FLAT_RATE,

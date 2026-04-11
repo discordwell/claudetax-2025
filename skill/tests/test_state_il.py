@@ -39,6 +39,10 @@ from skill.scripts.models import (
     Address,
     CanonicalReturn,
     FilingStatus,
+    Form1099DIV,
+    Form1099INT,
+    Form1099R,
+    FormSSA1099,
     Person,
     ResidencyStatus,
     StateReturn,
@@ -578,3 +582,302 @@ class TestIllinoisPluginFormIds:
             days_in_state=365,
         )
         assert PLUGIN.render_pdfs(state_return, tmp_path) == []
+
+
+# ---------------------------------------------------------------------------
+# Wave 4: IL-1040 line 2 + line 5 + Schedule M line 22 adds/subs
+# ---------------------------------------------------------------------------
+#
+# Each test in this class takes the baseline $65k single IL filer and
+# attaches exactly one canonical return field (a 1099-INT with US Treasury
+# interest, a 1099-R, a SSA-1099, a 1099-INT/1099-DIV with muni interest).
+# Every test asserts the DELTA between the baseline IL tax and the IL tax
+# with the adjustment applied is exactly ``rate * amount`` (or the negative
+# for an addback), at the cent. This structure catches (a) wiring bugs,
+# (b) rounding drift, and (c) accidental double-counting on sum lines.
+#
+# Baseline for the $65k single filer is locked in the wave-3 class
+# ``TestIllinoisPluginComputeResident`` at $3,076.43.
+
+
+def _add_1099_int(
+    return_: CanonicalReturn,
+    box1: str = "0",
+    box3: str = "0",
+    box8: str = "0",
+) -> CanonicalReturn:
+    """Append a 1099-INT to a canonical return — helper for deltas."""
+    return_.forms_1099_int.append(
+        Form1099INT(
+            payer_name="Test Broker",
+            box1_interest_income=Decimal(box1),
+            box3_us_savings_bond_and_treasury_interest=Decimal(box3),
+            box8_tax_exempt_interest=Decimal(box8),
+        )
+    )
+    return return_
+
+
+def _add_1099_div(
+    return_: CanonicalReturn, box11: str = "0"
+) -> CanonicalReturn:
+    return_.forms_1099_div.append(
+        Form1099DIV(
+            payer_name="Test Fund",
+            box11_exempt_interest_dividends=Decimal(box11),
+        )
+    )
+    return return_
+
+
+def _add_1099_r(
+    return_: CanonicalReturn,
+    box2a: str,
+    recipient_is_taxpayer: bool = True,
+) -> CanonicalReturn:
+    return_.forms_1099_r.append(
+        Form1099R(
+            payer_name="Test Pension",
+            box1_gross_distribution=Decimal(box2a),
+            box2a_taxable_amount=Decimal(box2a),
+            recipient_is_taxpayer=recipient_is_taxpayer,
+        )
+    )
+    return return_
+
+
+def _add_ssa_1099(
+    return_: CanonicalReturn,
+    box5: str,
+    recipient_is_taxpayer: bool = True,
+) -> CanonicalReturn:
+    return_.forms_ssa_1099.append(
+        FormSSA1099(
+            recipient_is_taxpayer=recipient_is_taxpayer,
+            box5_net_benefits=Decimal(box5),
+        )
+    )
+    return return_
+
+
+class TestIllinoisPluginAddsAndSubsWave4:
+    # -----------------------------------------------------------------
+    # Schedule M Step 2 Line 22 — US Treasury interest subtraction
+    # -----------------------------------------------------------------
+
+    def test_us_treasury_interest_reduces_tax_by_rate_times_amount(
+        self, single_65k_return, federal_single_65k
+    ):
+        """Attaching a 1099-INT with box 3 = $1,000 should reduce IL tax
+        by exactly 0.0495 * $1,000 = $49.50.
+
+        Source: IL-1040 Schedule M Step 2 Line 22 — "U.S. Treasury bonds,
+        bills, notes, savings bonds, and U.S. agency interest from
+        federal Form 1040 or 1040-SR".
+        """
+        baseline = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        with_treasury = PLUGIN.compute(
+            _add_1099_int(single_65k_return, box3="1000"),
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        delta = (
+            baseline.state_specific["state_total_tax"]
+            - with_treasury.state_specific["state_total_tax"]
+        )
+        assert delta == Decimal("49.50")
+        assert with_treasury.state_specific["il_subtractions"][
+            "il_schedule_m_line22_us_treasury_subtraction"
+        ] == Decimal("1000.00")
+
+    def test_us_treasury_subtraction_aggregates_multiple_1099_ints(
+        self, single_65k_return, federal_single_65k
+    ):
+        """Multiple 1099-INTs with box 3 amounts should sum to a single
+        subtraction; delta is 0.0495 * total box3."""
+        _add_1099_int(single_65k_return, box3="750")
+        _add_1099_int(single_65k_return, box3="250")
+        result = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        assert result.state_specific["il_subtractions"][
+            "il_schedule_m_line22_us_treasury_subtraction"
+        ] == Decimal("1000.00")
+        # Same tax as the combined-$1000 single form case.
+        assert result.state_specific["state_total_tax"] == Decimal("3026.93")
+
+    # -----------------------------------------------------------------
+    # IL-1040 Line 5 — Social Security subtraction
+    # -----------------------------------------------------------------
+
+    def test_social_security_benefits_subtracted_100_percent(
+        self, single_65k_return, federal_single_65k
+    ):
+        """IL does not tax Social Security; 100% of SSA-1099 box 5 is
+        subtracted on IL-1040 Line 5 per the IL-1040 instructions
+        page 2 'Tips To Speed Up' bullet."""
+        _add_ssa_1099(single_65k_return, box5="20000")
+        result = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        assert result.state_specific["il_subtractions"][
+            "il_1040_line5_social_security_subtraction"
+        ] == Decimal("20000.00")
+        # Baseline $3,076.43 - (0.0495 * 20,000) = $3,076.43 - $990 = $2,086.43
+        assert result.state_specific["state_total_tax"] == Decimal("2086.43")
+
+    # -----------------------------------------------------------------
+    # IL-1040 Line 5 — Qualified retirement income subtraction
+    # -----------------------------------------------------------------
+
+    def test_qualified_retirement_income_subtracted(
+        self, single_65k_return, federal_single_65k
+    ):
+        """IL is retirement-friendly: 100% of 1099-R box 2a taxable
+        amount comes off IL base income on Line 5."""
+        _add_1099_r(single_65k_return, box2a="15000")
+        result = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        assert result.state_specific["il_subtractions"][
+            "il_1040_line5_retirement_income_subtraction"
+        ] == Decimal("15000.00")
+        # Baseline - 0.0495 * 15000 = 3076.43 - 742.50 = 2333.93
+        assert result.state_specific["state_total_tax"] == Decimal("2333.93")
+
+    def test_pension_plus_us_treasury_combine_linearly(
+        self, single_65k_return, federal_single_65k
+    ):
+        """Multiple subtractions combine linearly at the cent."""
+        _add_1099_r(single_65k_return, box2a="10000")
+        _add_1099_int(single_65k_return, box3="2000")
+        result = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        # Combined subtraction = $12,000 -> tax reduced by 0.0495*12000 = 594.
+        # Baseline 3076.43 - 594.00 = 2482.43
+        assert result.state_specific["il_subtractions_total"] == Decimal(
+            "12000.00"
+        )
+        assert result.state_specific["state_total_tax"] == Decimal("2482.43")
+
+    # -----------------------------------------------------------------
+    # IL-1040 Line 2 — Non-IL muni interest addback
+    # -----------------------------------------------------------------
+
+    def test_non_il_muni_interest_added_back_increases_tax(
+        self, single_65k_return, federal_single_65k
+    ):
+        """Non-IL muni interest (1099-INT box 8) is added back on
+        IL-1040 Line 2, which INCREASES IL tax by 0.0495 * box8."""
+        _add_1099_int(single_65k_return, box8="5000")
+        result = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        # Baseline + 0.0495 * 5000 = 3076.43 + 247.50 = 3323.93
+        assert result.state_specific["il_additions"][
+            "il_1040_line2_tax_exempt_interest_addback"
+        ] == Decimal("5000.00")
+        assert result.state_specific["state_total_tax"] == Decimal("3323.93")
+
+    def test_muni_addback_handles_both_1099_int_and_1099_div(
+        self, single_65k_return, federal_single_65k
+    ):
+        """Both 1099-INT box 8 and 1099-DIV box 11 feed Line 2."""
+        _add_1099_int(single_65k_return, box8="2000")
+        _add_1099_div(single_65k_return, box11="3000")
+        result = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        assert result.state_specific["il_additions_total"] == Decimal(
+            "5000.00"
+        )
+        assert result.state_specific["state_total_tax"] == Decimal("3323.93")
+
+    # -----------------------------------------------------------------
+    # Adds + subs combined
+    # -----------------------------------------------------------------
+
+    def test_adds_and_subs_net_against_each_other(
+        self, single_65k_return, federal_single_65k
+    ):
+        """$1,000 non-IL muni addback + $1,000 US Treasury subtraction
+        should net to $0 delta — same tax as the baseline."""
+        _add_1099_int(single_65k_return, box3="1000", box8="1000")
+        result = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        assert result.state_specific["state_total_tax"] == Decimal("3076.43")
+        assert result.state_specific["il_additions_total"] == Decimal(
+            "1000.00"
+        )
+        assert result.state_specific["il_subtractions_total"] == Decimal(
+            "1000.00"
+        )
+
+    # -----------------------------------------------------------------
+    # Floor behavior — subtractions can't push taxable < 0
+    # -----------------------------------------------------------------
+
+    def test_huge_retirement_subtraction_floors_at_zero(
+        self, single_65k_return, federal_single_65k
+    ):
+        """A pension distribution larger than federal AGI should not
+        produce negative IL tax."""
+        _add_1099_r(single_65k_return, box2a="500000")
+        result = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        assert result.state_specific["state_taxable_income"] == Decimal("0.00")
+        assert result.state_specific["state_total_tax"] == Decimal("0.00")
+
+    # -----------------------------------------------------------------
+    # v1_limitations — new slugs for wave 4
+    # -----------------------------------------------------------------
+
+    def test_v1_limitations_document_wave4_partial_closure(
+        self, single_65k_return, federal_single_65k
+    ):
+        """Wave 4 limitations list should still mention what's NOT
+        modeled (phase-out cliff, in-state muni carve-out, 1099-R
+        distribution-code gating)."""
+        result = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        joined = " ".join(result.state_specific["v1_limitations"]).lower()
+        assert "in-state muni" in joined or "in-state" in joined
+        assert "distribution-code" in joined or "distribution code" in joined
+        assert "phase-out" in joined or "phase out" in joined

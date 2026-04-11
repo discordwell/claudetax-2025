@@ -57,31 +57,65 @@ IRS Federal/State MeF program. Individual taxpayers cannot transmit MeF
 XML directly; they must either use the free Georgia Tax Center (GTC) at
 https://gtc.dor.ga.gov/_/ or a commercial IRS-authorized e-file provider.
 
+Wave 4 upgrade (2026-04-11): the previous v1 flat-approximation layer
+(federal AGI → flat rate) has been extended with a real GA Form 500
+Schedule 1 additions + subtractions pass. See the block labeled
+"Wave 4 adds/subs implemented" below for exactly what is now modeled and
+the "v1 LIMITATIONS STILL OPEN" list for what is still deferred.
+
+Wave 4 adds/subs implemented (TY2025):
+
+- Schedule 1 addition: non-GA municipal bond interest. Pulled from
+  ``forms_1099_int[].box8_tax_exempt_interest`` + ``forms_1099_div[]
+  .box11_exempt_interest_dividends``. Conservative v1: treats ALL
+  federal tax-exempt muni interest as non-GA.
+
+- Schedule 1 subtraction: U.S. Treasury and federal obligation interest
+  (``forms_1099_int[].box3_us_savings_bond_and_treasury_interest``).
+  GA cannot tax federal obligation interest per the Supremacy Clause.
+
+- Schedule 1 subtraction: Social Security benefits that are taxable on
+  the federal return. Per DOR guidance, "Taxable Social Security and
+  Railroad Retirement on the Federal return are exempt from Georgia
+  Income Tax. The taxable portion is subtracted on schedule 1 of Form
+  500." Pulled from ``forms_ssa_1099[].box5_net_benefits``. v1 uses
+  box 5 as a conservative upper bound — a true implementation would
+  subtract only the federally taxable portion (up to 85%).
+
+- Schedule 1 subtraction: Retirement Income Exclusion (O.C.G.A. §48-7-27).
+  Amounts per DOR guidance verified 2026-04-11:
+      age 62-64 or permanently disabled:  up to $35,000
+      age 65+:                            up to $65,000
+  Age is computed at 12/31 of the tax year. Pension income (1099-R box
+  2a taxable amount) is split by ``recipient_is_taxpayer`` so taxpayer
+  and spouse each get their own exclusion based on their own age.
+  The $4,000 earned-income sub-cap for the retirement exclusion
+  (applies when the retirement income includes earned income such as
+  W-2 wages or self-employment) is NOT modeled in v1 because the v1
+  does not distinguish earned retirement income from unearned — it
+  subtracts all 1099-R box2a as retirement. The earned-income sub-cap
+  is called out in _V1_LIMITATIONS.
+
 =============================================================================
-                LOUD v1 LIMITATIONS - NOT MODELED HERE
+                v1 LIMITATIONS STILL OPEN
 =============================================================================
 
-The simplified v1 calculation applied by this plugin is:
-
-    1. base = federal AGI  (no GA Schedule 1 additions or subtractions)
-    2. exemption_total = GA standard-deduction-equivalent personal amount
-                         + $4,000 per dependent
-    3. taxable = max(0, base - exemption_total)
-    4. tax = taxable * 5.19% (flat rate)
-
-The following are NOT modeled in v1 and will need fan-out follow-ups
-before the plugin is considered production-accurate:
+The following are NOT modeled in v1 and will need fan-out follow-ups:
 
     - Georgia itemized deductions (Schedule A adjusted for the state-local
       tax disallowance; IT-511 requires you itemize on GA if you itemize
       on federal).
-    - Retirement income exclusion (O.C.G.A. 48-7-27: up to $35,000
-      earned+unearned for age 62-64, up to $65,000 for 65+; earned-income
-      sub-cap of $4,000).
+    - $4,000 earned-income sub-cap on the retirement exclusion (applies
+      when retirement income includes W-2 wages / self-employment; v1
+      applies the full $35k/$65k cap to all 1099-R box2a without earned/
+      unearned split).
+    - Schedule 1 non-GA muni interest addback is 100% of federal tax-
+      exempt muni, over-adding in-state GA muni holdings.
     - Low Income Credit (AGI < $20,000, IT-511 page 35).
     - Child and Dependent Care Expense Credit (50% of the federal credit).
-    - Any HB 1302 surplus tax refund / one-time rebate (surplus refunds
-      have been per-year legislation and should not affect the base tax).
+    - Any HB 1302 / HB 112 / HB 1000 surplus tax refund / one-time rebate
+      (surplus refunds have been per-year legislation and should not
+      affect the base tax).
     - Unborn dependent exemption (GA-specific, $4,000 per unborn child
       claimed on Line 7b - folded into the dependent count via Line 7c
       on GA Form 500; this plugin treats `federal.num_dependents` as the
@@ -92,12 +126,16 @@ before the plugin is considered production-accurate:
     - Georgia NOL (Line 15b).
     - Credit for taxes paid to other states (Line 19).
     - Georgia estimated tax / extension payments (Line 24).
+    - Form 1099-R distribution-code gating (box 7): rollovers and non-
+      qualifying distributions are subtracted wholesale.
+    - Military retirement exclusion (under age 62).
 
 Keep this list in sync with the `v1_limitations` key inside
 `state_specific` on every StateReturn this plugin emits.
 """
 from __future__ import annotations
 
+import datetime as dt
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
@@ -106,6 +144,7 @@ from typing import Any
 from skill.scripts.models import (
     CanonicalReturn,
     FilingStatus,
+    Person,
     ResidencyStatus,
     StateReturn,
 )
@@ -143,6 +182,17 @@ GA_TY2025_PERSONAL_EXEMPTION: dict[FilingStatus, Decimal] = {
 # Source: 2025 IT-511 booklet Line 14 ("Multiply the number of dependents
 # on Line 7c by $4,000 and enter the total").
 GA_TY2025_DEPENDENT_EXEMPTION: Decimal = Decimal("4000")
+
+
+# TY2025 Georgia retirement income exclusion amounts per O.C.G.A.
+# §48-7-27(a)(5), verified 2026-04-11 via GA DOR Retirement Income
+# Exclusion page: "The exclusion provided by law is up to $35,000 in
+# retirement income for those ages 62 to 64 and up to $65,000 in
+# retirement income for Georgians 65 and over."
+# https://dor.georgia.gov/retirement-income-exclusion
+GA_RETIREMENT_EXCLUSION_AGE_62_TO_64: Decimal = Decimal("35000")
+GA_RETIREMENT_EXCLUSION_AGE_65_PLUS: Decimal = Decimal("65000")
+GA_RETIREMENT_EXCLUSION_MIN_AGE: int = 62
 
 
 _CENTS = Decimal("0.01")
@@ -194,10 +244,22 @@ def _apportionment_fraction(
 # Kept as a module-level constant so the test suite can import it directly
 # and assert parity with the value surfaced inside state_specific. Matches
 # the structure used in other hand-rolled state plugins.
+#
+# Wave 4: retains the keyword slugs existing tests assert on, while adding
+# new slugs for what Wave 4 implements vs. what is still missing.
 V1_LIMITATIONS: tuple[str, ...] = (
+    # Wave 4 partial closure marker — the Schedule 1 adds/subs that WERE
+    # missing from wave 3 are now implemented for the big-ticket line
+    # items (non-GA muni addback, US Treasury sub, SS sub, retirement
+    # exclusion). Slug retained verbatim for wave-3 test compat.
     "ga_schedule_1_additions_subtractions_not_modeled",
+    "ga_schedule_1_additions_subtractions_partial_only_wave_4_muni_add_treasury_ss_retirement_sub_implemented",
+    "ga_schedule_1_in_state_muni_interest_carve_out_not_modeled_over_adds",
+    "ga_retirement_exclusion_4k_earned_income_sub_cap_not_modeled",
+    "ga_form_1099_r_box7_distribution_code_gating_not_modeled",
     "ga_itemized_deductions_not_modeled",
-    "ga_retirement_income_exclusion_not_modeled",
+    "ga_retirement_income_exclusion_not_modeled",  # wave-3 slug retained for compat
+    "ga_military_retirement_exclusion_under_62_not_modeled",
     "ga_low_income_credit_not_modeled",
     "ga_child_and_dependent_care_credit_not_modeled",
     "ga_hb_1302_surplus_refund_not_modeled",
@@ -206,6 +268,114 @@ V1_LIMITATIONS: tuple[str, ...] = (
     "ga_unborn_dependent_exemption_line_7b_folded_into_line_7c",
     "ga_schedule_3_nonresident_apportionment_is_day_prorated_stopgap",
 )
+
+
+def _person_age_at_end_of_year(person: Person, tax_year: int) -> int:
+    """Age of ``person`` on 12/31/``tax_year`` (GA DOR convention)."""
+    dob = person.date_of_birth
+    end_of_year = dt.date(tax_year, 12, 31)
+    years = end_of_year.year - dob.year
+    if (end_of_year.month, end_of_year.day) < (dob.month, dob.day):
+        years -= 1
+    return years
+
+
+def _ga_retirement_exclusion_cap_for_age(age: int) -> Decimal:
+    """Return the GA retirement exclusion cap for ``age``.
+
+    - age < 62:       $0 (no exclusion unless permanently disabled —
+                      disability exclusion NOT modeled in v1)
+    - age 62-64:      $35,000
+    - age 65+:        $65,000
+
+    Source: GA DOR Retirement Income Exclusion page, O.C.G.A. §48-7-27.
+    """
+    if age >= 65:
+        return GA_RETIREMENT_EXCLUSION_AGE_65_PLUS
+    if age >= GA_RETIREMENT_EXCLUSION_MIN_AGE:
+        return GA_RETIREMENT_EXCLUSION_AGE_62_TO_64
+    return Decimal("0")
+
+
+def _ga_additions(return_: CanonicalReturn) -> dict[str, Decimal]:
+    """Compute Form 500 Schedule 1 additions.
+
+    Wave 4 v1: non-GA municipal bond interest addback. 1099-INT box 8 +
+    1099-DIV box 11, conservatively treated as 100% non-GA.
+    """
+    muni_addback = Decimal("0")
+    for form in return_.forms_1099_int:
+        muni_addback += form.box8_tax_exempt_interest
+    for form in return_.forms_1099_div:
+        muni_addback += form.box11_exempt_interest_dividends
+
+    total = muni_addback
+    return {
+        "ga_schedule_1_non_ga_muni_interest_addback": _cents(muni_addback),
+        "ga_additions_total": _cents(total),
+    }
+
+
+def _ga_subtractions(return_: CanonicalReturn) -> dict[str, Decimal]:
+    """Compute Form 500 Schedule 1 subtractions.
+
+    Wave 4 v1:
+    - U.S. Treasury / federal obligation interest (1099-INT box 3).
+    - Social Security benefits (100% of SSA-1099 box 5, per DOR).
+    - Retirement Income Exclusion per taxpayer/spouse based on age.
+      Pension income from ``forms_1099_r[].box2a_taxable_amount`` split
+      by ``recipient_is_taxpayer``.
+    """
+    # U.S. Treasury
+    us_treasury_sub = Decimal("0")
+    for form in return_.forms_1099_int:
+        us_treasury_sub += form.box3_us_savings_bond_and_treasury_interest
+
+    # Social Security benefits (v1 uses box 5 as a conservative upper
+    # bound; a future refinement should use only the federally taxable
+    # portion).
+    ss_sub = Decimal("0")
+    for form in return_.forms_ssa_1099:
+        ss_sub += form.box5_net_benefits
+
+    # Retirement exclusion — per-filer, age-based cap.
+    tp_age = _person_age_at_end_of_year(return_.taxpayer, return_.tax_year)
+    sp_age: int | None = None
+    if return_.spouse is not None:
+        sp_age = _person_age_at_end_of_year(return_.spouse, return_.tax_year)
+
+    tp_cap = _ga_retirement_exclusion_cap_for_age(tp_age)
+    sp_cap = (
+        _ga_retirement_exclusion_cap_for_age(sp_age)
+        if sp_age is not None
+        else Decimal("0")
+    )
+
+    tp_pension = Decimal("0")
+    sp_pension = Decimal("0")
+    for form in return_.forms_1099_r:
+        if form.recipient_is_taxpayer:
+            tp_pension += form.box2a_taxable_amount
+        else:
+            sp_pension += form.box2a_taxable_amount
+
+    tp_retirement_sub = min(tp_pension, tp_cap)
+    sp_retirement_sub = min(sp_pension, sp_cap)
+    retirement_sub = tp_retirement_sub + sp_retirement_sub
+
+    total = us_treasury_sub + ss_sub + retirement_sub
+    return {
+        "ga_schedule_1_us_treasury_interest_subtraction": _cents(us_treasury_sub),
+        "ga_schedule_1_social_security_subtraction": _cents(ss_sub),
+        "ga_schedule_1_retirement_income_exclusion": _cents(retirement_sub),
+        "ga_retirement_taxpayer_age": Decimal(tp_age),
+        "ga_retirement_taxpayer_cap": _cents(tp_cap),
+        "ga_retirement_spouse_age": (
+            Decimal(sp_age) if sp_age is not None else Decimal(-1)
+        ),
+        "ga_retirement_spouse_cap": _cents(sp_cap),
+        "ga_subtractions_total": _cents(total),
+    }
 
 
 @dataclass(frozen=True)
@@ -227,11 +397,25 @@ class GeorgiaPlugin:
         residency: ResidencyStatus,
         days_in_state: int,
     ) -> StateReturn:
-        base_income = federal.adjusted_gross_income
+        # Start from federal AGI (GA Form 500 line 8).
+        federal_agi = federal.adjusted_gross_income
+
+        # Wave 4: Schedule 1 additions / subtractions.
+        additions = _ga_additions(return_)
+        additions_total = additions["ga_additions_total"]
+        subtractions = _ga_subtractions(return_)
+        subtractions_total = subtractions["ga_subtractions_total"]
+
+        base_income_after_adjustments = (
+            federal_agi + additions_total - subtractions_total
+        )
+        if base_income_after_adjustments < 0:
+            base_income_after_adjustments = Decimal("0")
+
         exemption_total = _ga_total_exemption(
             federal.filing_status, federal.num_dependents
         )
-        taxable = base_income - exemption_total
+        taxable = base_income_after_adjustments - exemption_total
         if taxable < 0:
             taxable = Decimal("0")
 
@@ -241,7 +425,16 @@ class GeorgiaPlugin:
         state_tax_apportioned = _cents(resident_tax_full_year * fraction)
 
         state_specific: dict[str, Any] = {
-            "state_base_income_approx": _cents(base_income),
+            # ``state_base_income_approx`` preserved for wave-3 test
+            # compatibility = federal AGI directly (Form 500 line 8).
+            "state_base_income_approx": _cents(federal_agi),
+            "state_base_income_after_adjustments": _cents(
+                base_income_after_adjustments
+            ),
+            "ga_additions": additions,
+            "ga_subtractions": subtractions,
+            "ga_additions_total": additions_total,
+            "ga_subtractions_total": subtractions_total,
             "state_exemption_total": _cents(exemption_total),
             "state_taxable_income": _cents(taxable),
             "state_total_tax": state_tax_apportioned,

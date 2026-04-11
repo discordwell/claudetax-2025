@@ -43,6 +43,12 @@ from skill.scripts.models import (
     Address,
     CanonicalReturn,
     FilingStatus,
+    Form1099DIV,
+    Form1099G,
+    Form1099INT,
+    Form1099R,
+    FormSSA1099,
+    ItemizedDeductions,
     Person,
     ResidencyStatus,
     StateReturn,
@@ -638,3 +644,417 @@ class TestColoradoFormIds:
             days_in_state=365,
         )
         assert PLUGIN.render_pdfs(state_return, Path("/tmp")) == []
+
+
+# ---------------------------------------------------------------------------
+# Wave 4: DR 0104 additions + DR 0104AD subtractions
+# ---------------------------------------------------------------------------
+#
+# Baseline resident single $65k AGI / $49,250 taxable CO tax = $2,167.00
+# (from wave 3's locked ``test_resident_single_65k_standard_deduction``).
+# Each test attaches a canonical field and asserts the delta is exactly
+# ``rate * amount`` at the cent.
+
+
+def _co_add_1099_int(
+    return_: CanonicalReturn,
+    box1: str = "0",
+    box3: str = "0",
+    box8: str = "0",
+) -> CanonicalReturn:
+    return_.forms_1099_int.append(
+        Form1099INT(
+            payer_name="Test Broker",
+            box1_interest_income=Decimal(box1),
+            box3_us_savings_bond_and_treasury_interest=Decimal(box3),
+            box8_tax_exempt_interest=Decimal(box8),
+        )
+    )
+    return return_
+
+
+def _co_add_1099_div(
+    return_: CanonicalReturn, box11: str = "0"
+) -> CanonicalReturn:
+    return_.forms_1099_div.append(
+        Form1099DIV(
+            payer_name="Test Fund",
+            box11_exempt_interest_dividends=Decimal(box11),
+        )
+    )
+    return return_
+
+
+def _co_add_1099_g(
+    return_: CanonicalReturn, box2: str
+) -> CanonicalReturn:
+    return_.forms_1099_g.append(
+        Form1099G(
+            payer_name="State DOR",
+            box2_state_or_local_income_tax_refund=Decimal(box2),
+            box2_tax_year=2024,
+        )
+    )
+    return return_
+
+
+def _co_add_1099_r(
+    return_: CanonicalReturn,
+    box2a: str,
+    recipient_is_taxpayer: bool = True,
+) -> CanonicalReturn:
+    return_.forms_1099_r.append(
+        Form1099R(
+            payer_name="Test Pension",
+            box1_gross_distribution=Decimal(box2a),
+            box2a_taxable_amount=Decimal(box2a),
+            recipient_is_taxpayer=recipient_is_taxpayer,
+        )
+    )
+    return return_
+
+
+def _co_add_ssa(
+    return_: CanonicalReturn,
+    box5: str,
+    recipient_is_taxpayer: bool = True,
+) -> CanonicalReturn:
+    return_.forms_ssa_1099.append(
+        FormSSA1099(
+            recipient_is_taxpayer=recipient_is_taxpayer,
+            box5_net_benefits=Decimal(box5),
+        )
+    )
+    return return_
+
+
+# ---------------------------------------------------------------------------
+# Additional fixtures for wave 4 tests (age 65+ retiree in CO)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def senior_65k_return() -> CanonicalReturn:
+    """Single CO filer, age 65 at 12/31/2025 (DOB 1960-06-15)."""
+    return CanonicalReturn(
+        tax_year=2025,
+        filing_status=FilingStatus.SINGLE,
+        taxpayer=Person(
+            first_name="Retiree",
+            last_name="Mountain",
+            ssn="111-22-4444",
+            date_of_birth=dt.date(1960, 6, 15),
+        ),
+        address=Address(
+            street1="200 Retirement Way",
+            city="Denver",
+            state="CO",
+            zip="80202",
+        ),
+        w2s=[
+            W2(
+                employer_name="Summit Corp",
+                box1_wages=Decimal("65000"),
+                box2_federal_income_tax_withheld=Decimal("0"),
+            ),
+        ],
+    )
+
+
+@pytest.fixture
+def senior_57_return() -> CanonicalReturn:
+    """Single CO filer, age 57 (DOB 1968-06-15). Gets the $20k cap."""
+    return CanonicalReturn(
+        tax_year=2025,
+        filing_status=FilingStatus.SINGLE,
+        taxpayer=Person(
+            first_name="Earlyretiree",
+            last_name="Mountain",
+            ssn="111-22-5555",
+            date_of_birth=dt.date(1968, 6, 15),
+        ),
+        address=Address(
+            street1="300 Pre-Retirement Rd",
+            city="Denver",
+            state="CO",
+            zip="80202",
+        ),
+        w2s=[
+            W2(
+                employer_name="Summit Corp",
+                box1_wages=Decimal("65000"),
+                box2_federal_income_tax_withheld=Decimal("0"),
+            ),
+        ],
+    )
+
+
+class TestColoradoPluginAddsAndSubsWave4:
+    # -----------------------------------------------------------------
+    # DR 0104AD Line 2 — US Treasury interest subtraction
+    # -----------------------------------------------------------------
+
+    def test_us_treasury_interest_reduces_tax_by_rate_times_amount(
+        self, single_65k_return, federal_single_65k
+    ):
+        """Attaching a 1099-INT with box 3 = $1,000 should reduce CO tax
+        by exactly 0.044 * $1,000 = $44.00."""
+        baseline = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        with_treasury = PLUGIN.compute(
+            _co_add_1099_int(single_65k_return, box3="1000"),
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        delta = (
+            baseline.state_specific["state_total_tax"]
+            - with_treasury.state_specific["state_total_tax"]
+        )
+        assert delta == Decimal("44.00")
+        assert with_treasury.state_specific["co_subtractions"][
+            "co_dr0104ad_line2_us_government_interest"
+        ] == Decimal("1000.00")
+
+    # -----------------------------------------------------------------
+    # DR 0104AD Line 1 — State income tax refund subtraction
+    # -----------------------------------------------------------------
+
+    def test_state_income_tax_refund_subtracted(
+        self, single_65k_return, federal_single_65k
+    ):
+        """A prior-year state income tax refund (1099-G box 2) that was
+        included in federal taxable income is subtracted on CO DR 0104AD
+        line 1."""
+        _co_add_1099_g(single_65k_return, box2="500")
+        result = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        assert result.state_specific["co_subtractions"][
+            "co_dr0104ad_line1_state_income_tax_refund"
+        ] == Decimal("500.00")
+        # Baseline $2,167.00 - 0.044 * 500 = $2,167.00 - $22.00 = $2,145.00
+        assert result.state_specific["state_total_tax"] == Decimal("2145.00")
+
+    # -----------------------------------------------------------------
+    # DR 0104 Line 2 — State income tax addback (itemizers)
+    # -----------------------------------------------------------------
+
+    def test_state_income_tax_addback_when_itemizing(
+        self, single_65k_return, federal_single_65k
+    ):
+        """Itemizers add back the state_and_local_income_tax line on
+        DR 0104 Line 2. $5,000 SALT-income addback -> tax INCREASES by
+        0.044 * 5000 = $220.00 relative to the non-itemizer baseline."""
+        single_65k_return.itemize_deductions = True
+        single_65k_return.itemized = ItemizedDeductions(
+            state_and_local_income_tax=Decimal("5000"),
+            elect_sales_tax_over_income_tax=False,
+        )
+        result = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        assert result.state_specific["co_additions"][
+            "co_dr0104_line2_state_income_tax_addback"
+        ] == Decimal("5000.00")
+        # Baseline $2,167.00 + $220.00 = $2,387.00
+        assert result.state_specific["state_total_tax"] == Decimal("2387.00")
+
+    def test_state_sales_tax_election_blocks_income_tax_addback(
+        self, single_65k_return, federal_single_65k
+    ):
+        """Taxpayers who elected sales tax on federal Schedule A did NOT
+        deduct state income tax -> CO Line 2 addback is $0 regardless of
+        the state_and_local_income_tax field."""
+        single_65k_return.itemize_deductions = True
+        single_65k_return.itemized = ItemizedDeductions(
+            state_and_local_income_tax=Decimal("5000"),
+            state_and_local_sales_tax=Decimal("4000"),
+            elect_sales_tax_over_income_tax=True,
+        )
+        result = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        assert result.state_specific["co_additions"][
+            "co_dr0104_line2_state_income_tax_addback"
+        ] == Decimal("0.00")
+        assert result.state_specific["state_total_tax"] == Decimal("2167.00")
+
+    # -----------------------------------------------------------------
+    # DR 0104 Line 2 — non-CO muni interest addback
+    # -----------------------------------------------------------------
+
+    def test_non_co_muni_interest_addback(
+        self, single_65k_return, federal_single_65k
+    ):
+        """1099-INT box 8 + 1099-DIV box 11 addback on DR 0104 line 2."""
+        _co_add_1099_int(single_65k_return, box8="3000")
+        _co_add_1099_div(single_65k_return, box11="2000")
+        result = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        assert result.state_specific["co_additions"][
+            "co_dr0104_line2_non_co_muni_interest_addback"
+        ] == Decimal("5000.00")
+        # Baseline $2,167.00 + 0.044 * 5000 = $2,167.00 + $220.00 = $2,387.00
+        assert result.state_specific["state_total_tax"] == Decimal("2387.00")
+
+    # -----------------------------------------------------------------
+    # DR 0104AD Lines 3-4 — age 65+ pension/annuity subtraction
+    # -----------------------------------------------------------------
+
+    def test_pension_subtraction_age_65_plus_full_cap(
+        self, senior_65k_return, federal_single_65k
+    ):
+        """Age 65+ filer with $30,000 1099-R income gets the $24,000
+        cap. CO tax is reduced by 0.044 * 24000 = $1,056.00 relative
+        to the baseline."""
+        _co_add_1099_r(senior_65k_return, box2a="30000")
+        result = PLUGIN.compute(
+            senior_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        assert result.state_specific["co_subtractions"][
+            "co_dr0104ad_pension_annuity_subtraction"
+        ] == Decimal("24000.00")
+        assert result.state_specific["co_subtractions"][
+            "co_dr0104ad_taxpayer_cap"
+        ] == Decimal("24000.00")
+        # Baseline $2,167.00 - $1,056.00 = $1,111.00
+        assert result.state_specific["state_total_tax"] == Decimal("1111.00")
+
+    def test_pension_subtraction_age_65_plus_under_cap(
+        self, senior_65k_return, federal_single_65k
+    ):
+        """Age 65+ filer with $10,000 pension income takes the full
+        $10,000 subtraction (under the $24k cap). Tax reduced by
+        0.044 * 10000 = $440."""
+        _co_add_1099_r(senior_65k_return, box2a="10000")
+        result = PLUGIN.compute(
+            senior_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        assert result.state_specific["co_subtractions"][
+            "co_dr0104ad_pension_annuity_subtraction"
+        ] == Decimal("10000.00")
+        # Baseline $2,167.00 - $440.00 = $1,727.00
+        assert result.state_specific["state_total_tax"] == Decimal("1727.00")
+
+    def test_pension_subtraction_age_55_to_64_cap(
+        self, senior_57_return, federal_single_65k
+    ):
+        """Age 57 gets the $20,000 cap, not $24,000."""
+        _co_add_1099_r(senior_57_return, box2a="30000")
+        result = PLUGIN.compute(
+            senior_57_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        assert result.state_specific["co_subtractions"][
+            "co_dr0104ad_taxpayer_cap"
+        ] == Decimal("20000.00")
+        assert result.state_specific["co_subtractions"][
+            "co_dr0104ad_pension_annuity_subtraction"
+        ] == Decimal("20000.00")
+        # Baseline $2,167.00 - 0.044 * 20000 = $2,167.00 - $880.00 = $1,287.00
+        assert result.state_specific["state_total_tax"] == Decimal("1287.00")
+
+    def test_pension_subtraction_under_age_55_zero_cap(
+        self, single_65k_return, federal_single_65k
+    ):
+        """Taxpayer under 55 gets NO pension subtraction — cap = $0."""
+        _co_add_1099_r(single_65k_return, box2a="30000")
+        result = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        assert result.state_specific["co_subtractions"][
+            "co_dr0104ad_taxpayer_cap"
+        ] == Decimal("0.00")
+        assert result.state_specific["co_subtractions"][
+            "co_dr0104ad_pension_annuity_subtraction"
+        ] == Decimal("0.00")
+        # No subtraction -> baseline $2,167.00 stays.
+        assert result.state_specific["state_total_tax"] == Decimal("2167.00")
+
+    # -----------------------------------------------------------------
+    # Social Security + pension cap interaction
+    # -----------------------------------------------------------------
+
+    def test_ss_reduces_pension_cap_dollar_for_dollar(
+        self, senior_65k_return, federal_single_65k
+    ):
+        """Per CO DOR: the $24k cap covers BOTH Social Security and
+        pension combined. With $10k SS + $20k pension, the SS eats $10k
+        of the cap, leaving $14k for the pension -> total subtraction
+        $24k (not $30k).
+
+        Source: CO DOR Income Tax Topics - Social Security, Pensions
+        and Annuities — "Any subtraction claimed for Social Security
+        benefits will reduce the subtraction an individual can claim
+        for any other pension and annuity income."
+        """
+        _co_add_ssa(senior_65k_return, box5="10000")
+        _co_add_1099_r(senior_65k_return, box2a="20000")
+        result = PLUGIN.compute(
+            senior_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        ss = result.state_specific["co_subtractions"]
+        assert ss["co_dr0104ad_social_security_subtraction"] == Decimal(
+            "10000.00"
+        )
+        # Remaining cap is $14,000 — pension of $20k is clipped to $14k.
+        assert ss["co_dr0104ad_pension_annuity_subtraction"] == Decimal(
+            "14000.00"
+        )
+        # Total subtraction is $24,000 (SS $10k + pension $14k).
+        # Baseline $2,167.00 - 0.044 * 24000 = $1,111.00
+        assert result.state_specific["state_total_tax"] == Decimal("1111.00")
+
+    # -----------------------------------------------------------------
+    # v1_limitations — wave 4 partial closure documentation
+    # -----------------------------------------------------------------
+
+    def test_v1_limitations_mention_wave4_partial_closure(
+        self, single_65k_return, federal_single_65k
+    ):
+        """Wave 4 updates v1_limitations to mark which adds/subs are
+        now implemented and which are still missing."""
+        result = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        joined = " ".join(result.state_specific["v1_limitations"]).lower()
+        # Wave 4 marker: additions PARTIALLY modeled.
+        assert "partially modeled" in joined
+        # SALT cap pro-rata caveat and distribution-code gating still open.
+        assert "salt" in joined or "$10k cap" in joined
+        assert "distribution-code" in joined or "distribution code" in joined

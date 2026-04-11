@@ -261,6 +261,7 @@ def run_pipeline(
     render_schedule_b: bool = True,
     render_schedule_c: bool = True,
     render_schedule_se: bool = True,
+    render_form_6251: bool = True,
 ) -> PipelineResult:
     """Run the full pipeline: ingest → compute → render → emit result.
 
@@ -398,6 +399,22 @@ def run_pipeline(
             out_path_se = output_dir / "schedule_se.pdf"
             render_schedule_se_pdf(fields_se, out_path_se)
             rendered.append(out_path_se)
+
+    # Form 6251 renders ONLY when the engine actually computed a
+    # nonzero AMT — most returns will not. The trigger already fired
+    # inside engine.compute(), so we simply check the result.
+    if render_form_6251:
+        amt_val = canonical.computed.alternative_minimum_tax
+        if amt_val is not None and amt_val > 0:
+            from skill.scripts.output.form_6251 import (
+                compute_form_6251_fields,
+                render_form_6251_pdf,
+            )
+
+            fields_6251 = compute_form_6251_fields(canonical)
+            out_path_6251 = output_dir / "form_6251.pdf"
+            render_form_6251_pdf(fields_6251, out_path_6251)
+            rendered.append(out_path_6251)
 
     # ------------------------------------------------------------------
     # 5. Emit result.json

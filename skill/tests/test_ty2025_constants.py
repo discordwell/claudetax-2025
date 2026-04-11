@@ -417,4 +417,62 @@ def test_pending_research_is_listed():
     """Calc modules that need unresearched numbers must be blocked on research, not guesses."""
     pending = C.pending_research()
     assert len(pending) > 0
-    assert any("AMT" in item for item in pending)
+    # Pick an item that remains unresearched as of wave 6. AMT was
+    # originally in this list but was pinned in wave 6 against IRS Form
+    # 6251 TY2025 — see ``amt_6251`` block in ty2025-constants.json and
+    # ``skill/scripts/output/form_6251.py``.
+    assert any("FEIE" in item or "Foreign Earned Income" in item for item in pending)
+
+
+def test_amt_constants_no_longer_pending():
+    """Wave 6 pinned the Form 6251 AMT constants — they should not
+    appear on the pending-research list any more."""
+    pending = C.pending_research()
+    assert not any("AMT" in item for item in pending), (
+        f"AMT was pinned in wave 6; remove it from ty2025-constants.json::_todo. "
+        f"Pending still contains: {pending}"
+    )
+
+
+def test_amt_constants_block_present() -> None:
+    """The ``amt_6251`` block in the constants JSON must carry the
+    exact TY2025 numbers used by ``skill.scripts.output.form_6251``.
+    This is the authoritative cross-check — if any number here drifts
+    from the form_6251.py module, this test fails LOUDLY so a future
+    maintainer catches the mismatch."""
+    from decimal import Decimal
+    from skill.scripts.output.form_6251 import (
+        AMT_EXEMPTION_MFJ_QSS,
+        AMT_EXEMPTION_MFS,
+        AMT_EXEMPTION_SINGLE_HOH,
+        AMT_PHASEOUT_THRESHOLD_MFJ_QSS,
+        AMT_PHASEOUT_THRESHOLD_MFS,
+        AMT_PHASEOUT_THRESHOLD_SINGLE_HOH,
+        AMT_RATE_BREAKPOINT_MFS,
+        AMT_RATE_BREAKPOINT_NORMAL,
+        AMT_RATE_FLAT_ADJUSTMENT_MFS,
+        AMT_RATE_FLAT_ADJUSTMENT_NORMAL,
+    )
+
+    amt = C._raw()["amt_6251"]
+    assert Decimal(str(amt["exemption"]["single"])) == AMT_EXEMPTION_SINGLE_HOH
+    assert Decimal(str(amt["exemption"]["hoh"])) == AMT_EXEMPTION_SINGLE_HOH
+    assert Decimal(str(amt["exemption"]["mfj"])) == AMT_EXEMPTION_MFJ_QSS
+    assert Decimal(str(amt["exemption"]["qss"])) == AMT_EXEMPTION_MFJ_QSS
+    assert Decimal(str(amt["exemption"]["mfs"])) == AMT_EXEMPTION_MFS
+    assert (
+        Decimal(str(amt["exemption_phaseout_threshold"]["single"]))
+        == AMT_PHASEOUT_THRESHOLD_SINGLE_HOH
+    )
+    assert (
+        Decimal(str(amt["exemption_phaseout_threshold"]["mfj"]))
+        == AMT_PHASEOUT_THRESHOLD_MFJ_QSS
+    )
+    assert (
+        Decimal(str(amt["exemption_phaseout_threshold"]["mfs"]))
+        == AMT_PHASEOUT_THRESHOLD_MFS
+    )
+    assert Decimal(str(amt["rate_breakpoint_26_to_28"])) == AMT_RATE_BREAKPOINT_NORMAL
+    assert Decimal(str(amt["rate_breakpoint_26_to_28_mfs"])) == AMT_RATE_BREAKPOINT_MFS
+    assert Decimal(str(amt["rate_flat_adjustment"])) == AMT_RATE_FLAT_ADJUSTMENT_NORMAL
+    assert Decimal(str(amt["rate_flat_adjustment_mfs"])) == AMT_RATE_FLAT_ADJUSTMENT_MFS

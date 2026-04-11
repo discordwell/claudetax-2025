@@ -244,10 +244,33 @@
     "_sources": ["obbba_provisions", "obbba_deductions"]
   },
 
+  "amt_6251": {
+    "_authority": "IRS Form 6251 (TY2025), https://www.irs.gov/pub/irs-pdf/f6251.pdf",
+    "note": "Pinned TY2025 AMT constants. Also duplicated in skill/scripts/output/form_6251.py as named Decimal constants so the calc engine does not have to read the JSON.",
+    "exemption": {
+      "single": 88100,
+      "hoh": 88100,
+      "mfj": 137000,
+      "qss": 137000,
+      "mfs": 68500
+    },
+    "exemption_phaseout_threshold": {
+      "single": 626350,
+      "hoh": 626350,
+      "mfj": 1252700,
+      "qss": 1252700,
+      "mfs": 626350
+    },
+    "exemption_phaseout_rate_per_dollar": 0.25,
+    "rate_breakpoint_26_to_28": 239100,
+    "rate_breakpoint_26_to_28_mfs": 119550,
+    "rate_flat_adjustment": 4782,
+    "rate_flat_adjustment_mfs": 2391
+  },
+
   "_todo": {
     "note": "Items not yet researched — do NOT make up numbers. When a calc module needs one of these, block on a targeted research sub-agent.",
     "pending": [
-      "AMT exemption amount and phase-out thresholds (needed for Form 6251)",
       "Foreign Earned Income Exclusion (FEIE) amount for TY2025",
       "Student loan interest deduction phase-out thresholds",
       "Savers Credit income brackets",

@@ -1,0 +1,829 @@
+{
+  "source_pdf_url": "https://www.irs.gov/pub/irs-pdf/f6251.pdf",
+  "source_pdf_sha256": "6995bfd29c6fe1b80fdc396c9c4796c7cef58a966070db0346721eae815fea3f",
+  "source_pdf_bytes": 104434,
+  "source_pdf_title": "2025 Form 6251",
+  "fetched_at": "2026-04-11",
+  "pypdf_version": "5.9.0",
+  "form_year": 2025,
+  "form_name": "6251",
+  "total_widgets": 62,
+  "mapped_count": 62,
+  "unmapped_count": 0,
+  "notes": [
+    "Form 6251 (Alternative Minimum Tax \u2014 Individuals) widget map for the IRS-hosted TY2025 PDF. PDF /Title metadata is '2025 Form 6251'.",
+    "Widget enumeration walks /Annots on each page (NOT reader.get_fields(), which over-reports non-terminal containers). Sorted into visual reading order (page asc, rect_top desc, rect_left asc) before correlation to line numbers.",
+    "Page 1 carries lines 1a-11 (Part I AMTI plus Part II tentative-minimum-tax flow). Page 2 carries Part III lines 12-40, the alternative capital-gain-rate flow used ONLY when line 7 instructs the filer to use Part III.",
+    "TY2025 constants embedded in the instructions but not on the form itself: exemption $88,100 (Single/HoH), $137,000 (MFJ/QSS), $68,500 (MFS); exemption phase-out threshold $626,350 (Single/HoH/MFS) and $1,252,700 (MFJ/QSS) with 25%-per-dollar recapture; 26%/28% breakpoint $239,100 ($119,550 MFS) with $4,782 ($2,391 MFS) adjustment.",
+    "Layer 1 compute_form_6251_fields fills lines 1a-11 deterministically. Part III (lines 12-40) is ONLY populated when line 7 instructs \u2014 the common case is blank Part III.",
+    "Layer 1 does NOT carry 'taxpayer_ssn' (Form 1040 holds the canonical SSN). The f1_2 widget is mapped here for completeness but the renderer leaves it empty."
+  ],
+  "mapping": {
+    "taxpayer_name": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_1[0]",
+      "terminal_name": "f1_1[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        36.0,
+        684.0,
+        445.65,
+        698.001
+      ],
+      "note": "Line 0 \u2014 Name(s) shown on Form 1040"
+    },
+    "taxpayer_ssn": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_2[0]",
+      "terminal_name": "f1_2[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        446.4,
+        684.0,
+        576.0,
+        698.001
+      ],
+      "note": "Line 0 \u2014 Your social security number"
+    },
+    "line_1a_subtract_sch_1a_from_1040_14": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_3[0]",
+      "terminal_name": "f1_3[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        648.0,
+        481.65,
+        659.999
+      ],
+      "note": "Line 1a \u2014 Subtract Schedule 1-A (Form 1040), line 37, from Form 1040 line 14"
+    },
+    "line_1b_subtract_1a_from_1040_11b": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_4[0]",
+      "terminal_name": "f1_4[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        624.002,
+        576.0,
+        636.001
+      ],
+      "note": "Line 1b \u2014 Subtract line 1a from Form 1040 line 11b"
+    },
+    "line_2a_taxes_from_sch_a_7": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_5[0]",
+      "terminal_name": "f1_5[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        600.001,
+        576.0,
+        612.0
+      ],
+      "note": "Line 2a \u2014 Taxes from Schedule A, line 7"
+    },
+    "line_2b_tax_refund": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_6[0]",
+      "terminal_name": "f1_6[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        508.0,
+        588.002,
+        572.0,
+        600.001
+      ],
+      "note": "Line 2b \u2014 Tax refund from Schedule 1 line 1 or 8z (negative)"
+    },
+    "line_2c_investment_interest_expense": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_7[0]",
+      "terminal_name": "f1_7[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        576.0,
+        576.0,
+        587.999
+      ],
+      "note": "Line 2c \u2014 Investment interest expense (reg vs AMT)"
+    },
+    "line_2d_depletion": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_8[0]",
+      "terminal_name": "f1_8[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        564.001,
+        576.0,
+        576.0
+      ],
+      "note": "Line 2d \u2014 Depletion (reg vs AMT)"
+    },
+    "line_2e_nol_deduction": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_9[0]",
+      "terminal_name": "f1_9[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        552.002,
+        576.0,
+        564.001
+      ],
+      "note": "Line 2e \u2014 Net operating loss deduction (as positive)"
+    },
+    "line_2f_alternative_tax_nol_deduction": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_10[0]",
+      "terminal_name": "f1_10[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        508.0,
+        540.0,
+        572.0,
+        551.999
+      ],
+      "note": "Line 2f \u2014 Alternative tax NOL deduction (negative)"
+    },
+    "line_2g_private_activity_bond_interest": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_11[0]",
+      "terminal_name": "f1_11[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        528.001,
+        576.0,
+        540.0
+      ],
+      "note": "Line 2g \u2014 Interest from specified private activity bonds"
+    },
+    "line_2h_qualified_small_business_stock": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_12[0]",
+      "terminal_name": "f1_12[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        516.002,
+        576.0,
+        528.001
+      ],
+      "note": "Line 2h \u2014 Qualified small business stock"
+    },
+    "line_2i_iso_exercise": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_13[0]",
+      "terminal_name": "f1_13[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        504.0,
+        576.0,
+        515.999
+      ],
+      "note": "Line 2i \u2014 Exercise of incentive stock options (bargain element)"
+    },
+    "line_2j_estates_trusts": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_14[0]",
+      "terminal_name": "f1_14[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        492.001,
+        576.0,
+        504.0
+      ],
+      "note": "Line 2j \u2014 Estates and trusts K-1 box 12 code A"
+    },
+    "line_2k_disposition_of_property": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_15[0]",
+      "terminal_name": "f1_15[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        480.002,
+        576.0,
+        492.001
+      ],
+      "note": "Line 2k \u2014 Disposition of property (AMT vs reg gain/loss)"
+    },
+    "line_2l_depreciation_post_1986": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_16[0]",
+      "terminal_name": "f1_16[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        468.0,
+        576.0,
+        479.999
+      ],
+      "note": "Line 2l \u2014 Depreciation on assets after 1986 (reg vs AMT)"
+    },
+    "line_2m_passive_activities": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_17[0]",
+      "terminal_name": "f1_17[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        456.001,
+        576.0,
+        468.0
+      ],
+      "note": "Line 2m \u2014 Passive activities (AMT vs reg)"
+    },
+    "line_2n_loss_limitations": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_18[0]",
+      "terminal_name": "f1_18[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        444.002,
+        576.0,
+        456.001
+      ],
+      "note": "Line 2n \u2014 Loss limitations (AMT vs reg)"
+    },
+    "line_2o_circulation_costs": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_19[0]",
+      "terminal_name": "f1_19[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        432.0,
+        576.0,
+        443.999
+      ],
+      "note": "Line 2o \u2014 Circulation costs (reg vs AMT)"
+    },
+    "line_2p_long_term_contracts": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_20[0]",
+      "terminal_name": "f1_20[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        420.001,
+        576.0,
+        432.0
+      ],
+      "note": "Line 2p \u2014 Long-term contracts (AMT vs reg)"
+    },
+    "line_2q_mining_costs": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_21[0]",
+      "terminal_name": "f1_21[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        408.002,
+        576.0,
+        420.001
+      ],
+      "note": "Line 2q \u2014 Mining costs (reg vs AMT)"
+    },
+    "line_2r_research_and_experimental": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_22[0]",
+      "terminal_name": "f1_22[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        396.0,
+        576.0,
+        407.999
+      ],
+      "note": "Line 2r \u2014 Research and experimental costs (reg vs AMT)"
+    },
+    "line_2s_installment_sales_pre_1987": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_23[0]",
+      "terminal_name": "f1_23[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        508.0,
+        384.001,
+        572.0,
+        396.0
+      ],
+      "note": "Line 2s \u2014 Income from installment sales before 1/1/1987 (negative)"
+    },
+    "line_2t_intangible_drilling_costs": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_24[0]",
+      "terminal_name": "f1_24[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        372.002,
+        576.0,
+        384.001
+      ],
+      "note": "Line 2t \u2014 Intangible drilling costs preference"
+    },
+    "line_3_other_adjustments": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_25[0]",
+      "terminal_name": "f1_25[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        360.0,
+        576.0,
+        371.999
+      ],
+      "note": "Line 3 \u2014 Other adjustments"
+    },
+    "line_4_amti": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_26[0]",
+      "terminal_name": "f1_26[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        336.002,
+        576.0,
+        348.001
+      ],
+      "note": "Line 4 \u2014 Alternative Minimum Taxable Income"
+    },
+    "line_5_exemption": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_27[0]",
+      "terminal_name": "f1_27[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        264.002,
+        576.0,
+        276.001
+      ],
+      "note": "Line 5 \u2014 Exemption (filing-status table with phase-out)"
+    },
+    "line_6_subtract_5_from_4": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_28[0]",
+      "terminal_name": "f1_28[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        228.002,
+        576.0,
+        240.001
+      ],
+      "note": "Line 6 \u2014 Subtract line 5 from line 4"
+    },
+    "line_7_tentative_amt_26_or_28pct": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_29[0]",
+      "terminal_name": "f1_29[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        180.0,
+        576.0,
+        191.999
+      ],
+      "note": "Line 7 \u2014 Tentative AMT (26% / 28% breakpoint at $239,100)"
+    },
+    "line_8_amt_foreign_tax_credit": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_30[0]",
+      "terminal_name": "f1_30[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        120.002,
+        576.0,
+        132.001
+      ],
+      "note": "Line 8 \u2014 AMT foreign tax credit"
+    },
+    "line_9_tentative_minimum_tax": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_31[0]",
+      "terminal_name": "f1_31[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        108.0,
+        576.0,
+        119.999
+      ],
+      "note": "Line 9 \u2014 Tentative minimum tax (line 7 - line 8)"
+    },
+    "line_10_regular_tax_for_amt": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_32[0]",
+      "terminal_name": "f1_32[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        48.002,
+        576.0,
+        60.001
+      ],
+      "note": "Line 10 \u2014 Regular tax for AMT comparison"
+    },
+    "line_11_amt_owed": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_33[0]",
+      "terminal_name": "f1_33[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        36.0,
+        576.0,
+        47.999
+      ],
+      "note": "Line 11 \u2014 AMT (line 9 - line 10 if positive)"
+    },
+    "line_12_amount_from_line_6": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_1[0]",
+      "terminal_name": "f2_1[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        696.002,
+        576.0,
+        708.001
+      ],
+      "note": "Line 12 \u2014 Amount from Form 6251 line 6"
+    },
+    "line_13_qdcg_worksheet_or_sch_d": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_2[0]",
+      "terminal_name": "f2_2[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        648.0,
+        576.0,
+        659.999
+      ],
+      "note": "Line 13 \u2014 QDCG worksheet line 4 or Sch D Tax Worksheet line 13"
+    },
+    "line_14_sch_d_line_19": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_3[0]",
+      "terminal_name": "f2_3[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        624.002,
+        576.0,
+        636.001
+      ],
+      "note": "Line 14 \u2014 Schedule D line 19 (28% rate gain)"
+    },
+    "line_15_qdcg_sum_or_line_13": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_4[0]",
+      "terminal_name": "f2_4[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        576.0,
+        576.0,
+        587.999
+      ],
+      "note": "Line 15 \u2014 Sum of 13+14 capped by Sch D worksheet line 10, or line 13"
+    },
+    "line_16_smaller_of_12_or_15": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_5[0]",
+      "terminal_name": "f2_5[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        564.001,
+        576.0,
+        576.0
+      ],
+      "note": "Line 16 \u2014 Smaller of line 12 or line 15"
+    },
+    "line_17_12_minus_16": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_6[0]",
+      "terminal_name": "f2_6[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        552.002,
+        576.0,
+        564.001
+      ],
+      "note": "Line 17 \u2014 Line 12 minus line 16"
+    },
+    "line_18_tax_on_line_17": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_7[0]",
+      "terminal_name": "f2_7[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        528.001,
+        576.0,
+        540.0
+      ],
+      "note": "Line 18 \u2014 Tax on line 17 (26%/28%)"
+    },
+    "line_19_ltcg_zero_bracket_amt": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_8[0]",
+      "terminal_name": "f2_8[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        492.001,
+        576.0,
+        504.0
+      ],
+      "note": "Line 19 \u2014 $96,700/$48,350/$64,750 filing-status LTCG 0% bracket"
+    },
+    "line_20_qdcg_line_5_or_sch_d_14": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_9[0]",
+      "terminal_name": "f2_9[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        432.0,
+        576.0,
+        443.999
+      ],
+      "note": "Line 20 \u2014 QDCG worksheet line 5 or Sch D Tax Worksheet line 14"
+    },
+    "line_21_19_minus_20": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_10[0]",
+      "terminal_name": "f2_10[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        420.001,
+        576.0,
+        432.0
+      ],
+      "note": "Line 21 \u2014 Line 19 minus line 20"
+    },
+    "line_22_smaller_of_12_or_13": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_11[0]",
+      "terminal_name": "f2_11[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        408.002,
+        576.0,
+        420.001
+      ],
+      "note": "Line 22 \u2014 Smaller of line 12 or line 13"
+    },
+    "line_23_smaller_of_21_or_22": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_12[0]",
+      "terminal_name": "f2_12[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        396.0,
+        576.0,
+        407.999
+      ],
+      "note": "Line 23 \u2014 Smaller of line 21 or line 22 (taxed at 0%)"
+    },
+    "line_24_22_minus_23": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_13[0]",
+      "terminal_name": "f2_13[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        384.001,
+        576.0,
+        396.0
+      ],
+      "note": "Line 24 \u2014 Line 22 minus line 23"
+    },
+    "line_25_ltcg_15_bracket_top": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_14[0]",
+      "terminal_name": "f2_14[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        348.001,
+        576.0,
+        360.0
+      ],
+      "note": "Line 25 \u2014 15%/20% breakpoint ($533,400/$300,000/$600,050/$566,700)"
+    },
+    "line_26_amount_from_line_21": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_15[0]",
+      "terminal_name": "f2_15[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        312.001,
+        576.0,
+        324.0
+      ],
+      "note": "Line 26 \u2014 Amount from line 21"
+    },
+    "line_27_qdcg_line_5_or_sch_d_21": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_16[0]",
+      "terminal_name": "f2_16[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        264.002,
+        576.0,
+        276.001
+      ],
+      "note": "Line 27 \u2014 QDCG worksheet line 5 or Sch D Tax Worksheet line 21"
+    },
+    "line_28_sum_26_27": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_17[0]",
+      "terminal_name": "f2_17[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        252.0,
+        576.0,
+        263.999
+      ],
+      "note": "Line 28 \u2014 Line 26 + line 27"
+    },
+    "line_29_25_minus_28": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_18[0]",
+      "terminal_name": "f2_18[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        240.001,
+        576.0,
+        252.0
+      ],
+      "note": "Line 29 \u2014 Line 25 minus line 28"
+    },
+    "line_30_smaller_of_24_or_29": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_19[0]",
+      "terminal_name": "f2_19[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        228.002,
+        576.0,
+        240.001
+      ],
+      "note": "Line 30 \u2014 Smaller of line 24 or line 29"
+    },
+    "line_31_line_30_x_15pct": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_20[0]",
+      "terminal_name": "f2_20[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        216.0,
+        576.0,
+        227.999
+      ],
+      "note": "Line 31 \u2014 Line 30 \u00d7 15%"
+    },
+    "line_32_sum_23_30": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_21[0]",
+      "terminal_name": "f2_21[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        204.001,
+        576.0,
+        216.0
+      ],
+      "note": "Line 32 \u2014 Line 23 + line 30"
+    },
+    "line_33_22_minus_32": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_22[0]",
+      "terminal_name": "f2_22[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        180.0,
+        576.0,
+        191.999
+      ],
+      "note": "Line 33 \u2014 Line 22 minus line 32"
+    },
+    "line_34_line_33_x_20pct": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_23[0]",
+      "terminal_name": "f2_23[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        168.001,
+        576.0,
+        180.0
+      ],
+      "note": "Line 34 \u2014 Line 33 \u00d7 20%"
+    },
+    "line_35_sum_17_32_33": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_24[0]",
+      "terminal_name": "f2_24[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        144.0,
+        576.0,
+        155.999
+      ],
+      "note": "Line 35 \u2014 Line 17 + line 32 + line 33"
+    },
+    "line_36_12_minus_35": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_25[0]",
+      "terminal_name": "f2_25[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        132.001,
+        576.0,
+        144.0
+      ],
+      "note": "Line 36 \u2014 Line 12 minus line 35"
+    },
+    "line_37_line_36_x_25pct": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_26[0]",
+      "terminal_name": "f2_26[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        120.002,
+        576.0,
+        132.001
+      ],
+      "note": "Line 37 \u2014 Line 36 \u00d7 25% (unrecaptured 1250 gain)"
+    },
+    "line_38_sum_18_31_34_37": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_27[0]",
+      "terminal_name": "f2_27[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        108.0,
+        576.0,
+        119.999
+      ],
+      "note": "Line 38 \u2014 Line 18 + 31 + 34 + 37"
+    },
+    "line_39_tax_on_line_12": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_28[0]",
+      "terminal_name": "f2_28[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        84.002,
+        576.0,
+        96.001
+      ],
+      "note": "Line 39 \u2014 Tax on line 12 (26%/28%)"
+    },
+    "line_40_smaller_of_38_or_39": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_29[0]",
+      "terminal_name": "f2_29[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        60.001,
+        576.0,
+        72.0
+      ],
+      "note": "Line 40 \u2014 Smaller of line 38 or line 39 (flows to line 7)"
+    }
+  }
+}

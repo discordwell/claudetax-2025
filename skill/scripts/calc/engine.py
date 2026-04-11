@@ -771,6 +771,61 @@ def _any_tips_or_overtime_declared(return_: CanonicalReturn) -> bool:
     )
 
 
+def _any_amt_trigger(return_: CanonicalReturn) -> bool:
+    """Cheap gate for the Form 6251 AMT compute pass.
+
+    Fires when the taxpayer has any AMT preference that could push
+    tentative minimum tax above regular tax. The triggers are:
+
+    * **SALT add-back**: itemizing with any nonzero state/local income
+      tax, sales tax, real-estate tax, or personal-property tax. The
+      Schedule A line 7 SALT subtotal flows to Form 6251 line 2a.
+    * **Manual AMTAdjustments block**: presence of any
+      ``amt_adjustments_manual`` field with a nonzero value — ISO
+      bargain element, manual PAB interest, depreciation timing, or
+      anything in ``other_prefs``.
+    * **1099-INT box 9**: specified private activity bond interest
+      reported on any 1099-INT flows to line 2g even without a manual
+      AMTAdjustments block.
+
+    Returns False for the common case (standard deduction, no manual
+    AMT block, no PAB interest) so the engine skips Form 6251 entirely.
+    """
+    # SALT trigger — any itemizer with nonzero state/local taxes on
+    # Schedule A. Even if the post-cap amount is below the AMT
+    # exemption, we still run the compute — it's cheap and the
+    # resulting AMT is zero so nothing ships.
+    if return_.itemize_deductions and return_.itemized is not None:
+        it = return_.itemized
+        if (
+            it.state_and_local_income_tax > Decimal("0")
+            or it.state_and_local_sales_tax > Decimal("0")
+            or it.real_estate_tax > Decimal("0")
+            or it.personal_property_tax > Decimal("0")
+        ):
+            return True
+
+    # Manual AMTAdjustments block — any entry fires the path.
+    if return_.amt_adjustments_manual is not None:
+        amt_adj = return_.amt_adjustments_manual
+        if (
+            amt_adj.iso_bargain_element > Decimal("0")
+            or amt_adj.private_activity_bond_interest > Decimal("0")
+            or amt_adj.depreciation_adjustment != Decimal("0")
+            or any(v != Decimal("0") for v in amt_adj.other_prefs.values())
+        ):
+            return True
+
+    # 1099-INT box 9: specified private activity bond interest. This
+    # alone can push a filer into AMT territory if they hold the right
+    # muni bonds.
+    for f in return_.forms_1099_int:
+        if f.box9_specified_private_activity_bond_interest > Decimal("0"):
+            return True
+
+    return False
+
+
 def _call_tenforty(tf_input: "TenfortyInput") -> Any:
     """Thin wrapper around tenforty.evaluate_return for deterministic calling.
 
@@ -1124,6 +1179,59 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     payments_val = _cents(total_payments(return_with_patches))
 
     # -------------------------------------------------------------------
+    # Form 6251 — Alternative Minimum Tax (wave 6)
+    # -------------------------------------------------------------------
+    # The AMT path fires when the taxpayer has any AMT trigger item:
+    # SALT deduction, manual AMTAdjustments block, or specified private
+    # activity bond interest on a 1099-INT (box 9). When fired, AMT is
+    # computed from a preliminary ComputedTotals (taxable income +
+    # deduction_taken + regular tentative_tax) and added to total_tax.
+    amt_value: Decimal | None = None
+    amt_delta = Decimal("0")
+    if _any_amt_trigger(return_with_patches):
+        from skill.scripts.output.form_6251 import compute_form_6251_fields
+
+        # Build a temporary canonical return with a preliminary
+        # ComputedTotals so the Form 6251 compute can read taxable
+        # income, deduction_taken, and tentative_tax. This mirrors the
+        # shape the final `computed` block will take, minus the AMT
+        # contribution itself.
+        prelim_computed = ComputedTotals(
+            total_income=ti_val,
+            adjustments_total=adjustments_val,
+            adjusted_gross_income=agi,
+            deduction_taken=deduction,
+            taxable_income=ti,
+            tentative_tax=fed_tax,
+            total_credits_nonrefundable=_cents(total_credits_nonref),
+            other_taxes_total=_cents(other_taxes_val),
+            total_tax=final_total_tax,
+            total_payments=payments_val,
+        )
+        return_for_amt = return_with_patches.model_copy(
+            update={"computed": prelim_computed}
+        )
+        amt_fields = compute_form_6251_fields(return_for_amt)
+        amt_value = _cents(amt_fields.line_11_amt_owed) or Decimal("0")
+        amt_delta = amt_value
+
+        # Fold AMT into other_taxes and total_tax, and also stamp it on
+        # the OtherTaxes model so downstream consumers see it there.
+        other_taxes_val = other_taxes_val + amt_delta
+        final_total_tax = _cents(
+            (final_total_tax or Decimal("0")) + amt_delta
+        )
+        updated_other_taxes = updated_other_taxes.model_copy(
+            update={"alternative_minimum_tax": amt_value}
+        )
+        return_with_patches = return_with_patches.model_copy(
+            update={"other_taxes": updated_other_taxes}
+        )
+        # Refund / owed rely on total_tax vs payments — recompute the
+        # aggregate so the final ComputedTotals reflects the AMT delta.
+        payments_val = _cents(total_payments(return_with_patches))
+
+    # -------------------------------------------------------------------
     # Validation pass (FFFF compatibility + future cross-checks)
     # -------------------------------------------------------------------
     # Runs against `return_with_patches` so the report reflects any
@@ -1165,6 +1273,7 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
         taxable_income=ti,
         tentative_tax=fed_tax,
         total_credits_nonrefundable=_cents(total_credits_nonref),
+        alternative_minimum_tax=amt_value,
         other_taxes_total=_cents(other_taxes_val),
         total_tax=final_total_tax,
         total_payments=payments_val,

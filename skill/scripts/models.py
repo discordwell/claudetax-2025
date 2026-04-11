@@ -545,6 +545,58 @@ class AdjustmentsToIncome(_StrictModel):
     other_adjustments: dict[str, Money] = Field(default_factory=dict)
 
 
+class AMTAdjustments(_StrictModel):
+    """Form 6251 AMT-specific adjustments and preferences.
+
+    Optional block on :class:`CanonicalReturn` for taxpayers with AMT
+    preference items that the engine cannot derive from the regular
+    return. The SALT add-back on Form 6251 line 2a is handled
+    automatically by the renderer (it reads Schedule A line 7); these
+    fields cover the OTHER preferences the calc engine does not model:
+
+    * **iso_bargain_element** — Line 2i. The excess of the ISO stock's
+      fair market value over the exercise price on the date of exercise,
+      for shares exercised but NOT sold in the same tax year. Positive
+      amounts push AMTI up.
+    * **private_activity_bond_interest** — Line 2g. Interest from
+      specified private activity bonds that is exempt from regular tax
+      but not from AMT. Also populated indirectly from
+      ``Form1099INT.box9_specified_private_activity_bond_interest`` when
+      present, but this manual field lets a caller override or add to
+      that.
+    * **depreciation_adjustment** — Line 2l. Difference between regular-
+      tax and AMT depreciation on assets placed in service after 1986.
+      Positive = AMT depreciation is less than regular (AMTI goes up);
+      can be negative in later recovery years.
+    * **other_prefs** — Catch-all for the remaining Line 2c/2d/2e/2h/
+      2j/2k/2m/2n/2o/2p/2q/2r/2t preferences plus line 3 "Other
+      adjustments". Sum is added to AMTI. Keep per-line breakdown in the
+      dict for traceability.
+
+    Authority: IRS Form 6251 TY2025, Part I lines 2a-2t and 3. See
+    https://www.irs.gov/pub/irs-pdf/f6251.pdf and the accompanying
+    instructions at https://www.irs.gov/pub/irs-pdf/i6251.pdf.
+    """
+
+    iso_bargain_element: Money = Decimal("0")
+    """Line 2i — incentive stock option bargain element (FMV at
+    exercise - strike price) for ISOs exercised but held past year end."""
+
+    private_activity_bond_interest: Money = Decimal("0")
+    """Line 2g — interest from specified private activity bonds that is
+    exempt from regular tax but taxable under the AMT."""
+
+    depreciation_adjustment: Money = Decimal("0")
+    """Line 2l — post-1986 depreciation timing difference. Positive
+    increases AMTI; can be negative as regular-tax recovery catches up
+    with AMT recovery in later years."""
+
+    other_prefs: dict[str, Money] = Field(default_factory=dict)
+    """Catch-all for the remaining Form 6251 line 2/line 3 preference
+    items. Every entry is added to AMTI as-is; negative values are
+    respected for lines 2b/2f/2s which enter as subtractions."""
+
+
 class ItemizedDeductions(_StrictModel):
     """Schedule A — Itemized Deductions.
 
@@ -671,6 +723,12 @@ class ComputedTotals(_StrictModel):
     taxable_income: Money | None = None
     tentative_tax: Money | None = None
     total_credits_nonrefundable: Money | None = None
+    alternative_minimum_tax: Money | None = None
+    """Form 6251 line 11 — additional tax owed beyond regular tax when
+    tentative minimum tax exceeds regular tax. Added into ``total_tax``
+    by the engine when the Form 6251 compute path fires. ``None`` when
+    AMT was not computed (no trigger items). Zero when computed but
+    below or equal to regular tax."""
     other_taxes_total: Money | None = None
     total_tax: Money | None = None
     total_payments: Money | None = None
@@ -755,6 +813,11 @@ class CanonicalReturn(_StrictModel):
     credits: Credits = Field(default_factory=Credits)
     other_taxes: OtherTaxes = Field(default_factory=OtherTaxes)
     payments: Payments = Field(default_factory=Payments)
+
+    # Form 6251 AMT manual adjustments (ISOs, PAB interest, depreciation
+    # timing, etc.) — optional; omit for taxpayers with no AMT preferences
+    # beyond the SALT add-back (which the engine reads from itemized).
+    amt_adjustments_manual: AMTAdjustments | None = None
 
     # States
     state_returns: list[StateReturn] = Field(default_factory=list)

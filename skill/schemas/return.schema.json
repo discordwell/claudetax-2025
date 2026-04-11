@@ -1,5 +1,71 @@
 {
   "$defs": {
+    "AMTAdjustments": {
+      "additionalProperties": false,
+      "description": "Form 6251 AMT-specific adjustments and preferences.\n\nOptional block on :class:`CanonicalReturn` for taxpayers with AMT\npreference items that the engine cannot derive from the regular\nreturn. The SALT add-back on Form 6251 line 2a is handled\nautomatically by the renderer (it reads Schedule A line 7); these\nfields cover the OTHER preferences the calc engine does not model:\n\n* **iso_bargain_element** \u2014 Line 2i. The excess of the ISO stock's\n  fair market value over the exercise price on the date of exercise,\n  for shares exercised but NOT sold in the same tax year. Positive\n  amounts push AMTI up.\n* **private_activity_bond_interest** \u2014 Line 2g. Interest from\n  specified private activity bonds that is exempt from regular tax\n  but not from AMT. Also populated indirectly from\n  ``Form1099INT.box9_specified_private_activity_bond_interest`` when\n  present, but this manual field lets a caller override or add to\n  that.\n* **depreciation_adjustment** \u2014 Line 2l. Difference between regular-\n  tax and AMT depreciation on assets placed in service after 1986.\n  Positive = AMT depreciation is less than regular (AMTI goes up);\n  can be negative in later recovery years.\n* **other_prefs** \u2014 Catch-all for the remaining Line 2c/2d/2e/2h/\n  2j/2k/2m/2n/2o/2p/2q/2r/2t preferences plus line 3 \"Other\n  adjustments\". Sum is added to AMTI. Keep per-line breakdown in the\n  dict for traceability.\n\nAuthority: IRS Form 6251 TY2025, Part I lines 2a-2t and 3. See\nhttps://www.irs.gov/pub/irs-pdf/f6251.pdf and the accompanying\ninstructions at https://www.irs.gov/pub/irs-pdf/i6251.pdf.",
+      "properties": {
+        "depreciation_adjustment": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Depreciation Adjustment"
+        },
+        "iso_bargain_element": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Iso Bargain Element"
+        },
+        "other_prefs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "description": "US dollar amount, 2 decimal places"
+          },
+          "title": "Other Prefs",
+          "type": "object"
+        },
+        "private_activity_bond_interest": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Private Activity Bond Interest"
+        }
+      },
+      "title": "AMTAdjustments",
+      "type": "object"
+    },
     "Address": {
       "additionalProperties": false,
       "properties": {
@@ -370,6 +436,27 @@
           ],
           "default": null,
           "title": "Adjustments Total"
+        },
+        "alternative_minimum_tax": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                }
+              ],
+              "description": "US dollar amount, 2 decimal places"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alternative Minimum Tax"
         },
         "amount_owed": {
           "anyOf": [
@@ -4076,6 +4163,17 @@
     },
     "adjustments": {
       "$ref": "#/$defs/AdjustmentsToIncome"
+    },
+    "amt_adjustments_manual": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AMTAdjustments"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "carryforwards": {
       "$ref": "#/$defs/PriorYearCarryforwards"

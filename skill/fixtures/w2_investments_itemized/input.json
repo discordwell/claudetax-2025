@@ -1,0 +1,112 @@
+{
+  "schema_version": "0.1.0",
+  "tax_year": 2025,
+  "filing_status": "mfj",
+  "taxpayer": {
+    "first_name": "Jamie",
+    "last_name": "Smith",
+    "ssn": "222-33-4444",
+    "date_of_birth": "1980-03-15",
+    "is_blind": false,
+    "is_age_65_or_older": false
+  },
+  "spouse": {
+    "first_name": "Pat",
+    "last_name": "Smith",
+    "ssn": "333-44-5555",
+    "date_of_birth": "1982-06-20",
+    "is_blind": false,
+    "is_age_65_or_older": false
+  },
+  "address": {
+    "street1": "42 Maple Street",
+    "city": "Albany",
+    "state": "NY",
+    "zip": "12207",
+    "country": "US"
+  },
+  "w2s": [
+    {
+      "employer_name": "Acme Corp",
+      "employer_ein": "12-3456789",
+      "employee_is_taxpayer": true,
+      "box1_wages": "150000.00",
+      "box2_federal_income_tax_withheld": "18000.00",
+      "box3_social_security_wages": "150000.00",
+      "box4_social_security_tax_withheld": "9300.00",
+      "box5_medicare_wages": "150000.00",
+      "box6_medicare_tax_withheld": "2175.00",
+      "box7_social_security_tips": "0",
+      "box8_allocated_tips": "0",
+      "box10_dependent_care_benefits": "0",
+      "box11_nonqualified_plans": "0",
+      "box12_entries": [],
+      "box13_statutory_employee": false,
+      "box13_retirement_plan": false,
+      "box13_third_party_sick_pay": false,
+      "box14_other": [],
+      "state_rows": []
+    },
+    {
+      "employer_name": "Beta LLC",
+      "employer_ein": "98-7654321",
+      "employee_is_taxpayer": false,
+      "box1_wages": "50000.00",
+      "box2_federal_income_tax_withheld": "5000.00",
+      "box3_social_security_wages": "50000.00",
+      "box4_social_security_tax_withheld": "3100.00",
+      "box5_medicare_wages": "50000.00",
+      "box6_medicare_tax_withheld": "725.00",
+      "box7_social_security_tips": "0",
+      "box8_allocated_tips": "0",
+      "box10_dependent_care_benefits": "0",
+      "box11_nonqualified_plans": "0",
+      "box12_entries": [],
+      "box13_statutory_employee": false,
+      "box13_retirement_plan": false,
+      "box13_third_party_sick_pay": false,
+      "box14_other": [],
+      "state_rows": []
+    }
+  ],
+  "forms_1099_int": [
+    {
+      "payer_name": "Big Bank",
+      "recipient_is_taxpayer": true,
+      "box1_interest_income": "3000.00"
+    }
+  ],
+  "forms_1099_div": [
+    {
+      "payer_name": "Index Fund",
+      "recipient_is_taxpayer": true,
+      "box1a_ordinary_dividends": "5000.00",
+      "box1b_qualified_dividends": "3000.00",
+      "box2a_total_capital_gain_distributions": "500.00"
+    }
+  ],
+  "forms_1099_b": [
+    {
+      "broker_name": "Brokerage Inc",
+      "recipient_is_taxpayer": true,
+      "transactions": [
+        {
+          "description": "100 sh VTI",
+          "date_acquired": "2018-05-01",
+          "date_sold": "2025-11-15",
+          "proceeds": "20000.00",
+          "cost_basis": "10000.00",
+          "is_long_term": true,
+          "basis_reported_to_irs": true
+        }
+      ]
+    }
+  ],
+  "itemize_deductions": true,
+  "itemized": {
+    "state_and_local_income_tax": "15000.00",
+    "real_estate_tax": "8000.00",
+    "home_mortgage_interest": "20000.00",
+    "gifts_to_charity_cash": "5000.00"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "description": "MFJ with two W-2s ($150k taxpayer + $50k spouse), investment income (interest, qualified dividends, capital gain distribution, long-term 1099-B gain), and itemized deductions with SALT cap applied. Exercises SALT cap ($23k raw -> $10k cap), itemized election over MFJ standard deduction ($35k > $31.5k), and long-term capital gains preferential rate.",
+  "authority": [
+    "skill/reference/ty2025-constants.json for MFJ standard deduction $31,500 (OBBBA)",
+    "IRC sec. 164(b)(6) SALT cap $10,000 (TCJA, made permanent by OBBBA)",
+    "skill/scripts/calc/engine.py::itemized_total_capped for SALT cap enforcement",
+    "Engine-locked values produced by skill/scripts/calc/engine.py::compute on 2026-04-10"
+  ],
+  "expected_computed_totals": {
+    "total_income": "218500.00",
+    "adjustments_total": "0.00",
+    "adjusted_gross_income": "218500.00",
+    "deduction_taken": "35000.00",
+    "taxable_income": "183500.00",
+    "tentative_tax": "29253.00",
+    "other_taxes_total": "0.00",
+    "total_tax": "29253.00",
+    "total_payments": "23000.00",
+    "refund": null,
+    "amount_owed": "6253.00",
+    "effective_rate": 15.9,
+    "marginal_rate": 22.0
+  },
+  "hand_check": {
+    "wages_calc": "150000 (Jamie W-2) + 50000 (Pat W-2) = 200000",
+    "investment_income_calc": "3000 interest + 5000 ord div + 500 cap gain distr + 10000 LT 1099-B (20000 proceeds - 10000 basis) = 18500",
+    "total_income_calc": "200000 wages + 18500 investment = 218500",
+    "agi_calc": "218500 total income - 0 adjustments = 218500 AGI",
+    "salt_raw": "15000 state income tax + 8000 real estate tax = 23000",
+    "salt_capped_mfj": "min(23000, 10000) = 10000 (SALT cap $10k for MFJ)",
+    "itemized_total_calc": "10000 SALT (capped) + 20000 home mortgage interest + 5000 charity cash = 35000",
+    "standard_deduction_mfj_ty2025_obbba": 31500,
+    "deduction_elected": "itemize because 35000 > 31500 MFJ standard",
+    "taxable_income_calc": "218500 AGI - 35000 deduction = 183500",
+    "total_withholding_calc": "18000 (Jamie W-2) + 5000 (Pat W-2) = 23000",
+    "balance_due_calc": "29253 total tax - 23000 withholding = 6253 owed"
+  }
+}

@@ -255,8 +255,14 @@ class TestStateRegistry:
         assert codes == sorted(codes)
 
     def test_registry_len(self):
-        """8 no-tax + 4 wave-1 + 6 wave-2 + 6 wave-3 taxing states = 24 registered plugins."""
-        assert len(registry) == 24
+        """8 no-tax + 4 wave-1 + 6 wave-2 + 6 wave-3 + 6 wave-4 taxing states
+        = 30 registered plugins.
+
+        Wave 4 added CT, KS, KY, MD, MN, WI — all hand-rolled from DOR
+        primary sources except WI, which wraps tenforty's graph backend
+        (see skill/reference/tenforty-ty2025-gap.md for the enum gap).
+        """
+        assert len(registry) == 30
 
 
 # ---------------------------------------------------------------------------

@@ -416,6 +416,8 @@ def run_pipeline(
     render_form_4562: bool = True,
     render_form_8829: bool = True,
     render_state_returns: bool = True,
+    build_paper_bundle: bool = True,
+    emit_ffff_map: bool = True,
 ) -> PipelineResult:
     """Run the full pipeline: ingest → compute → render → emit result.
 
@@ -442,6 +444,19 @@ def run_pipeline(
         distributions; Schedule SE is skipped if SE net earnings are
         under the $400 filing floor; Form 4562 is rendered per
         Schedule C that has ``depreciable_assets`` populated.
+    build_paper_bundle
+        When ``True`` (default), assemble all rendered federal PDFs into
+        a single ``paper_bundle.pdf`` inside ``output_dir`` (cover sheet
+        + ordered forms + signature page + mailing instructions). Pass
+        ``False`` to skip bundle assembly — useful when the caller only
+        wants the loose form PDFs. The bundle path is appended to
+        ``PipelineResult.rendered_paths`` when built.
+    emit_ffff_map
+        When ``True`` (default), write the FFFF entry transcript to
+        ``output_dir / 'ffff_entries.json'`` and
+        ``output_dir / 'ffff_entries.txt'``. These files are the
+        field-by-field script a taxpayer follows to type their return
+        into freefillableforms.com. Pass ``False`` to skip emission.
 
     Returns
     -------
@@ -635,4 +650,44 @@ def run_pipeline(
         state_returns=state_returns,
     )
     result.write_result_json(output_dir / "result.json")
+
+    # ------------------------------------------------------------------
+    # 6. Build paper bundle (cover sheet + forms + sig + mailing).
+    #
+    # This step runs AFTER all federal PDFs are rendered and AFTER
+    # result.json is emitted so that a failure during bundle assembly
+    # (missing reference data, pypdf merge error, etc.) leaves the
+    # loose PDFs on disk for forensic inspection.
+    #
+    # NOTE: This block is placed after the state-dispatch insertion
+    # point that wave-6 agent 1 owns. When agent 1's changes land, the
+    # state-return PDFs they render should live ABOVE this block so
+    # the paper bundle can filter them out of the federal envelope
+    # (``skill.scripts.output.paper_bundle.order_forms`` drops any
+    # path whose filename begins with ``state_``).
+    # ------------------------------------------------------------------
+    if build_paper_bundle and rendered:
+        from skill.scripts.output.paper_bundle import (
+            build_paper_bundle as _build_paper_bundle,
+        )
+
+        bundle_path = output_dir / "paper_bundle.pdf"
+        _build_paper_bundle(canonical, rendered, bundle_path)
+        rendered.append(bundle_path)
+
+    # ------------------------------------------------------------------
+    # 7. Emit FFFF entry map (JSON + human-readable transcript).
+    #
+    # The FFFF entry map is a field-by-field transcript a taxpayer
+    # follows to type their return into freefillableforms.com. It is
+    # produced from the same layer-1 field dataclasses the federal
+    # renderers use, so numbers stay bit-for-bit consistent.
+    # ------------------------------------------------------------------
+    if emit_ffff_map:
+        from skill.scripts.output.ffff_entry_map import build_ffff_entry_map
+
+        entry_map = build_ffff_entry_map(canonical)
+        (output_dir / "ffff_entries.json").write_text(entry_map.to_json())
+        (output_dir / "ffff_entries.txt").write_text(entry_map.to_text())
+
     return result

@@ -200,13 +200,14 @@ def test_salt_elect_sales_tax_reads_sales_line() -> None:
     assert fields.line_5e_salt_capped == Decimal("7500")
 
 
-def test_salt_cap_matches_engine_itemized_total_capped() -> None:
-    """Cross-check: our line 5e is consistent with the engine's SALT.
+def test_salt_cap_matches_engine_itemized_total_capped_zero_medical() -> None:
+    """Cross-check: with medical=0, line 17 equals engine's capped total.
 
-    The engine's ``itemized_total_capped`` returns the post-cap sum of
-    every Schedule A line. If we subtract the other components from
-    that total, we should recover the same SALT-capped figure that
-    Layer 1 publishes on line 5e.
+    With zero medical there is no 7.5%-floor divergence, so line 17
+    (renderer form-level total, medical post-floor) agrees bit-for-bit
+    with ``itemized_total_capped`` (engine param total, medical raw).
+    See the companion test below that locks the expected delta when
+    medical > 0.
     """
     it = ItemizedDeductions(
         state_and_local_income_tax=Decimal("15000"),
@@ -222,8 +223,52 @@ def test_salt_cap_matches_engine_itemized_total_capped() -> None:
     #   medical 0 + SALT_capped 10000 + interest 20000 + charity 5000 = 35000
     assert engine_total == Decimal("35000")
 
-    # Our line 17 total should agree exactly.
+    # With zero medical, our line 17 total agrees exactly.
     assert fields.line_17_total_itemized == engine_total
+
+
+def test_line17_vs_engine_delta_equals_7_5pct_agi_floor_on_medical() -> None:
+    """Form-vs-engine semantic gap: with medical > 0, line 17 DIVERGES
+    from ``itemized_total_capped`` by exactly ``min(raw_medical, floor)``.
+
+    - Renderer (form-level): medical line 4 = max(0, raw - 7.5% * AGI)
+    - Engine (tenforty param): raw medical (floor applied inside tenforty)
+
+    This test locks the delta so future drift on either side trips CI.
+    The goldens pass because they use medical=0.
+    """
+    from skill.scripts.models import ComputedTotals
+
+    it = ItemizedDeductions(
+        medical_and_dental_total=Decimal("20000"),
+        state_and_local_income_tax=Decimal("5000"),
+        home_mortgage_interest=Decimal("10000"),
+        gifts_to_charity_cash=Decimal("1000"),
+    )
+    # Construct a return with a populated AGI so the 7.5% floor bites.
+    # We don't need compute() — the renderer only reads
+    # return_.computed.adjusted_gross_income.
+    r_pre = _minimal_return(filing_status=FilingStatus.SINGLE, itemized=it)
+    agi = Decimal("65000")
+    r = r_pre.model_copy(
+        update={"computed": ComputedTotals(adjusted_gross_income=agi)}
+    )
+
+    fields = compute_schedule_a_fields(r)
+
+    # 7.5% floor: quantize to cents as the renderer does.
+    floor = (agi * Decimal("0.075")).quantize(Decimal("0.01"))
+    raw_medical = Decimal("20000")
+    expected_delta = min(raw_medical, floor)
+
+    engine_total = itemized_total_capped(it, FilingStatus.SINGLE)
+    delta = engine_total - fields.line_17_total_itemized
+    assert delta == expected_delta, (
+        f"Expected line_17 to lag engine_total by the floor ({expected_delta}), "
+        f"got delta={delta}. "
+        f"engine_total={engine_total}, line_17={fields.line_17_total_itemized}, "
+        f"floor={floor}, raw_medical={raw_medical}"
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -6,6 +6,28 @@ Session memory for this project. Top section = most recent session summaries (ne
 
 ## Session Summaries
 
+### 2026-04-11 10:00 UTC — Session 2: wave 3 finish + wave 4 fan-out
+
+**Wave 3 serial cleanup** (commit `8d260b1` — 3 deferred items the user split off for "finish wave 3" before wave 4 dispatch):
+- **S1 Form 4547 Trump Account AGI leak fix**: removed `trump_account_deduction_form_4547` from `_sum_adjustments` in engine.py:273 (IRC §219 disallows any individual deduction per wave-3 research). Wired `compute_trump_account_deduction` into engine.compute() as audit-only (always returns $0) and force-zero the field on returned adjustments. 4 regression tests lock a $1,000 leaked input → $0 AGI impact.
+- **S2 FFFF validator wiring**: new `run_return_validation(return_)` entry point in `skill/scripts/validate/__init__.py`. New `ComputedTotals.validation_report: dict[str, Any] | None` field (schema regenerated). engine.compute() runs validator on patched return and stores the dict. 10 tests covering shape, JSON round-trip, engine wiring, K-1 blocker surfacing.
+- **S3 golden fixture `senior_with_tips`**: Single age-67, $80k wages + $5k declared tips. Exercises BOTH OBBBA pre-tax-bracket patches (senior deduction $5,700 after 6% phase-out + Schedule 1-A tips $5,000) in a single compute() call. Locked: AGI $69,300, taxable $53,550, fed tax $6,701, refund $3,299. 6 tests.
+- Suite: 1128 → 1148 passed + 2 skipped.
+
+**Wave 4 fan-out** (13 parallel sub-agents via `isolation: "worktree"`, cherry-picked 13 commits in sequence because worktrees branched from pre-S1/S2/S3 HEAD — zero conflicts since every agent owned disjoint files). Landed:
+
+- **States (6)**: CT +89 tests ($65k single = $2,875.00, hand-rolled from CT-1040 TCS Rev. 12/25 Tables A-E); MN +78 tests ($2,931.14, hand-rolled Form M1); MD +124 tests ($4,039.01 state+local, hand-rolled Form 502 **+ 22-jurisdiction county local tax table + Anne Arundel/Frederick progressive locals + Dorchester retroactive hike**); WI +40 tests ($2,861.80, **first plugin to use tenforty `backend="graph"`** via wi_form1_2025.json graph definition, known gaps on state_taxable_income/state_tax_bracket echo); KS +151 tests ($2,827.71, hand-rolled K-40 per IP25 booklet, SB 1 2024 two-bracket 5.20/5.58 split at $23k); KY +51 tests ($2,469.20, hand-rolled flat 4% per HB 8 2022 schedule, 7-state reciprocity network).
+- **Output renderers (4)**: Schedule A +19 (SALT cap enforced, cross-check against `engine.itemized_total_capped`), Schedule B +22 ($1,500 required threshold, Part III foreign flags defaulted), Schedule C +21 (per-business dispatch via `compute_schedule_c_fields_all`, delegates Line 28/31 to engine helpers), Schedule SE +26 (TY2025 SS wage base $176,100 cited, $400 threshold, cross-checked against engine.other_taxes_total within $1).
+- **Form 1040 AcroForm widget research**: +13 tests. Downloaded IRS f1040.pdf (SHA256 `3d31c226df0d189c...`), enumerated 199 terminal widgets, **mapped 52 to all 44 numeric Layer-1 fields**. **Surprise**: IRS URL already serves the TY2025 PDF, not TY2024 — renumbers lines 11/12/13/27 for OBBBA Schedule 1-A. Delta documented in per-field notes. Full methodology doc for repeating on Schedule A/B/C/SE.
+- **SSA-1099 ingester**: +30 tests. `DocumentKind.FORM_SSA_1099` already existed. All 6 model boxes mapped (box3/4/5/6 + Medicare B/D from description narrative), synthetic widget names.
+- **IL/CO/GA state adds-subs remediation**: +32 tests. IL Sch M (Treasury sub, non-IL muni addback, 100% SS sub, retirement sub), CO DR 0104AD (state-tax addback if itemizing, state refund sub, Treasury sub, age-based pension $20k/$24k combined cap with SS reducing), GA Sch 1 (non-GA muni addback, Treasury sub, 100% SS sub, retirement exclusion $35k age 62-64 / $65k age 65+ per filer). All 3 wave-3 $65k baselines unchanged because fixtures have W-2 income only.
+
+**MAJOR FINDING (captured in `skill/reference/tenforty-ty2025-gap.md`)**: every wave-4 state agent independently discovered that tenforty's `OTSState` enum LIES about TY2025 capability. The default OTS backend has form configs for only 11 states (AZ/CA/MA/MI/NC/NJ/NY/OH/OR/PA/VA); every other enum code raises `ValueError: OTS does not support YYYY/ST_FORM`. Five agents hand-rolled (KS, KY, CT, MN, MD); one (WI) used graph backend. The reference doc lays out the decision rubric (probe → default → graph → hand-roll), the gatekeeper test pattern, and the authoritative supported-state list.
+
+**Registry wiring** (commit `abfcbac`): Registry count 24 → 30. Update test_state_plugin_api.py registry_len to 30.
+
+Suite: **1844 passed + 3 skipped** (new skip: KS tenforty-gatekeeper auto-activates when tenforty gains KS support). That's **+696 net new tests** from the wave-4 starting baseline of 1148.
+
 ### 2026-04-10 17:30 UTC — Session 1: scoping, research, plan, scaffold
 
 - **Scoped the skill**: packaged distributable, TY2025 first, federal + all states, W-2 + 1099-INT/DIV/B + Sch C + Sch E, hybrid calc engine, local JSON storage, full golden-fixture tests. Not a real-filer build — deadline pressure off. Each user installs and runs independently.
@@ -57,19 +79,26 @@ Full suite: **1128 passed + 2 skipped** in ~8s. Registry: 24 plugins (8 no-tax +
 
 Full suite: **844 passed + 1 skipped** in 1.72s. Registry: 18 plugins (8 no-tax + CA/NY/WA/DC + AZ/MA/MI/NJ/PA/VA).
 
-**Deferred to wave 4 and beyond:**
-- **Model cleanup**: remove or zero-out `AdjustmentsToIncome.trump_account_deduction_form_4547` now that wave 3 confirmed IRC §219 disallows the deduction; wire the zero-always Form 4547 patch into engine.compute() for audit visibility, or drop it
-- **Real IRS AcroForm widget name research** for Form 1040 — wave-3 renderer is a reportlab scaffold; the real overlay onto the IRS fillable PDF needs widget identifiers
-- Real per-state nonresident apportionment (CA 540NR, NY IT-203 source ratio, PA Sch NRH, MI Sch NR, WA RCW 82.87.100 sourcing, MA 1-NR/PY)
-- Hand-rolled-state additions/subtractions (IL Sch M, CO DR 0104 add/sub, GA Sch 1) — v1 approximations landed in wave 3, these need real modeling
-- Remaining ~21 taxing states (AL, AR, CT, DE, HI, ID, IN, IA, KS, KY, LA, ME, MD, MN, MS, MO, MT, NE, NM, ND, OK, RI, SC, UT, VT, WI, WV) — all hand-rolled since tenforty's 11-state list is now exhausted
-- SSA-1099/K-1 ingesters (1099-R/G landed in wave 3)
-- PDF output renderers per IRS form beyond 1040 (Sch A/B/C/D/E/SE, 8949, 8829, 6251, etc.)
-- FFFF entry map + paper-file bundle (FFFF limits checker landed in wave 3)
-- Azure Document Intelligence variants for 1098/1099 (beyond W-2)
-- Real IRS W-2 / 1099-INT / 1099-DIV / 1099-NEC / 1099-B / 1099-R / 1099-G AcroForm field name research (replace synthetic field maps)
-- SKILL.md interview flow
-- Distribution packaging + wet test
+**Wave 4 code review findings (1 fix landed, rest tracked):**
+- **FIXED**: Schedule A `line_17_total_itemized` vs `engine.itemized_total_capped` semantic gap. Code was form-accurate (medical line 4 = max(0, raw - 7.5% * AGI) per IRS form); docstring and test wrongly claimed line 17 matches engine's capped total. The engine passes RAW medical to tenforty, so engine_total is pre-floor on medical and diverges from form-level line 17 by exactly `min(raw_medical, floor)`. Fix: updated the module docstring section to document the divergence, renamed the zero-medical cross-check test, and added a new `test_line17_vs_engine_delta_equals_7_5pct_agi_floor_on_medical` test locking the expected delta. Suite 1844 → 1845.
+- **TRACKED (non-blocking)**: SSA-1099 ingester + Schedule A/B/C/SE renderers are dark (no caller assembles their Ingester/output cascade). Pre-existing pattern — every ingester and output renderer is dark until the SKILL.md interview or a bundler imports them. Wave 5 or later pipeline step will assemble.
+- **TRACKED**: `wi.py` imports private `_to_tenforty_input` from `engine` (symbolic, not public). Same pattern as oh/nj/mi/etc. If wave 5 touches the engine's tenforty marshalling, expect to update 6 importers.
+- **TRACKED**: `tenforty-ty2025-gap.md` decision rubric doesn't enumerate "tenforty silently returns zero" case (e.g. stubbed graph file). Wave-4 gatekeeper tests all pin specific nonzero figures, so drift is caught, but the rubric could call this out explicitly in step 2a.
+- **TRACKED**: MD Garrett (2.65%) and Cecil (2.74%) county local rates look atypical but are cited to Withholding Tax Facts 2025. Worth an independent double-check before MD goes user-facing.
+
+**Deferred to wave 5 and beyond:**
+- **Real AcroForm overlay for Form 1040 / Sch A/B/C/SE**: wave 4 produced the widget-name map for Form 1040 (52 of 199 mapped) and reportlab scaffolds for all 4 schedules. Wave 5 should replace Layer 2 of each renderer with a real `pypdf` AcroForm widget overlay, and apply the methodology doc to produce Schedule A/B/C/SE widget maps.
+- Real per-state nonresident apportionment (CA 540NR, NY IT-203 source ratio, PA Sch NRH, MI Sch NR, WA RCW 82.87.100 sourcing, MA 1-NR/PY, MN M1NR, KY 740-NP Sch A, etc.). Current wave-4 plugins use day-proration as a stopgap.
+- **Remaining ~21 taxing states**: AL, AR, DE, HI, IA, ID, IN, LA, ME, MO, MS, MT, ND, NE, NM, OK, RI, SC, UT, VT, WV. Per `skill/reference/tenforty-ty2025-gap.md`, every one must be hand-rolled (tenforty's default backend has no TY2025 config for any of them). Each needs its own DOR primary-source research pass.
+- Schedule K-1 ingester (SSA-1099 landed in wave 4).
+- PDF output renderers per IRS form beyond 1040/A/B/C/SE (Sch D, 8949, 8829, 6251, Sch E, Form 4562, etc.).
+- FFFF entry map + paper-file bundle (FFFF compat checker + validator entry-point wired in wave 3/4).
+- Azure Document Intelligence variants for 1098/1099 (beyond W-2).
+- Real IRS W-2 / 1099-INT / 1099-DIV / 1099-NEC / 1099-B / 1099-R / 1099-G / SSA-1099 AcroForm field name research (replace synthetic field maps, reusing the wave-4 methodology).
+- **WI graph backend output-field gaps**: `state_taxable_income` echoes AGI, `state_tax_bracket` / `state_effective_tax_rate` return 0.0. Tax total is correct but the display fields need fixing upstream in tenforty or replaced with a hand-computed post-process.
+- **Hand-rolled state deep cleanup**: CO TABOR refund, CO SALT-cap pro-rata addback, GA $4k earned-income sub-cap on retirement exclusion, KY MFJ column split (up to $130.80 taxpayer-unfavorable), KY Family Size Tax Credit, MD county-specific surtaxes, MN dependent-exemption high-income phaseouts, CT EITC (40% federal match), CT property tax credit, KS Schedule S Part A, etc. Each plugin enumerates its own V1 limitations list.
+- SKILL.md interview flow.
+- Distribution packaging + wet test.
 
 ---
 

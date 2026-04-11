@@ -88,15 +88,26 @@ Authority and citations
   OBBBA package made the cap permanent (see
   skill/scripts/calc/engine.py::SALT_CAP_NORMAL / SALT_CAP_MFS).
 
-Simplifications LOUDLY deferred (tracked for later waves)
----------------------------------------------------------
-* Line 1 is reported as the RAW medical_and_dental_total from the
-  canonical model. The 7.5%-of-AGI floor subtraction (lines 2-4) is NOT
-  applied here — tenforty already enforces it inside the engine's
-  itemized total. Line 4 here mirrors line 1 as a placeholder so a
-  human eyeballing the scaffold can still see the raw medical figure.
-  True worksheet semantics (line 4 = max(0, line 1 - line 3)) is a
-  follow-up.
+Medical semantics — IMPORTANT divergence from the engine
+--------------------------------------------------------
+Line 1 reports RAW medical_and_dental_total from the canonical model.
+Line 4 = max(0, line 1 - line 3) applies the 7.5%-of-AGI floor per the
+IRS Schedule A form layout. This is what a filer sees on the printed
+form and is the form-accurate semantics.
+
+This MEANS ``line_17_total_itemized`` (which sums line 4) will DIVERGE
+from ``skill.scripts.calc.engine.itemized_total_capped`` whenever medical
+is nonzero. The engine passes RAW medical to tenforty and lets tenforty
+apply the 7.5% floor inside its own bracket calculation; the engine's
+"capped total" is therefore PRE-floor on the medical component. Line 17
+here is POST-floor. The delta is exactly ``line 3`` (7.5% of AGI),
+capped at ``line 1``. Both are correct for their respective purposes:
+the engine number is the tenforty-parameter semantics, the renderer
+number is the IRS-form display semantics.
+
+Cross-check tests at the test boundary use medical=0 to avoid this
+divergence; a separate test explicitly locks the expected delta when
+medical > 0 so future drift on either side trips CI.
 * Line 6 ("Other taxes") is pulled from ``other_itemized`` dict keyed on
   ``"other_taxes_paid"`` only. Any other keys in ``other_itemized`` are
   routed to line 16. This matches how the engine's

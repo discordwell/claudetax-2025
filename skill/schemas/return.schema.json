@@ -54,7 +54,7 @@
     },
     "AdjustmentsToIncome": {
       "additionalProperties": false,
-      "description": "Schedule 1 Part II \u2014 above-the-line adjustments.",
+      "description": "Schedule 1 Part II \u2014 above-the-line adjustments. Includes OBBBA additions.",
       "properties": {
         "alimony_divorce_date": {
           "anyOf": [
@@ -167,6 +167,20 @@
           "description": "US dollar amount, 2 decimal places",
           "title": "Ira Deduction"
         },
+        "moving_expenses_military": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Moving Expenses Military"
+        },
         "other_adjustments": {
           "additionalProperties": {
             "anyOf": [
@@ -182,6 +196,48 @@
           },
           "title": "Other Adjustments",
           "type": "object"
+        },
+        "penalty_on_early_withdrawal_of_savings": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Penalty On Early Withdrawal Of Savings"
+        },
+        "qualified_overtime_deduction_schedule_1a": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Qualified Overtime Deduction Schedule 1A"
+        },
+        "qualified_tips_deduction_schedule_1a": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Qualified Tips Deduction Schedule 1A"
         },
         "se_health_insurance": {
           "anyOf": [
@@ -211,6 +267,20 @@
           "description": "US dollar amount, 2 decimal places",
           "title": "Se Retirement Plans"
         },
+        "senior_deduction_obbba": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Senior Deduction Obbba"
+        },
         "student_loan_interest": {
           "anyOf": [
             {
@@ -224,6 +294,20 @@
           "default": "0",
           "description": "US dollar amount, 2 decimal places",
           "title": "Student Loan Interest"
+        },
+        "trump_account_deduction_form_4547": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Trump Account Deduction Form 4547"
         }
       },
       "title": "AdjustmentsToIncome",
@@ -231,7 +315,7 @@
     },
     "ComputedTotals": {
       "additionalProperties": false,
-      "description": "Fields populated by the calc engine. Absent on a fresh interview; filled after compute.",
+      "description": "Fields populated by the calc engine. Absent on a fresh interview; filled after compute.\n\n`computed_input_hash` is a stamp of the input fields that produced this\nresult. If the canonical return is mutated after compute() runs, downstream\nconsumers can detect stale computed totals by re-hashing the inputs and\ncomparing.",
       "properties": {
         "adjusted_gross_income": {
           "anyOf": [
@@ -295,6 +379,18 @@
           ],
           "default": null,
           "title": "Amount Owed"
+        },
+        "computed_input_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Computed Input Hash"
         },
         "deduction_taken": {
           "anyOf": [
@@ -1167,6 +1263,134 @@
       "title": "Form1099DIV",
       "type": "object"
     },
+    "Form1099G": {
+      "additionalProperties": false,
+      "description": "Form 1099-G, Certain Government Payments.\n\nBox 1 = unemployment compensation (Schedule 1 line 7).\nBox 2 = state/local tax refund (taxable only if itemized prior year).",
+      "properties": {
+        "box1_unemployment_compensation": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box1 Unemployment Compensation"
+        },
+        "box2_state_or_local_income_tax_refund": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box2 State Or Local Income Tax Refund"
+        },
+        "box2_tax_year": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Box2 Tax Year"
+        },
+        "box4_federal_income_tax_withheld": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box4 Federal Income Tax Withheld"
+        },
+        "box5_rtaa_payments": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box5 Rtaa Payments"
+        },
+        "box6_taxable_grants": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box6 Taxable Grants"
+        },
+        "box7_agricultural_payments": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box7 Agricultural Payments"
+        },
+        "payer_name": {
+          "title": "Payer Name",
+          "type": "string"
+        },
+        "payer_tin": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Payer Tin"
+        },
+        "recipient_is_taxpayer": {
+          "default": true,
+          "title": "Recipient Is Taxpayer",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "payer_name"
+      ],
+      "title": "Form1099G",
+      "type": "object"
+    },
     "Form1099INT": {
       "additionalProperties": false,
       "description": "Form 1099-INT, Interest Income.",
@@ -1397,9 +1621,258 @@
       "title": "Form1099NEC",
       "type": "object"
     },
+    "Form1099R": {
+      "additionalProperties": false,
+      "description": "Form 1099-R, Distributions From Pensions, Annuities, Retirement, etc.\n\nTyped stub \u2014 fan-out will extend. Pension/retirement distributions flow to\n1040 line 5a/5b (pensions), 4a/4b (IRAs), or Schedule 1 depending on code.",
+      "properties": {
+        "box12_state_tax_withheld": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box12 State Tax Withheld"
+        },
+        "box13_state": {
+          "anyOf": [
+            {
+              "description": "Two-letter USPS state code",
+              "maxLength": 2,
+              "minLength": 2,
+              "pattern": "^[A-Z]{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Box13 State"
+        },
+        "box16_state_distribution": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box16 State Distribution"
+        },
+        "box1_gross_distribution": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box1 Gross Distribution"
+        },
+        "box2a_taxable_amount": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box2A Taxable Amount"
+        },
+        "box2b_taxable_amount_not_determined": {
+          "default": false,
+          "title": "Box2B Taxable Amount Not Determined",
+          "type": "boolean"
+        },
+        "box2b_total_distribution": {
+          "default": false,
+          "title": "Box2B Total Distribution",
+          "type": "boolean"
+        },
+        "box4_federal_income_tax_withheld": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box4 Federal Income Tax Withheld"
+        },
+        "box7_distribution_codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Box7 Distribution Codes",
+          "type": "array"
+        },
+        "box7_ira_sep_simple": {
+          "default": false,
+          "title": "Box7 Ira Sep Simple",
+          "type": "boolean"
+        },
+        "box9a_percent_total_distribution": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Box9A Percent Total Distribution"
+        },
+        "payer_name": {
+          "title": "Payer Name",
+          "type": "string"
+        },
+        "payer_tin": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Payer Tin"
+        },
+        "recipient_is_taxpayer": {
+          "default": true,
+          "title": "Recipient Is Taxpayer",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "payer_name"
+      ],
+      "title": "Form1099R",
+      "type": "object"
+    },
+    "FormSSA1099": {
+      "additionalProperties": false,
+      "description": "Form SSA-1099, Social Security Benefit Statement.\n\nTaxable portion of SS benefits is computed via the SS benefits worksheet.",
+      "properties": {
+        "box3_total_benefits": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box3 Total Benefits"
+        },
+        "box4_benefits_repaid": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box4 Benefits Repaid"
+        },
+        "box5_net_benefits": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box5 Net Benefits"
+        },
+        "box6_federal_income_tax_withheld": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box6 Federal Income Tax Withheld"
+        },
+        "medicare_part_b_premiums": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Medicare Part B Premiums"
+        },
+        "medicare_part_d_premiums": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Medicare Part D Premiums"
+        },
+        "recipient_is_taxpayer": {
+          "default": true,
+          "title": "Recipient Is Taxpayer",
+          "type": "boolean"
+        }
+      },
+      "title": "FormSSA1099",
+      "type": "object"
+    },
     "ItemizedDeductions": {
       "additionalProperties": false,
-      "description": "Schedule A \u2014 Itemized Deductions.",
+      "description": "Schedule A \u2014 Itemized Deductions.\n\nNote: the taxpayer must choose state/local INCOME tax OR state/local SALES tax\n(not both). Whichever is larger is typically elected. The SALT (state +\nlocal + real estate + personal property) total is CAPPED at $10,000 MFJ/S/HoH\nor $5,000 MFS. The cap is applied in the calc engine, not in this model.",
       "properties": {
         "casualty_and_theft_losses_federal_disaster": {
           "anyOf": [
@@ -1414,6 +1887,11 @@
           "default": "0",
           "description": "US dollar amount, 2 decimal places",
           "title": "Casualty And Theft Losses Federal Disaster"
+        },
+        "elect_sales_tax_over_income_tax": {
+          "default": false,
+          "title": "Elect Sales Tax Over Income Tax",
+          "type": "boolean"
         },
         "gifts_to_charity_carryover": {
           "anyOf": [
@@ -1698,8 +2176,36 @@
     },
     "Payments": {
       "additionalProperties": false,
-      "description": "Form 1040 lines 25 and 31 \u2014 payments / credits against tax.",
+      "description": "Form 1040 lines 25 and 31 \u2014 payments / credits against tax.\n\nConvention: W-2 federal withholding is read directly from the W-2 list\n(w2s[].box2_federal_income_tax_withheld). Do NOT also set\nfederal_income_tax_withheld_from_w2 \u2014 it's kept for cases where the user\nenters an aggregate without itemized W-2s, and the calc engine warns if\nboth are non-zero.",
       "properties": {
+        "additional_child_tax_credit_refundable": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Additional Child Tax Credit Refundable"
+        },
+        "american_opportunity_credit_refundable": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "American Opportunity Credit Refundable"
+        },
         "amount_paid_with_4868_extension": {
           "anyOf": [
             {
@@ -1713,6 +2219,20 @@
           "default": "0",
           "description": "US dollar amount, 2 decimal places",
           "title": "Amount Paid With 4868 Extension"
+        },
+        "earned_income_credit_refundable": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Earned Income Credit Refundable"
         },
         "estimated_tax_payments_2025": {
           "anyOf": [
@@ -1809,6 +2329,19 @@
           "format": "date",
           "title": "Date Of Birth",
           "type": "string"
+        },
+        "date_of_death": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Date Of Death"
         },
         "first_name": {
           "title": "First Name",
@@ -2871,6 +3404,242 @@
       "title": "ScheduleEProperty",
       "type": "object"
     },
+    "ScheduleK1": {
+      "additionalProperties": false,
+      "description": "Schedule K-1 (Form 1065 for partnerships, 1120-S for S-corps).\n\nTyped stub \u2014 extend in fan-out. K-1 items flow to many 1040 lines depending\non the box and the partnership/S-corp source.",
+      "properties": {
+        "guaranteed_payments": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Guaranteed Payments"
+        },
+        "interest_income": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Interest Income"
+        },
+        "long_term_capital_gain_loss": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Long Term Capital Gain Loss"
+        },
+        "net_rental_real_estate_income": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Net Rental Real Estate Income"
+        },
+        "ordinary_business_income": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Ordinary Business Income"
+        },
+        "ordinary_dividends": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Ordinary Dividends"
+        },
+        "other_items": {
+          "additionalProperties": true,
+          "title": "Other Items",
+          "type": "object"
+        },
+        "other_net_rental_income": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Other Net Rental Income"
+        },
+        "qbi_qualified": {
+          "default": false,
+          "title": "Qbi Qualified",
+          "type": "boolean"
+        },
+        "qualified_dividends": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Qualified Dividends"
+        },
+        "recipient_is_taxpayer": {
+          "default": true,
+          "title": "Recipient Is Taxpayer",
+          "type": "boolean"
+        },
+        "royalties": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Royalties"
+        },
+        "section_179_deduction": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Section 179 Deduction"
+        },
+        "section_199a_ubia": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Section 199A Ubia"
+        },
+        "section_199a_w2_wages": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Section 199A W2 Wages"
+        },
+        "short_term_capital_gain_loss": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Short Term Capital Gain Loss"
+        },
+        "source_ein": {
+          "anyOf": [
+            {
+              "description": "Employer Identification Number, dd-ddddddd",
+              "pattern": "^\\d{2}-?\\d{7}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Ein"
+        },
+        "source_name": {
+          "title": "Source Name",
+          "type": "string"
+        },
+        "source_type": {
+          "default": "partnership",
+          "enum": [
+            "partnership",
+            "s_corp",
+            "estate_or_trust"
+          ],
+          "title": "Source Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_name"
+      ],
+      "title": "ScheduleK1",
+      "type": "object"
+    },
     "StateReturn": {
       "additionalProperties": false,
       "properties": {
@@ -2966,78 +3735,6 @@
           "title": "Box14 Other",
           "type": "array"
         },
-        "box15_state": {
-          "anyOf": [
-            {
-              "description": "Two-letter USPS state code",
-              "maxLength": 2,
-              "minLength": 2,
-              "pattern": "^[A-Z]{2}$",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Box15 State"
-        },
-        "box16_state_wages": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-              "type": "string"
-            }
-          ],
-          "default": "0",
-          "description": "US dollar amount, 2 decimal places",
-          "title": "Box16 State Wages"
-        },
-        "box17_state_tax_withheld": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-              "type": "string"
-            }
-          ],
-          "default": "0",
-          "description": "US dollar amount, 2 decimal places",
-          "title": "Box17 State Tax Withheld"
-        },
-        "box18_local_wages": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-              "type": "string"
-            }
-          ],
-          "default": "0",
-          "description": "US dollar amount, 2 decimal places",
-          "title": "Box18 Local Wages"
-        },
-        "box19_local_tax_withheld": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-              "type": "string"
-            }
-          ],
-          "default": "0",
-          "description": "US dollar amount, 2 decimal places",
-          "title": "Box19 Local Tax Withheld"
-        },
         "box1_wages": {
           "anyOf": [
             {
@@ -3050,18 +3747,6 @@
           ],
           "description": "US dollar amount, 2 decimal places",
           "title": "Box1 Wages"
-        },
-        "box20_locality": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Box20 Locality"
         },
         "box2_federal_income_tax_withheld": {
           "anyOf": [
@@ -3183,6 +3868,13 @@
         "employer_name": {
           "title": "Employer Name",
           "type": "string"
+        },
+        "state_rows": {
+          "items": {
+            "$ref": "#/$defs/W2StateRow"
+          },
+          "title": "State Rows",
+          "type": "array"
         }
       },
       "required": [
@@ -3219,6 +3911,105 @@
         "amount"
       ],
       "title": "W2Box12Entry",
+      "type": "object"
+    },
+    "W2StateRow": {
+      "additionalProperties": false,
+      "description": "A single state row on a W-2 (box 15/16/17).\n\nW-2 Copy 2 can list multiple state rows when a taxpayer worked in more than\none state for the same employer. Each row has its own state code, wages, and\nwithholding. The list form allows lossless multi-state W-2 ingestion.",
+      "properties": {
+        "local_tax_withheld": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Local Tax Withheld"
+        },
+        "local_wages": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Local Wages"
+        },
+        "locality": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Locality"
+        },
+        "state": {
+          "description": "Two-letter USPS state code",
+          "maxLength": 2,
+          "minLength": 2,
+          "pattern": "^[A-Z]{2}$",
+          "title": "State",
+          "type": "string"
+        },
+        "state_employer_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "State Employer Id"
+        },
+        "state_tax_withheld": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "State Tax Withheld"
+        },
+        "state_wages": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "State Wages"
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "title": "W2StateRow",
       "type": "object"
     }
   },
@@ -3278,6 +4069,13 @@
       "title": "Forms 1099 Div",
       "type": "array"
     },
+    "forms_1099_g": {
+      "items": {
+        "$ref": "#/$defs/Form1099G"
+      },
+      "title": "Forms 1099 G",
+      "type": "array"
+    },
     "forms_1099_int": {
       "items": {
         "$ref": "#/$defs/Form1099INT"
@@ -3290,6 +4088,20 @@
         "$ref": "#/$defs/Form1099NEC"
       },
       "title": "Forms 1099 Nec",
+      "type": "array"
+    },
+    "forms_1099_r": {
+      "items": {
+        "$ref": "#/$defs/Form1099R"
+      },
+      "title": "Forms 1099 R",
+      "type": "array"
+    },
+    "forms_ssa_1099": {
+      "items": {
+        "$ref": "#/$defs/FormSSA1099"
+      },
+      "title": "Forms Ssa 1099",
       "type": "array"
     },
     "itemize_deductions": {
@@ -3350,6 +4162,13 @@
         "$ref": "#/$defs/ScheduleE"
       },
       "title": "Schedules E",
+      "type": "array"
+    },
+    "schedules_k1": {
+      "items": {
+        "$ref": "#/$defs/ScheduleK1"
+      },
+      "title": "Schedules K1",
       "type": "array"
     },
     "schema_version": {

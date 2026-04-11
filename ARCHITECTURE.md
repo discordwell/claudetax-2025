@@ -36,20 +36,45 @@ A document classifier routes a folder of mixed PDFs to the right ingester. OCR i
 
 ### State scalability via plugin API
 
-The skill supports "all states" through a plugin interface. Every state implements the same contract:
+The skill supports "all states" through a plugin interface. Every state implements the same contract (see `skill/scripts/states/_plugin_api.py` for the authoritative definition):
 
 ```python
+from typing import Protocol, runtime_checkable
+from pathlib import Path
+from skill.scripts.models import CanonicalReturn, ResidencyStatus, StateReturn
+from skill.scripts.states._plugin_api import (
+    FederalTotals, IncomeApportionment, StatePluginMeta,
+)
+
+@runtime_checkable
 class StatePlugin(Protocol):
-    code: str  # "CA", "NY", ...
-    def compute(self, return_: CanonicalReturn) -> StateReturn: ...
-    def apportion_multi_state(self, return_: CanonicalReturn, days_in_state: int) -> ...: ...
-    def reciprocity_partners(self) -> list[str]: ...
-    def form_ids(self) -> list[str]: ...
+    # Metadata (dataclass-frozen) carries code, name, starting_point,
+    # submission_channel, reciprocity_partners, dor_url, etc.
+    meta: StatePluginMeta
+
+    def compute(
+        self,
+        return_: CanonicalReturn,
+        federal: FederalTotals,
+        residency: ResidencyStatus,
+        days_in_state: int,
+    ) -> StateReturn: ...
+
+    def apportion_income(
+        self,
+        return_: CanonicalReturn,
+        residency: ResidencyStatus,
+        days_in_state: int,
+    ) -> IncomeApportionment: ...
+
     def render_pdfs(self, state_return: StateReturn, out_dir: Path) -> list[Path]: ...
-    def submission_channel(self) -> SubmissionChannel: ...
+
+    def form_ids(self) -> list[str]: ...
 ```
 
-Once this API is stable (**CP5**), individual state implementations fan out to parallel sub-agents — one agent per state. No state blocks another state, and adding state #44 tomorrow doesn't touch core code.
+Reciprocity data and submission channel live on `StatePluginMeta` (static per state). Reciprocity lookups go through `ReciprocityTable.load()` — see `skill/scripts/states/_plugin_api.py` and `skill/reference/state-reciprocity.json`.
+
+Once this API is stable (**CP5 + review remediation**), individual state implementations fan out to parallel sub-agents — one agent per state. No state blocks another state, and adding state #44 tomorrow doesn't touch core code.
 
 ## Repository layout
 

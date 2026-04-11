@@ -32,6 +32,7 @@ from skill.scripts.states._plugin_api import (
     ReciprocityTable,
     StatePlugin,
     StatePluginMeta,
+    StateStartingPoint,
     SubmissionChannel,
 )
 from skill.scripts.states._registry import registry
@@ -136,10 +137,16 @@ class TestNoIncomeTaxPlugin:
     @pytest.fixture
     def federal(self) -> FederalTotals:
         return FederalTotals(
+            filing_status=FilingStatus.SINGLE,
+            num_dependents=0,
             adjusted_gross_income=Decimal("60000"),
             taxable_income=Decimal("44250"),
             total_federal_tax=Decimal("5075"),
             federal_income_tax=Decimal("5075"),
+            federal_standard_deduction=Decimal("15750"),
+            federal_itemized_deductions_total=Decimal("0"),
+            deduction_taken=Decimal("15750"),
+            federal_withholding_from_w2s=Decimal("5000"),
         )
 
     def test_protocol_satisfied_at_runtime(self):
@@ -162,6 +169,7 @@ class TestNoIncomeTaxPlugin:
         assert plugin.meta.code == "TX"
         assert plugin.meta.name == "Texas"
         assert plugin.meta.has_income_tax is False
+        assert plugin.meta.starting_point == StateStartingPoint.NONE
         assert plugin.meta.submission_channel == SubmissionChannel.NO_RETURN_REQUIRED
         assert plugin.meta.reciprocity_partners == ()
         assert 2025 in plugin.meta.supported_tax_years

@@ -46,6 +46,7 @@ user-data/
 **/return.json
 !skill/schemas/return.schema.json
 !skill/fixtures/**/return.json
+!skill/tests/**/return.json
 
 # Secrets
 .env

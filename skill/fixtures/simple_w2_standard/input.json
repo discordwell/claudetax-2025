@@ -37,10 +37,7 @@
       "box13_retirement_plan": false,
       "box13_third_party_sick_pay": false,
       "box14_other": [],
-      "box16_state_wages": "0",
-      "box17_state_tax_withheld": "0",
-      "box18_local_wages": "0",
-      "box19_local_tax_withheld": "0"
+      "state_rows": []
     }
   ],
   "itemize_deductions": false

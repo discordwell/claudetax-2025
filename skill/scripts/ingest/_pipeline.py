@@ -93,19 +93,40 @@ class FieldExtraction:
 class PartialReturn:
     """A structured patch an ingester wants to apply to a CanonicalReturn.
 
-    The orchestrator collects partial returns from multiple ingesters and merges
-    them into one canonical return. Conflicts (multiple ingesters writing to the
-    same path) are resolved by confidence (higher wins) then by order of the
-    cascade (earlier tier wins on tie).
+    v0.1 behavior: the cascade is first-usable-wins — it returns the first
+    ingester whose result `is_usable`, without merging. A future version may
+    introduce a merge step that combines fields from multiple ingesters (e.g.
+    pypdf reads the headline W-2 boxes + pdfplumber picks up box 14 notes).
+    When merging lands, the policy will be: higher confidence wins per path,
+    earlier cascade tier breaks ties.
     """
 
     fields: list[FieldExtraction] = field(default_factory=list)
     document_kind: DocumentKind = DocumentKind.UNKNOWN
     warnings: list[str] = field(default_factory=list)
 
-    def add(self, path: str, value: Any, confidence: float = 1.0, **meta) -> None:
+    def add(
+        self,
+        path: str,
+        value: Any,
+        confidence: float = 1.0,
+        source_bbox: tuple[float, float, float, float] | None = None,
+        raw_text: str | None = None,
+    ) -> None:
+        """Append a FieldExtraction to this partial.
+
+        Only the documented kwargs are accepted — unknown kwargs were previously
+        swallowed by **meta and silently ignored. If you need more metadata,
+        extend FieldExtraction and update callers explicitly.
+        """
         self.fields.append(
-            FieldExtraction(path=path, value=value, confidence=confidence, **meta)
+            FieldExtraction(
+                path=path,
+                value=value,
+                confidence=confidence,
+                source_bbox=source_bbox,
+                raw_text=raw_text,
+            )
         )
 
     def is_empty(self) -> bool:
@@ -177,6 +198,8 @@ class IngestCascade:
     Tier 1 ingesters (pypdf AcroForm) are fast and high-confidence; always try
     them first. Tier 2 (pdfplumber text-layer) is the fallback. Tier 3 (OCR) is
     the last resort because it's slow and uses a paid API.
+
+    v0.1 policy: first-usable wins, no merging across ingesters.
     """
 
     def __init__(self, ingesters: list[Ingester]) -> None:

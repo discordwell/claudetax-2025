@@ -28,6 +28,7 @@ from typing import Protocol, runtime_checkable
 
 from skill.scripts.models import (
     CanonicalReturn,
+    FilingStatus,
     ResidencyStatus,
     StateCode,
     StateReturn,
@@ -72,14 +73,41 @@ class SubmissionChannel(str, Enum):
 # ---------------------------------------------------------------------------
 
 
+class StateStartingPoint(str, Enum):
+    """Where a state tax calculation begins.
+
+    Different states start from different federal figures, and a few don't
+    start from federal at all. One bool (AGI or not) is not enough — states
+    that start from federal taxable income need different marshaling than
+    states that start from AGI, and states with their own gross-income base
+    (like MA historically) need yet another path.
+    """
+
+    FEDERAL_AGI = "federal_agi"
+    """Most states: start from federal AGI, apply state additions/subtractions."""
+
+    FEDERAL_TAXABLE_INCOME = "federal_taxable_income"
+    """CO, ID, ND, SC, OR, UT: start from federal taxable income."""
+
+    STATE_GROSS = "state_gross"
+    """MA historically: computes its own gross base (Part A/B/C income) independent of federal."""
+
+    PA_COMPENSATION_BASE = "pa_compensation_base"
+    """PA: 8 specific classes of income, no federal conformity. Flat 3.07%."""
+
+    NH_INTEREST_DIVIDENDS = "nh_interest_dividends"
+    """NH: interest and dividends only (fully phased out after TY2024). Kept for historical."""
+
+    NONE = "none"
+    """No income tax at all."""
+
+
 @dataclass(frozen=True)
 class StatePluginMeta:
     code: StateCode
     name: str
     has_income_tax: bool
-    conforms_to_federal_agi: bool
-    """True if state tax calculation starts from federal AGI (most states).
-    False if state computes its own base (PA, NH historically)."""
+    starting_point: StateStartingPoint
     dor_url: str
     free_efile_url: str | None
     submission_channel: SubmissionChannel
@@ -99,14 +127,29 @@ class FederalTotals:
 
     Every state plugin gets this alongside the full canonical return. Plugins
     should prefer reading from this struct for consistency across plugins.
+    Fan-out agents may extend this if their state needs additional federal
+    inputs, but only if the extension is generally useful (else read from
+    canonical_return directly).
     """
 
+    filing_status: FilingStatus
+    num_dependents: int
     adjusted_gross_income: Decimal
     taxable_income: Decimal
     total_federal_tax: Decimal
     federal_income_tax: Decimal
+    federal_standard_deduction: Decimal
+    federal_itemized_deductions_total: Decimal
+    """The itemized total after SALT cap, as passed to tenforty. Zero when
+    standard deduction is taken."""
+    deduction_taken: Decimal
+    """max(standard, itemized) — what actually reduced AGI on the federal side."""
+    federal_withholding_from_w2s: Decimal = Decimal("0")
+    """Sum of W-2 box 2 across all W-2s."""
     qbi_deduction: Decimal = Decimal("0")
     se_tax: Decimal = Decimal("0")
+    additional_medicare_tax: Decimal = Decimal("0")
+    niit: Decimal = Decimal("0")
 
 
 # ---------------------------------------------------------------------------

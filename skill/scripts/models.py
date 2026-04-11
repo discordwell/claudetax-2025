@@ -133,6 +133,8 @@ class Person(_StrictModel):
     last_name: str
     ssn: SSN
     date_of_birth: dt.date
+    date_of_death: dt.date | None = None
+    """Required when this person is the spouse on a QSS (Qualifying Surviving Spouse) return."""
     is_blind: bool = False
     is_age_65_or_older: bool | None = None
     """If not set, caller should derive from date_of_birth and the tax year."""
@@ -168,6 +170,23 @@ class W2Box12Entry(_StrictModel):
     amount: Money
 
 
+class W2StateRow(_StrictModel):
+    """A single state row on a W-2 (box 15/16/17).
+
+    W-2 Copy 2 can list multiple state rows when a taxpayer worked in more than
+    one state for the same employer. Each row has its own state code, wages, and
+    withholding. The list form allows lossless multi-state W-2 ingestion.
+    """
+
+    state: StateCode
+    state_wages: Money = Decimal("0")
+    state_tax_withheld: Money = Decimal("0")
+    state_employer_id: str | None = None
+    locality: str | None = None
+    local_wages: Money = Decimal("0")
+    local_tax_withheld: Money = Decimal("0")
+
+
 class W2(_StrictModel):
     """Form W-2, Wage and Tax Statement."""
 
@@ -191,12 +210,8 @@ class W2(_StrictModel):
     box13_retirement_plan: bool = False
     box13_third_party_sick_pay: bool = False
     box14_other: list[str] = Field(default_factory=list)
-    box15_state: StateCode | None = None
-    box16_state_wages: Money = Decimal("0")
-    box17_state_tax_withheld: Money = Decimal("0")
-    box18_local_wages: Money = Decimal("0")
-    box19_local_tax_withheld: Money = Decimal("0")
-    box20_locality: str | None = None
+    state_rows: list[W2StateRow] = Field(default_factory=list)
+    """W-2 box 15/16/17 (+ 18/19/20 locality) as a list to support multi-state."""
 
 
 class Form1099INT(_StrictModel):
@@ -272,6 +287,91 @@ class Form1099NEC(_StrictModel):
     box4_federal_income_tax_withheld: Money = Decimal("0")
     linked_schedule_c: str | None = None
     """Name of the Schedule C business this 1099 flows into."""
+
+
+class Form1099R(_StrictModel):
+    """Form 1099-R, Distributions From Pensions, Annuities, Retirement, etc.
+
+    Typed stub — fan-out will extend. Pension/retirement distributions flow to
+    1040 line 5a/5b (pensions), 4a/4b (IRAs), or Schedule 1 depending on code.
+    """
+
+    payer_name: str
+    payer_tin: str | None = None
+    recipient_is_taxpayer: bool = True
+    box1_gross_distribution: Money = Decimal("0")
+    box2a_taxable_amount: Money = Decimal("0")
+    box2b_taxable_amount_not_determined: bool = False
+    box2b_total_distribution: bool = False
+    box4_federal_income_tax_withheld: Money = Decimal("0")
+    box7_distribution_codes: list[str] = Field(default_factory=list)
+    box7_ira_sep_simple: bool = False
+    box9a_percent_total_distribution: float | None = None
+    box12_state_tax_withheld: Money = Decimal("0")
+    box13_state: StateCode | None = None
+    box16_state_distribution: Money = Decimal("0")
+
+
+class FormSSA1099(_StrictModel):
+    """Form SSA-1099, Social Security Benefit Statement.
+
+    Taxable portion of SS benefits is computed via the SS benefits worksheet.
+    """
+
+    recipient_is_taxpayer: bool = True
+    box3_total_benefits: Money = Decimal("0")
+    box4_benefits_repaid: Money = Decimal("0")
+    box5_net_benefits: Money = Decimal("0")
+    box6_federal_income_tax_withheld: Money = Decimal("0")
+    medicare_part_b_premiums: Money = Decimal("0")
+    medicare_part_d_premiums: Money = Decimal("0")
+
+
+class Form1099G(_StrictModel):
+    """Form 1099-G, Certain Government Payments.
+
+    Box 1 = unemployment compensation (Schedule 1 line 7).
+    Box 2 = state/local tax refund (taxable only if itemized prior year).
+    """
+
+    payer_name: str
+    payer_tin: str | None = None
+    recipient_is_taxpayer: bool = True
+    box1_unemployment_compensation: Money = Decimal("0")
+    box2_state_or_local_income_tax_refund: Money = Decimal("0")
+    box2_tax_year: int | None = None
+    box4_federal_income_tax_withheld: Money = Decimal("0")
+    box5_rtaa_payments: Money = Decimal("0")
+    box6_taxable_grants: Money = Decimal("0")
+    box7_agricultural_payments: Money = Decimal("0")
+
+
+class ScheduleK1(_StrictModel):
+    """Schedule K-1 (Form 1065 for partnerships, 1120-S for S-corps).
+
+    Typed stub — extend in fan-out. K-1 items flow to many 1040 lines depending
+    on the box and the partnership/S-corp source.
+    """
+
+    source_name: str
+    source_ein: EIN | None = None
+    source_type: Literal["partnership", "s_corp", "estate_or_trust"] = "partnership"
+    recipient_is_taxpayer: bool = True
+    ordinary_business_income: Money = Decimal("0")
+    net_rental_real_estate_income: Money = Decimal("0")
+    other_net_rental_income: Money = Decimal("0")
+    guaranteed_payments: Money = Decimal("0")
+    interest_income: Money = Decimal("0")
+    ordinary_dividends: Money = Decimal("0")
+    qualified_dividends: Money = Decimal("0")
+    royalties: Money = Decimal("0")
+    short_term_capital_gain_loss: Money = Decimal("0")
+    long_term_capital_gain_loss: Money = Decimal("0")
+    section_179_deduction: Money = Decimal("0")
+    qbi_qualified: bool = False
+    section_199a_w2_wages: Money = Decimal("0")
+    section_199a_ubia: Money = Decimal("0")
+    other_items: dict[str, Any] = Field(default_factory=dict)
 
 
 class ScheduleCExpenses(_StrictModel):
@@ -381,11 +481,11 @@ class ScheduleE(_StrictModel):
 
 
 class AdjustmentsToIncome(_StrictModel):
-    """Schedule 1 Part II — above-the-line adjustments."""
+    """Schedule 1 Part II — above-the-line adjustments. Includes OBBBA additions."""
 
     educator_expenses: Money = Decimal("0")
     hsa_deduction: Money = Decimal("0")
-    deductible_se_tax: Money = Decimal("0")  # computed from Sch SE
+    deductible_se_tax: Money = Decimal("0")  # computed from Sch SE, do not set manually
     se_health_insurance: Money = Decimal("0")
     se_retirement_plans: Money = Decimal("0")  # SEP, SIMPLE, Solo 401k
     alimony_paid: Money = Decimal("0")  # pre-2019 divorces only
@@ -394,15 +494,36 @@ class AdjustmentsToIncome(_StrictModel):
     ira_deduction: Money = Decimal("0")
     student_loan_interest: Money = Decimal("0")
     archer_msa_deduction: Money = Decimal("0")
+    penalty_on_early_withdrawal_of_savings: Money = Decimal("0")
+    moving_expenses_military: Money = Decimal("0")
+
+    # OBBBA additions (TY2025 and forward)
+    qualified_tips_deduction_schedule_1a: Money = Decimal("0")
+    """OBBBA Schedule 1-A qualified tips deduction (TY2025-2028)."""
+    qualified_overtime_deduction_schedule_1a: Money = Decimal("0")
+    """OBBBA Schedule 1-A qualified overtime deduction (TY2025-2028)."""
+    senior_deduction_obbba: Money = Decimal("0")
+    """OBBBA +$6,000 age 65+ deduction (TY2025-2028). Computed, not set manually."""
+    trump_account_deduction_form_4547: Money = Decimal("0")
+    """OBBBA Form 4547 Trump Account election deduction."""
+
     other_adjustments: dict[str, Money] = Field(default_factory=dict)
 
 
 class ItemizedDeductions(_StrictModel):
-    """Schedule A — Itemized Deductions."""
+    """Schedule A — Itemized Deductions.
+
+    Note: the taxpayer must choose state/local INCOME tax OR state/local SALES tax
+    (not both). Whichever is larger is typically elected. The SALT (state +
+    local + real estate + personal property) total is CAPPED at $10,000 MFJ/S/HoH
+    or $5,000 MFS. The cap is applied in the calc engine, not in this model.
+    """
 
     medical_and_dental_total: Money = Decimal("0")
     state_and_local_income_tax: Money = Decimal("0")
     state_and_local_sales_tax: Money = Decimal("0")
+    elect_sales_tax_over_income_tax: bool = False
+    """If True, use state_and_local_sales_tax; else state_and_local_income_tax."""
     real_estate_tax: Money = Decimal("0")
     personal_property_tax: Money = Decimal("0")
     home_mortgage_interest: Money = Decimal("0")
@@ -441,15 +562,26 @@ class OtherTaxes(_StrictModel):
 
 
 class Payments(_StrictModel):
-    """Form 1040 lines 25 and 31 — payments / credits against tax."""
+    """Form 1040 lines 25 and 31 — payments / credits against tax.
 
-    federal_income_tax_withheld_from_w2: Money = Decimal("0")  # summed from W-2s
+    Convention: W-2 federal withholding is read directly from the W-2 list
+    (w2s[].box2_federal_income_tax_withheld). Do NOT also set
+    federal_income_tax_withheld_from_w2 — it's kept for cases where the user
+    enters an aggregate without itemized W-2s, and the calc engine warns if
+    both are non-zero.
+    """
+
+    federal_income_tax_withheld_from_w2: Money = Decimal("0")
+    """Optional aggregate. Prefer populating w2s[].box2 and leaving this at 0."""
     federal_income_tax_withheld_from_1099: Money = Decimal("0")
-    federal_income_tax_withheld_other: Money = Decimal("0")  # SSA, RRB
+    federal_income_tax_withheld_other: Money = Decimal("0")  # SSA, RRB, gambling
     estimated_tax_payments_2025: Money = Decimal("0")
     prior_year_overpayment_applied: Money = Decimal("0")
     amount_paid_with_4868_extension: Money = Decimal("0")
     excess_social_security_tax_withheld: Money = Decimal("0")
+    earned_income_credit_refundable: Money = Decimal("0")  # from EITC calc
+    additional_child_tax_credit_refundable: Money = Decimal("0")  # from CTC calc
+    american_opportunity_credit_refundable: Money = Decimal("0")  # from AOTC
 
 
 # ---------------------------------------------------------------------------
@@ -488,7 +620,13 @@ class PriorYearCarryforwards(_StrictModel):
 
 
 class ComputedTotals(_StrictModel):
-    """Fields populated by the calc engine. Absent on a fresh interview; filled after compute."""
+    """Fields populated by the calc engine. Absent on a fresh interview; filled after compute.
+
+    `computed_input_hash` is a stamp of the input fields that produced this
+    result. If the canonical return is mutated after compute() runs, downstream
+    consumers can detect stale computed totals by re-hashing the inputs and
+    comparing.
+    """
 
     total_income: Money | None = None
     adjustments_total: Money | None = None
@@ -505,6 +643,10 @@ class ComputedTotals(_StrictModel):
     amount_owed: Money | None = None
     effective_rate: float | None = None
     marginal_rate: float | None = None
+    computed_input_hash: str | None = None
+    """Hash of the input fields used to produce this result. If the model is
+    mutated after compute(), a fresh hash will differ and consumers can
+    recompute. Set by the calc engine; do not populate manually."""
 
 
 # ---------------------------------------------------------------------------
@@ -533,12 +675,17 @@ class CanonicalReturn(_StrictModel):
     forms_1099_div: list[Form1099DIV] = Field(default_factory=list)
     forms_1099_b: list[Form1099B] = Field(default_factory=list)
     forms_1099_nec: list[Form1099NEC] = Field(default_factory=list)
+    forms_1099_r: list[Form1099R] = Field(default_factory=list)
+    forms_1099_g: list[Form1099G] = Field(default_factory=list)
+    forms_ssa_1099: list[FormSSA1099] = Field(default_factory=list)
     schedules_c: list[ScheduleC] = Field(default_factory=list)
     schedules_e: list[ScheduleE] = Field(default_factory=list)
+    schedules_k1: list[ScheduleK1] = Field(default_factory=list)
 
-    # Other income (stubs — tighten in fan-out)
+    # Other income escape hatch (prefer typed forms above)
     other_income: dict[str, Any] = Field(default_factory=dict)
-    """1099-R, 1099-G, 1099-SSA, K-1, etc. Tighten per-form in fan-out."""
+    """Catch-all for income types without a typed form yet. Prefer adding a
+    typed model and moving out of here."""
 
     # Adjustments / deductions / credits / taxes / payments
     adjustments: AdjustmentsToIncome = Field(default_factory=AdjustmentsToIncome)
@@ -574,6 +721,13 @@ class CanonicalReturn(_StrictModel):
             raise ValueError(f"filing_status={self.filing_status.value} requires spouse")
         if not needs_spouse and self.spouse is not None and self.filing_status != FilingStatus.QSS:
             raise ValueError(f"filing_status={self.filing_status.value} should not have spouse")
+        # QSS: a spouse is allowed but must be marked deceased with a date of death
+        if self.filing_status == FilingStatus.QSS:
+            if self.spouse is not None and self.spouse.date_of_death is None:
+                raise ValueError(
+                    "filing_status=qss with a spouse requires spouse.date_of_death "
+                    "(Qualifying Surviving Spouse requires the spouse to be deceased)"
+                )
         return self
 
     @model_validator(mode="after")

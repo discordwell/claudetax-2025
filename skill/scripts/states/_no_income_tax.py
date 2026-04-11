@@ -26,6 +26,7 @@ from skill.scripts.states._plugin_api import (
     FederalTotals,
     IncomeApportionment,
     StatePluginMeta,
+    StateStartingPoint,
     SubmissionChannel,
 )
 
@@ -91,7 +92,7 @@ def _make(code: StateCode, name: str, dor_url: str, notes: str = "") -> NoIncome
             code=code,
             name=name,
             has_income_tax=False,
-            conforms_to_federal_agi=False,
+            starting_point=StateStartingPoint.NONE,
             dor_url=dor_url,
             free_efile_url=None,
             submission_channel=SubmissionChannel.NO_RETURN_REQUIRED,

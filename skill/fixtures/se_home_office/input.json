@@ -1,0 +1,51 @@
+{
+  "schema_version": "0.1.0",
+  "tax_year": 2025,
+  "filing_status": "single",
+  "taxpayer": {
+    "first_name": "Alex",
+    "last_name": "Freeman",
+    "ssn": "222-33-4444",
+    "date_of_birth": "1985-11-20",
+    "is_blind": false,
+    "is_age_65_or_older": false,
+    "occupation": "consulting"
+  },
+  "address": {
+    "street1": "42 Market Street",
+    "city": "Austin",
+    "state": "TX",
+    "zip": "78701",
+    "country": "US"
+  },
+  "w2s": [],
+  "schedules_c": [
+    {
+      "proprietor_is_taxpayer": true,
+      "business_name": "Freeman Consulting LLC",
+      "principal_business_or_profession": "Management consulting",
+      "accounting_method": "cash",
+      "material_participation": true,
+      "line1_gross_receipts": "120000.00",
+      "line2_returns_and_allowances": "0",
+      "line4_cost_of_goods_sold": "0",
+      "line6_other_income": "0",
+      "expenses": {
+        "line8_advertising": "3000.00",
+        "line9_car_and_truck": "5000.00",
+        "line17_legal_and_professional": "2000.00",
+        "line18_office_expense": "4000.00",
+        "line22_supplies": "2500.00",
+        "line24a_travel": "8000.00",
+        "line24b_meals_50pct_deductible": "1500.00",
+        "line25_utilities": "1000.00"
+      },
+      "line30_home_office_expense": "3000.00",
+      "line32_at_risk_box": "all_at_risk"
+    }
+  ],
+  "payments": {
+    "estimated_tax_payments_2025": "10000.00"
+  },
+  "itemize_deductions": false
+}

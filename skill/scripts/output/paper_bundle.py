@@ -83,6 +83,7 @@ _FORM_ORDER: tuple[str, ...] = (
     "schedule_se",
     "schedule_eic",
     "schedule_8812",
+    "form_8829",      # home-office deduction; attachment sequence 176
 )
 
 # Filenames produced by state plugin agents — these belong in a separate

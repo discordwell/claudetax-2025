@@ -2096,6 +2096,348 @@
       "title": "FormSSA1099",
       "type": "object"
     },
+    "HomeOffice": {
+      "additionalProperties": false,
+      "description": "Home-office deduction inputs for a single Schedule C business.\n\nWave 6 adds Form 8829 support. Taxpayers pick ONE method per home\noffice per tax year:\n\n* ``simplified`` \u2014 $5 per square foot of business-use area, capped\n  at 300 sq ft / $1,500. Reported directly on Schedule C line 30;\n  no Form 8829 is filed.\n* ``regular`` \u2014 Form 8829 with actual expenses \u00d7 business-use %\n  (of home). Subject to the gross-income limitation (can't deduct\n  more than Sch C line 29 net of non-home-office expenses); the\n  excess carries forward on Part IV. Depreciation on the business\n  portion of the home is computed via the Part III mini-worksheet\n  (39-year straight-line, mid-month convention).\n\nRegular-method-only fields (``home_purchase_price`` etc.) are\noptional \u2014 if you don't supply a purchase basis, the renderer simply\nomits Part III (no home depreciation). Rent-paying filers supply\n``rent_total`` and leave basis fields blank.",
+      "properties": {
+        "business_sq_ft": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Business Sq Ft"
+        },
+        "daycare_hours_per_year": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Daycare Hours Per Year"
+        },
+        "direct_insurance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Direct Insurance"
+        },
+        "direct_mortgage_interest": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Direct Mortgage Interest"
+        },
+        "direct_other_expenses": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Direct Other Expenses"
+        },
+        "direct_real_estate_taxes": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Direct Real Estate Taxes"
+        },
+        "direct_rent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Direct Rent"
+        },
+        "direct_repairs": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Direct Repairs"
+        },
+        "direct_utilities": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Direct Utilities"
+        },
+        "home_land_value": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                }
+              ],
+              "description": "US dollar amount, 2 decimal places"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Home Land Value"
+        },
+        "home_purchase_date": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Home Purchase Date"
+        },
+        "home_purchase_price": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                }
+              ],
+              "description": "US dollar amount, 2 decimal places"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Home Purchase Price"
+        },
+        "insurance_total": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Insurance Total"
+        },
+        "is_daycare_facility": {
+          "default": false,
+          "title": "Is Daycare Facility",
+          "type": "boolean"
+        },
+        "method": {
+          "default": "simplified",
+          "enum": [
+            "simplified",
+            "regular"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "mortgage_interest_total": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Mortgage Interest Total"
+        },
+        "other_expenses_total": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Other Expenses Total"
+        },
+        "prior_year_excess_casualty_depreciation_carryover": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Prior Year Excess Casualty Depreciation Carryover"
+        },
+        "prior_year_operating_carryover": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Prior Year Operating Carryover"
+        },
+        "real_estate_taxes_total": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Real Estate Taxes Total"
+        },
+        "rent_total": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Rent Total"
+        },
+        "repairs_total": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Repairs Total"
+        },
+        "total_home_sq_ft": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Total Home Sq Ft"
+        },
+        "utilities_total": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Utilities Total"
+        }
+      },
+      "required": [
+        "business_sq_ft",
+        "total_home_sq_ft"
+      ],
+      "title": "HomeOffice",
+      "type": "object"
+    },
     "ItemizedDeductions": {
       "additionalProperties": false,
       "description": "Schedule A \u2014 Itemized Deductions.\n\nNote: the taxpayer must choose state/local INCOME tax OR state/local SALES tax\n(not both). Whichever is larger is typically elected. The SALT (state +\nlocal + real estate + personal property) total is CAPPED at $10,000 MFJ/S/HoH\nor $5,000 MFS. The cap is applied in the calc engine, not in this model.",
@@ -2870,6 +3212,17 @@
           ],
           "default": null,
           "title": "Filed Required 1099S"
+        },
+        "home_office": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HomeOffice"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "line1_gross_receipts": {
           "anyOf": [

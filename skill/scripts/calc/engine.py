@@ -946,6 +946,26 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     )
 
     # -------------------------------------------------------------------
+    # Wave 6 — Form 8829 home-office dispatcher (pre-compute)
+    # -------------------------------------------------------------------
+    # If any ScheduleC on the return carries a populated `home_office`
+    # block, derive the Schedule C line 30 amount from it BEFORE any
+    # tenforty pass. This must run first because SE tax, AGI, and CTC
+    # are all downstream of Sch C net profit — recomputing line 30
+    # after compute() would leave those numbers stale. Simplified-
+    # method filers get $5/sq ft (capped at $1,500, never more than
+    # tentative profit); regular-method filers get Form 8829 line 36.
+    #
+    # Idempotent: the dispatcher OVERWRITES line30_home_office_expense
+    # from the HomeOffice inputs, so a caller who runs compute() twice
+    # on the same return gets the same result both times. Returns with
+    # NO `home_office` block are untouched (matches wave-5 behavior of
+    # callers who populate line 30 by hand).
+    from skill.scripts.output.form_8829 import apply_home_office_deductions
+
+    apply_home_office_deductions(return_)
+
+    # -------------------------------------------------------------------
     # OBBBA pre-tax-bracket patches (senior deduction + Schedule 1-A)
     # -------------------------------------------------------------------
     # These are gated behind cheap detection so returns with no senior

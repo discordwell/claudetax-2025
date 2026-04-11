@@ -477,6 +477,88 @@ class DepreciableAsset(_StrictModel):
     """Subject to the $31,300 §179 sub-cap for TY2025."""
 
 
+class HomeOffice(_StrictModel):
+    """Home-office deduction inputs for a single Schedule C business.
+
+    Wave 6 adds Form 8829 support. Taxpayers pick ONE method per home
+    office per tax year:
+
+    * ``simplified`` — $5 per square foot of business-use area, capped
+      at 300 sq ft / $1,500. Reported directly on Schedule C line 30;
+      no Form 8829 is filed.
+    * ``regular`` — Form 8829 with actual expenses × business-use %
+      (of home). Subject to the gross-income limitation (can't deduct
+      more than Sch C line 29 net of non-home-office expenses); the
+      excess carries forward on Part IV. Depreciation on the business
+      portion of the home is computed via the Part III mini-worksheet
+      (39-year straight-line, mid-month convention).
+
+    Regular-method-only fields (``home_purchase_price`` etc.) are
+    optional — if you don't supply a purchase basis, the renderer simply
+    omits Part III (no home depreciation). Rent-paying filers supply
+    ``rent_total`` and leave basis fields blank.
+    """
+
+    method: Literal["simplified", "regular"] = "simplified"
+    business_sq_ft: Decimal
+    total_home_sq_ft: Decimal
+
+    # Regular-method-only expense inputs (full-year totals; the renderer
+    # applies the business-use percentage for indirect expenses).
+    home_purchase_price: Money | None = None
+    home_purchase_date: dt.date | None = None
+    home_land_value: Money | None = None
+    """Land value included in purchase price. Excluded from depreciation basis."""
+    mortgage_interest_total: Money = Decimal("0")
+    """Total household mortgage interest (indirect, × business %)."""
+    real_estate_taxes_total: Money = Decimal("0")
+    """Total household real estate taxes (indirect, × business %)."""
+    utilities_total: Money = Decimal("0")
+    """Total household utilities (indirect, × business %)."""
+    insurance_total: Money = Decimal("0")
+    """Total household homeowners/renters insurance (indirect, × business %)."""
+    repairs_total: Money = Decimal("0")
+    """General household repairs and maintenance (indirect, × business %)."""
+    rent_total: Money = Decimal("0")
+    """Household rent paid (for renters; indirect, × business %)."""
+    other_expenses_total: Money = Decimal("0")
+    """Catch-all for other indirect home-office expenses (line 22)."""
+
+    # Direct-only expenses (100% business portion — e.g., painting the
+    # office room). Callers who only have household-level numbers should
+    # leave these at zero.
+    direct_mortgage_interest: Money = Decimal("0")
+    direct_real_estate_taxes: Money = Decimal("0")
+    direct_insurance: Money = Decimal("0")
+    direct_repairs: Money = Decimal("0")
+    direct_utilities: Money = Decimal("0")
+    direct_rent: Money = Decimal("0")
+    direct_other_expenses: Money = Decimal("0")
+
+    # Carryovers from prior year's Form 8829 Part IV
+    prior_year_operating_carryover: Money = Decimal("0")
+    """From prior year Form 8829 line 43 (operating expense carryover)."""
+    prior_year_excess_casualty_depreciation_carryover: Money = Decimal("0")
+    """From prior year Form 8829 line 44 (excess casualty/depreciation carryover)."""
+
+    # Daycare special case
+    is_daycare_facility: bool = False
+    daycare_hours_per_year: Decimal = Decimal("0")
+    """Daycare facilities not used exclusively for business scale the
+    area percentage by (daycare hours / 8,760). Leave zero for
+    non-daycare home offices."""
+
+    @model_validator(mode="after")
+    def _sq_ft_sanity(self) -> "HomeOffice":
+        if self.business_sq_ft < 0 or self.total_home_sq_ft < 0:
+            raise ValueError("home office square footage must be non-negative")
+        if self.total_home_sq_ft > 0 and self.business_sq_ft > self.total_home_sq_ft:
+            raise ValueError(
+                "home office business_sq_ft cannot exceed total_home_sq_ft"
+            )
+        return self
+
+
 class ScheduleC(_StrictModel):
     """Form 1040 Schedule C — Profit or Loss From Business (Sole Proprietorship)."""
 
@@ -507,7 +589,13 @@ class ScheduleC(_StrictModel):
     line6_other_income: Money = Decimal("0")
     expenses: ScheduleCExpenses = Field(default_factory=ScheduleCExpenses)
     line30_home_office_expense: Money = Decimal("0")
-    """From Form 8829."""
+    """From Form 8829 (regular method) or the $5/sq ft simplified method.
+
+    Wave 6: if ``home_office`` is populated, the engine / pipeline will
+    recompute this from the HomeOffice block via
+    ``skill.scripts.output.form_8829.compute_home_office_deduction``.
+    If you leave ``home_office`` ``None`` (wave 5 behavior) this field
+    remains a caller-supplied pass-through."""
     line32_at_risk_box: Literal["all_at_risk", "some_not_at_risk"] = "all_at_risk"
 
     # Depreciation / Form 4562 inputs (Wave 6 Agent 4)
@@ -522,6 +610,12 @@ class ScheduleC(_StrictModel):
     """Per-business §179 carryforward from prior year. Zero means
     "no carryover to apply on this business"; the Form 4562 Part I
     line 10 uses this value directly."""
+
+    home_office: HomeOffice | None = None
+    """Wave 6 — optional home-office block. When populated, the Form 8829
+    renderer derives the Schedule C line 30 amount (regular method) or
+    applies the $5/sq ft simplified cap, and the pipeline emits Form
+    8829 as a paper-bundle attachment for regular-method filers."""
 
 
 class ScheduleEProperty(_StrictModel):

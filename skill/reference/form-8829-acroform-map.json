@@ -1,0 +1,430 @@
+{
+  "source_pdf_url": "https://www.irs.gov/pub/irs-pdf/f8829.pdf",
+  "source_pdf_sha256": "994834c9eeacdb371f5d75e8ed272bda6e9fd601898af57670b6b2c47665890b",
+  "source_pdf_bytes": 82821,
+  "source_pdf_title": "2025 Form 8829",
+  "fetched_at": "2026-04-11",
+  "pypdf_version": "5.9.0",
+  "form_year": 2025,
+  "form": "8829",
+  "total_widgets": 58,
+  "mapped_count": 58,
+  "unmapped_count": 0,
+  "notes": [
+    "Form 8829 AcroForm widget map for the IRS-hosted TY2025 PDF (PDF /Title metadata: '2025 Form 8829').",
+    "TY2025 Form 8829 is a single-page form (all 44 line widgets on page 1) grouped into Parts I-IV: Part I = lines 1-7 (business-use percentage), Part II = lines 8-36 (allowable deduction with direct/indirect columns), Part III = lines 37-42 (depreciation of home), Part IV = lines 43-44 (carryover).",
+    "Two-column expenses (direct vs indirect) live inside named sub-forms: Table_Lines9-12 (lines 9-12) and Table_Lines16-23 (lines 16-23). Each row has two widgets: (a) direct / (b) indirect.",
+    "Single-column lines (13, 14, 15, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37-44) are flat f1_XX[0] widgets under Page1[0].",
+    "One Form 8829 is filed per home office per Schedule C business. Multi-business dispatch in Layer 2 produces ONE filled PDF per Schedule C with home_office.method == 'regular'. Simplified method skips Form 8829 entirely and reports directly on Sch C line 30.",
+    "Header SSN widget (f1_02) is filled by the Form 1040 header, not by the renderer, matching the Schedule C/SE convention."
+  ],
+  "mapping": {
+    "proprietor_name": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_01[0]",
+      "terminal_name": "f1_01[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Name of proprietor(s) — header."
+    },
+    "proprietor_ssn": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_02[0]",
+      "terminal_name": "f1_02[0]",
+      "type": "text",
+      "page": 1,
+      "note": "SSN — header. Filled by Form 1040 header, not by this renderer."
+    },
+    "line_1_business_area": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_03[0]",
+      "terminal_name": "f1_03[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part I line 1 — area (sq ft) used regularly and exclusively for business."
+    },
+    "line_2_total_home_area": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_04[0]",
+      "terminal_name": "f1_04[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part I line 2 — total area of home (sq ft)."
+    },
+    "line_3_area_percentage": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_05[0]",
+      "terminal_name": "f1_05[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part I line 3 — line 1 / line 2 as a percentage."
+    },
+    "line_4_daycare_hours": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_06[0]",
+      "terminal_name": "f1_06[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part I line 4 — daycare hours (daycare-facility special case). Blank for non-daycare."
+    },
+    "line_5_total_hours": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_07[0]",
+      "terminal_name": "f1_07[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part I line 5 — total hours in year (8,760 for full-year daycare)."
+    },
+    "line_6_daycare_decimal": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_08[0]",
+      "terminal_name": "f1_08[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part I line 6 — line 4 / line 5 as a decimal."
+    },
+    "line_7_business_percentage": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_09[0]",
+      "terminal_name": "f1_09[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part I line 7 — final business percentage applied to indirect expenses."
+    },
+    "line_8_sch_c_line_29_tentative_profit": {
+      "widget_name": "topmostSubform[0].Page1[0].Line8_ReadOrder[0].f1_10[0]",
+      "terminal_name": "f1_10[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 8 — Schedule C line 29 plus/minus adjustments; the gross-income limitation cap."
+    },
+    "line_9a_casualty_direct": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines9-12[0].Line9[0].f1_11[0]",
+      "terminal_name": "f1_11[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 9 (a) direct — casualty losses."
+    },
+    "line_9b_casualty_indirect": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines9-12[0].Line9[0].f1_12[0]",
+      "terminal_name": "f1_12[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 9 (b) indirect — casualty losses."
+    },
+    "line_10a_mortgage_interest_direct": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines9-12[0].Line10[0].f1_13[0]",
+      "terminal_name": "f1_13[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 10 (a) direct — deductible mortgage interest."
+    },
+    "line_10b_mortgage_interest_indirect": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines9-12[0].Line10[0].f1_14[0]",
+      "terminal_name": "f1_14[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 10 (b) indirect — deductible mortgage interest (subject to Schedule A limit)."
+    },
+    "line_11a_real_estate_taxes_direct": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines9-12[0].Line11[0].f1_15[0]",
+      "terminal_name": "f1_15[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 11 (a) direct — real estate taxes."
+    },
+    "line_11b_real_estate_taxes_indirect": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines9-12[0].Line11[0].f1_16[0]",
+      "terminal_name": "f1_16[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 11 (b) indirect — real estate taxes."
+    },
+    "line_12a_sum_9_10_11_direct": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines9-12[0].Line12[0].f1_17[0]",
+      "terminal_name": "f1_17[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 12 (a) direct — sum of lines 9a, 10a, 11a."
+    },
+    "line_12b_sum_9_10_11_indirect": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines9-12[0].Line12[0].f1_18[0]",
+      "terminal_name": "f1_18[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 12 (b) indirect — sum of lines 9b, 10b, 11b."
+    },
+    "line_13_line_12b_times_line_7": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_19[0]",
+      "terminal_name": "f1_19[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 13 — line 12b (indirect) × line 7 (business percentage)."
+    },
+    "line_14_sum_12a_plus_13": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_20[0]",
+      "terminal_name": "f1_20[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 14 — direct casualty/interest/taxes plus apportioned indirect."
+    },
+    "line_15_subtract_14_from_8": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_21[0]",
+      "terminal_name": "f1_21[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 15 — line 8 minus line 14 (remaining gross-income cap for operating expenses / depreciation)."
+    },
+    "line_16a_excess_mortgage_interest_direct": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines16-23[0].Line16[0].f1_22[0]",
+      "terminal_name": "f1_22[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 16 (a) direct — excess mortgage interest."
+    },
+    "line_16b_excess_mortgage_interest_indirect": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines16-23[0].Line16[0].f1_23[0]",
+      "terminal_name": "f1_23[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 16 (b) indirect — excess mortgage interest."
+    },
+    "line_17a_excess_real_estate_taxes_direct": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines16-23[0].Line17[0].f1_24[0]",
+      "terminal_name": "f1_24[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 17 (a) direct — excess real estate taxes."
+    },
+    "line_17b_excess_real_estate_taxes_indirect": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines16-23[0].Line17[0].f1_25[0]",
+      "terminal_name": "f1_25[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 17 (b) indirect — excess real estate taxes."
+    },
+    "line_18a_insurance_direct": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines16-23[0].Line18[0].f1_26[0]",
+      "terminal_name": "f1_26[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 18 (a) direct — insurance."
+    },
+    "line_18b_insurance_indirect": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines16-23[0].Line18[0].f1_27[0]",
+      "terminal_name": "f1_27[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 18 (b) indirect — insurance."
+    },
+    "line_19a_rent_direct": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines16-23[0].Line19[0].f1_28[0]",
+      "terminal_name": "f1_28[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 19 (a) direct — rent."
+    },
+    "line_19b_rent_indirect": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines16-23[0].Line19[0].f1_29[0]",
+      "terminal_name": "f1_29[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 19 (b) indirect — rent (if renting; applied via business percentage)."
+    },
+    "line_20a_repairs_direct": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines16-23[0].Line20[0].f1_30[0]",
+      "terminal_name": "f1_30[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 20 (a) direct — repairs and maintenance."
+    },
+    "line_20b_repairs_indirect": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines16-23[0].Line20[0].f1_31[0]",
+      "terminal_name": "f1_31[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 20 (b) indirect — repairs and maintenance."
+    },
+    "line_21a_utilities_direct": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines16-23[0].Line21[0].f1_32[0]",
+      "terminal_name": "f1_32[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 21 (a) direct — utilities."
+    },
+    "line_21b_utilities_indirect": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines16-23[0].Line21[0].f1_33[0]",
+      "terminal_name": "f1_33[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 21 (b) indirect — utilities."
+    },
+    "line_22a_other_expenses_direct": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines16-23[0].Line22[0].f1_34[0]",
+      "terminal_name": "f1_34[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 22 (a) direct — other expenses."
+    },
+    "line_22b_other_expenses_indirect": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines16-23[0].Line22[0].f1_35[0]",
+      "terminal_name": "f1_35[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 22 (b) indirect — other expenses."
+    },
+    "line_23a_sum_16_through_22_direct": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines16-23[0].Line23[0].f1_36[0]",
+      "terminal_name": "f1_36[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 23 (a) direct — sum of lines 16a-22a."
+    },
+    "line_23b_sum_16_through_22_indirect": {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Lines16-23[0].Line23[0].f1_37[0]",
+      "terminal_name": "f1_37[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 23 (b) indirect — sum of lines 16b-22b."
+    },
+    "line_24_line_23b_times_line_7": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_38[0]",
+      "terminal_name": "f1_38[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 24 — line 23b × line 7 (apportioned indirect operating expenses)."
+    },
+    "line_25_carryover_prior_year_operating": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_39[0]",
+      "terminal_name": "f1_39[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 25 — carryover of prior year operating expenses."
+    },
+    "line_26_sum_23a_24_25": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_40[0]",
+      "terminal_name": "f1_40[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 26 — sum of line 23a, line 24, and line 25 (total operating expenses with carryover)."
+    },
+    "line_27_allowable_operating_expenses": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_41[0]",
+      "terminal_name": "f1_41[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 27 — allowable operating expenses = min(line 15, line 26)."
+    },
+    "line_28_limit_on_excess_casualty_depreciation": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_42[0]",
+      "terminal_name": "f1_42[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 28 — line 15 minus line 27 (remaining cap for casualty/depreciation)."
+    },
+    "line_29_excess_casualty_losses": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_43[0]",
+      "terminal_name": "f1_43[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 29 — excess casualty losses."
+    },
+    "line_30_depreciation_of_home": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_44[0]",
+      "terminal_name": "f1_44[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 30 — depreciation of home (from Part III line 42 below)."
+    },
+    "line_31_carryover_prior_year_excess_casualty_depreciation": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_45[0]",
+      "terminal_name": "f1_45[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 31 — carryover of prior year excess casualty losses and depreciation."
+    },
+    "line_32_sum_29_30_31": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_46[0]",
+      "terminal_name": "f1_46[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 32 — sum of lines 29, 30, 31."
+    },
+    "line_33_allowable_excess_casualty_depreciation": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_47[0]",
+      "terminal_name": "f1_47[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 33 — min(line 28, line 32)."
+    },
+    "line_34_sum_14_27_33": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_48[0]",
+      "terminal_name": "f1_48[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 34 — sum of lines 14, 27, 33."
+    },
+    "line_35_casualty_loss_portion_to_4684": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_49[0]",
+      "terminal_name": "f1_49[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 35 — casualty loss portion carried to Form 4684."
+    },
+    "line_36_allowable_expenses_to_sch_c_line_30": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_50[0]",
+      "terminal_name": "f1_50[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part II line 36 — line 34 minus line 35. Flows to Schedule C line 30."
+    },
+    "line_37_smaller_of_basis_or_fmv": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_51[0]",
+      "terminal_name": "f1_51[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part III line 37 — smaller of home's adjusted basis or FMV."
+    },
+    "line_38_value_of_land": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_52[0]",
+      "terminal_name": "f1_52[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part III line 38 — land value included on line 37 (excluded from depreciation)."
+    },
+    "line_39_basis_of_building": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_53[0]",
+      "terminal_name": "f1_53[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part III line 39 — line 37 minus line 38."
+    },
+    "line_40_business_basis_of_building": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_54[0]",
+      "terminal_name": "f1_54[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part III line 40 — line 39 × line 7 (business percentage of building basis)."
+    },
+    "line_41_depreciation_percentage": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_55[0]",
+      "terminal_name": "f1_55[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part III line 41 — depreciation percentage (39-year nonresidential real property; mid-month convention in first/last year). Steady-state 2.564%."
+    },
+    "line_42_depreciation_allowable": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_56[0]",
+      "terminal_name": "f1_56[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part III line 42 — line 40 × line 41. Flows to Part II line 30."
+    },
+    "line_43_carryover_operating_expenses": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_57[0]",
+      "terminal_name": "f1_57[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part IV line 43 — operating expense carryover to next year (line 26 minus line 27)."
+    },
+    "line_44_carryover_excess_casualty_depreciation": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_58[0]",
+      "terminal_name": "f1_58[0]",
+      "type": "text",
+      "page": 1,
+      "note": "Part IV line 44 — excess casualty/depreciation carryover (line 32 minus line 33)."
+    }
+  },
+  "unmapped_widgets": []
+}

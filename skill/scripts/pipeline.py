@@ -413,6 +413,7 @@ def run_pipeline(
     render_schedule_se: bool = True,
     render_form_6251: bool = True,
     render_form_4562: bool = True,
+    render_form_8829: bool = True,
     render_state_returns: bool = True,
 ) -> PipelineResult:
     """Run the full pipeline: ingest → compute → render → emit result.
@@ -559,6 +560,15 @@ def run_pipeline(
 
             f4562_paths = render_form_4562_pdfs_all(canonical, output_dir)
             rendered.extend(f4562_paths)
+
+    if render_form_8829 and canonical.schedules_c:
+        # Emit one Form 8829 per regular-method home office. Simplified-
+        # method home offices do not file a Form 8829 (the deduction is
+        # reported directly on Schedule C line 30).
+        from skill.scripts.output.form_8829 import render_form_8829_pdfs_all
+
+        f8829_paths = render_form_8829_pdfs_all(canonical, output_dir)
+        rendered.extend(f8829_paths)
 
     if render_schedule_se:
         from skill.scripts.output.schedule_se import (

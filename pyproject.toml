@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tax-prep-skill"
-version = "0.0.1"
+version = "0.1.0"
 description = "Claude Code skill that prepares US individual income tax returns (federal + all states) for TY2025+"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "TBD"}
 authors = [{name = "discordwell"}]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: End Users/Desktop",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -19,6 +19,30 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Office/Business :: Financial :: Accounting",
 ]
+dependencies = [
+    # PDF manipulation
+    "pypdf>=5.1,<6",
+    "pdfplumber>=0.11,<0.12",
+    "pdfrw>=0.4,<0.5",
+    "reportlab>=4.2,<5",
+    # Schema + data modeling
+    "pydantic>=2.9,<3",
+    "jsonschema>=4.23,<5",
+    "python-dateutil>=2.9,<3",
+    # Calculation engine (OpenTaxSolver wrapper, TY2018-TY2025)
+    "tenforty>=0.2",
+    # OCR for tax documents
+    "azure-ai-documentintelligence>=1.0,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3,<9",
+    "pytest-cov>=5.0,<6",
+]
+
+[project.scripts]
+tax-prep = "skill.scripts.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

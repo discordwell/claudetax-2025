@@ -14,15 +14,36 @@ Architecture (see skill/reference/cp4-tenforty-verification.md):
              - Schedule 1 net (Part I additions - Part II adjustments)
         2. Call tenforty (OBBBA-current for standard deduction, brackets, SE,
            LTCG, Additional Medicare Tax, California state)
-        3. Apply patch layer for gaps: CTC, OBBBA senior deduction, Form 4547,
-           Schedule 1-A, QBI 8995-A, NIIT verification
-        4. Populate ComputedTotals and return
+        3. **OBBBA pre-tax-bracket patch layer** — senior deduction and
+           Schedule 1-A (tips/overtime) DO change AGI, so they MUST be folded
+           into adjustments BEFORE brackets are applied. We use a two-pass
+           tenforty strategy (Approach A): first pass gives us a preliminary
+           AGI for the MAGI-driven phase-outs; we compute the OBBBA
+           deductions from that AGI, fold them into a copy of
+           AdjustmentsToIncome, and re-call tenforty so the second pass sees
+           the reduced AGI and applies brackets correctly. Both pre-tax-
+           bracket patches are cheaply gated to skip the second pass when no
+           senior/tips/overtime trigger is present — which is the common
+           case for most returns.
+        4. Apply the post-tax-bracket patch layer for gaps that do NOT
+           change AGI: CTC, ACTC, ODC, NIIT, EITC.
+        5. Populate ComputedTotals and return.
+
+    **Why Approach A (two-pass tenforty) over Approach B (marginal-rate
+    approximation)?** Schedule 1-A tips/overtime and the OBBBA senior
+    deduction can easily push a return across a bracket boundary (see
+    integration test `test_single_with_tips_65k` — a $5k tips deduction on
+    a $65k single filer moves the filer from the 22% bracket to the 12%
+    bracket, and `marginal_rate × deduction` would OVERSTATE the tax
+    savings). Approach A is bit-for-bit correct because tenforty re-runs
+    its full bracket calculation on the reduced AGI.
 
 Fan-out rule: when you add a patch, write a golden fixture that exercises it.
 No patch without a test. No skill change without a test.
 """
 from __future__ import annotations
 
+import datetime as dt
 import hashlib
 import json
 from dataclasses import dataclass
@@ -40,6 +61,7 @@ from skill.scripts.models import (
     ItemizedDeductions,
     OtherTaxes,
     Payments,
+    Person,
     ScheduleC,
     ScheduleCExpenses,
     ScheduleE,
@@ -617,33 +639,80 @@ def _input_hash(return_: CanonicalReturn) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Main entry point
+# OBBBA pre-tax-bracket patch gating
 # ---------------------------------------------------------------------------
+#
+# The OBBBA senior deduction and Schedule 1-A tips/overtime deductions both
+# reduce AGI (they are Schedule 1 Part II adjustments). Folding them in
+# requires a SECOND tenforty call so the bracket calculation sees the
+# reduced AGI. These helpers let us skip the second call when no trigger
+# is present — which is the majority of returns.
 
 
-def compute(return_: CanonicalReturn) -> CanonicalReturn:
-    """Compute a canonical return end-to-end.
+def _person_age_at_end_of_year(person: Person, tax_year: int) -> int:
+    """Age of `person` on 12/31/`tax_year` (matches senior-deduction convention)."""
+    dob = person.date_of_birth
+    end_of_year = dt.date(tax_year, 12, 31)
+    years = end_of_year.year - dob.year
+    if (end_of_year.month, end_of_year.day) < (dob.month, dob.day):
+        years -= 1
+    return years
 
-    Returns a new CanonicalReturn with ComputedTotals populated.
 
-    Architecture:
-      1. Marshal CanonicalReturn -> tenforty.evaluate_return kwargs.
-      2. Unpack tenforty result (AGI, taxable income, federal income tax,
-         federal total tax = fed tax + SE + Add'l Medicare, effective/marginal
-         rates).
-      3. Apply the patch layer (CTC, NIIT, EITC) — tenforty does not compute
-         these from its high-level API.
-      4. Fold patch results into Credits / Payments / OtherTaxes on a copy of
-         the canonical return, and recompute the top-line totals so the
-         caller's `computed` block reflects the full federal picture.
+def _any_filer_age_65_plus(return_: CanonicalReturn) -> bool:
+    """Cheap gate for the senior-deduction second-pass tenforty call.
+
+    Returns True if the taxpayer (or, on MFJ/QSS, the spouse) is age 65+
+    at end of the tax year. Mirrors the logic in
+    `obbba_senior_deduction._count_qualifying_filers` without importing
+    the patch module — keeps this gate O(1) and independent of the
+    patch's year-gating so we can also skip the senior-deduction call
+    when tax_year is outside 2025-2028.
     """
-    # Lazy import to avoid circular import: niit.py imports from this module.
-    from skill.scripts.calc.patches.ctc import compute_ctc
-    from skill.scripts.calc.patches.eitc import compute_eitc
-    from skill.scripts.calc.patches.niit import compute_niit
+    if _person_age_at_end_of_year(return_.taxpayer, return_.tax_year) >= 65:
+        return True
+    if (
+        return_.filing_status in (FilingStatus.MFJ, FilingStatus.QSS)
+        and return_.spouse is not None
+        and _person_age_at_end_of_year(return_.spouse, return_.tax_year) >= 65
+    ):
+        return True
+    return False
 
-    tf_input = _to_tenforty_input(return_)
-    tf_result = tenforty.evaluate_return(
+
+def _any_tips_or_overtime_declared(return_: CanonicalReturn) -> bool:
+    """Cheap gate for the Schedule 1-A second-pass tenforty call.
+
+    The canonical model does not yet have a dedicated "user-declared
+    qualified tips/overtime" field on W-2 (box 7 is `social_security_tips`
+    which includes non-qualifying tips; the OBBBA definition requires
+    employer attestation that we don't yet model — see
+    `obbba_schedule_1a` module docstring). For now we treat the existing
+    `AdjustmentsToIncome.qualified_tips_deduction_schedule_1a` and
+    `qualified_overtime_deduction_schedule_1a` fields as the caller-
+    supplied raw amounts. The engine feeds those raw values to the
+    Schedule 1-A patch (which caps them and applies phase-out) and
+    OVERWRITES the adjustment fields with the patch's computed result.
+
+    TODO(w2-tips): once the ingestion layer gains a structured "qualified
+    tips" / "qualified overtime" extraction from W-2 box 14 + employer
+    attestation metadata, wire those fields through here instead of
+    relying on the caller to pre-populate the adjustment fields.
+    """
+    adj = return_.adjustments
+    return (
+        adj.qualified_tips_deduction_schedule_1a > 0
+        or adj.qualified_overtime_deduction_schedule_1a > 0
+    )
+
+
+def _call_tenforty(tf_input: "TenfortyInput") -> Any:
+    """Thin wrapper around tenforty.evaluate_return for deterministic calling.
+
+    Exists so the two-pass strategy in compute() can invoke tenforty from a
+    single code path; also centralizes the kwargs list.
+    """
+    return tenforty.evaluate_return(
         year=tf_input.year,
         filing_status=tf_input.filing_status,
         w2_income=tf_input.w2_income,
@@ -660,6 +729,153 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
         num_dependents=tf_input.num_dependents,
     )
 
+
+# ---------------------------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------------------------
+
+
+def compute(return_: CanonicalReturn) -> CanonicalReturn:
+    """Compute a canonical return end-to-end.
+
+    Returns a new CanonicalReturn with ComputedTotals populated.
+
+    Architecture:
+      1. Marshal CanonicalReturn -> tenforty.evaluate_return kwargs.
+      2. First tenforty call: produces a preliminary AGI that the MAGI-
+         driven OBBBA phase-outs need as input. For returns with no age 65+
+         filers AND no caller-declared tips/overtime, this is the final
+         call (the second pass is skipped).
+      3. **OBBBA pre-tax-bracket patch layer** — senior deduction and
+         Schedule 1-A tips/overtime. Both REDUCE AGI, so if either one
+         fires we fold the results into AdjustmentsToIncome and re-call
+         tenforty (Approach A: exact bracket re-application). Each patch
+         is gated behind a cheap "any trigger?" check so most returns
+         do not pay the second-call cost.
+      4. Unpack tenforty result (AGI, taxable income, federal income tax,
+         federal total tax = fed tax + SE + Add'l Medicare, effective/marginal
+         rates).
+      5. Apply the post-tax-bracket patch layer (CTC, NIIT, EITC) — these
+         do NOT change AGI so they run on the final tenforty result.
+      6. Fold patch results into Credits / Payments / OtherTaxes on a copy
+         of the canonical return, and recompute the top-line totals so the
+         caller's `computed` block reflects the full federal picture.
+    """
+    # Lazy import to avoid circular import: niit.py imports from this module.
+    from skill.scripts.calc.patches.ctc import compute_ctc
+    from skill.scripts.calc.patches.eitc import compute_eitc
+    from skill.scripts.calc.patches.niit import compute_niit
+    from skill.scripts.calc.patches.obbba_schedule_1a import compute_schedule_1a
+    from skill.scripts.calc.patches.obbba_senior_deduction import (
+        compute_senior_deduction,
+    )
+
+    # -------------------------------------------------------------------
+    # OBBBA pre-tax-bracket patches (senior deduction + Schedule 1-A)
+    # -------------------------------------------------------------------
+    # These are gated behind cheap detection so returns with no senior
+    # filers AND no caller-declared tips/overtime do NOT pay the second
+    # tenforty call. This preserves the bit-for-bit "no-op" invariant on
+    # the existing golden fixtures (simple_w2_standard, w2_investments_
+    # itemized, se_home_office — none have age 65+ filers or tips/overtime).
+    #
+    # MAGI-for-phase-out semantics: The OBBBA senior-deduction and
+    # Schedule 1-A phase-outs compare MAGI to a threshold. That MAGI is
+    # explicitly the AGI WITHOUT the OBBBA deduction in question (you
+    # cannot let a deduction reduce its own phase-out MAGI — that would
+    # be circular). So our first tenforty pass strips the OBBBA
+    # adjustment fields to zero before computing AGI, uses that AGI as
+    # MAGI for the phase-out math, then folds the patch outputs into a
+    # fresh AdjustmentsToIncome and calls tenforty a second time for the
+    # final bracket computation.
+    run_senior_patch = _any_filer_age_65_plus(return_)
+    run_schedule_1a_patch = _any_tips_or_overtime_declared(return_)
+
+    senior_deduction_amount = Decimal("0")
+    sched_1a_tips_amount = Decimal("0")
+    sched_1a_overtime_amount = Decimal("0")
+
+    updated_adjustments = return_.adjustments
+
+    if run_senior_patch or run_schedule_1a_patch:
+        # First pass MUST exclude the OBBBA adjustments so MAGI is clean.
+        adjustments_without_obbba = return_.adjustments.model_copy(
+            update={
+                "senior_deduction_obbba": Decimal("0"),
+                "qualified_tips_deduction_schedule_1a": Decimal("0"),
+                "qualified_overtime_deduction_schedule_1a": Decimal("0"),
+            }
+        )
+        return_for_first_pass = return_.model_copy(
+            update={"adjustments": adjustments_without_obbba}
+        )
+        tf_input = _to_tenforty_input(return_for_first_pass)
+        tf_result = _call_tenforty(tf_input)
+
+        # First-pass AGI is MAGI (== AGI before any OBBBA deduction).
+        prelim_agi = _d(tf_result.federal_adjusted_gross_income)
+        prelim_magi = magi(return_, prelim_agi)
+
+        if run_senior_patch:
+            senior_result = compute_senior_deduction(
+                return_=return_,
+                magi=prelim_magi,
+            )
+            senior_deduction_amount = senior_result.deduction
+
+        if run_schedule_1a_patch:
+            # The caller-populated adjustment fields act as the "raw
+            # qualified tips/overtime input" — see
+            # `_any_tips_or_overtime_declared` docstring for the rationale
+            # and TODO. The patch caps each amount, applies the MAGI
+            # phase-out, and returns the final deductions.
+            raw_tips = return_.adjustments.qualified_tips_deduction_schedule_1a
+            raw_overtime = return_.adjustments.qualified_overtime_deduction_schedule_1a
+            sched_1a_result = compute_schedule_1a(
+                return_=return_,
+                magi=prelim_magi,
+                qualified_tips_input=raw_tips,
+                qualified_overtime_input=raw_overtime,
+            )
+            sched_1a_tips_amount = sched_1a_result.tips_deduction
+            sched_1a_overtime_amount = sched_1a_result.overtime_deduction
+
+        # Build a new AdjustmentsToIncome with the OBBBA values folded in.
+        # We OVERWRITE rather than ADD: the patches are idempotent on the
+        # canonical state, so if a caller calls compute() twice on the same
+        # return, the second pass must see the same inputs as the first.
+        updated_adjustments = return_.adjustments.model_copy(
+            update={
+                "senior_deduction_obbba": senior_deduction_amount,
+                "qualified_tips_deduction_schedule_1a": sched_1a_tips_amount,
+                "qualified_overtime_deduction_schedule_1a": sched_1a_overtime_amount,
+            }
+        )
+
+        # Second tenforty pass with the updated adjustments. This is the
+        # authoritative bracket calculation. (If the sum of OBBBA fields
+        # happens to equal zero — e.g. full phase-out, year gate, or no
+        # trigger survived the patch — we skip the second call and reuse
+        # the first-pass result to save a round trip.)
+        obbba_total = (
+            senior_deduction_amount
+            + sched_1a_tips_amount
+            + sched_1a_overtime_amount
+        )
+        if obbba_total != Decimal("0"):
+            return_for_second_pass = return_.model_copy(
+                update={"adjustments": updated_adjustments}
+            )
+            tf_input = _to_tenforty_input(return_for_second_pass)
+            tf_result = _call_tenforty(tf_input)
+    else:
+        # No OBBBA patches fire — single tenforty call, identical to the
+        # pre-wave-3 behavior. This is the hot path for most returns and
+        # preserves the bit-for-bit invariant on the existing golden
+        # fixtures.
+        tf_input = _to_tenforty_input(return_)
+        tf_result = _call_tenforty(tf_input)
+
     agi = _cents(tf_result.federal_adjusted_gross_income)
     ti = _cents(tf_result.federal_taxable_income)
     fed_tax = _cents(tf_result.federal_income_tax)
@@ -667,7 +883,10 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     deduction = (agi - ti) if (agi is not None and ti is not None) else None
 
     ti_val = _cents(total_income(return_))
-    adjustments_val = _cents(_sum_adjustments(return_.adjustments))
+    # adjustments_total must reflect the OBBBA patch outputs if they fired.
+    # `updated_adjustments` is either the original adjustments (gates skipped)
+    # or a copy with the patched OBBBA fields.
+    adjustments_val = _cents(_sum_adjustments(updated_adjustments))
     payments_val = _cents(total_payments(return_))
 
     # -------------------------------------------------------------------
@@ -761,8 +980,12 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     # total_payments() already sums Payments.additional_child_tax_credit_refundable
     # and Payments.earned_income_credit_refundable, so rebuild a temporary
     # return with the updated Payments object to get the correct aggregate.
+    # The OBBBA `updated_adjustments` (senior deduction + Schedule 1-A caps/
+    # phase-outs applied) are also threaded through so downstream consumers
+    # see the final adjustment values.
     return_with_patches = return_.model_copy(
         update={
+            "adjustments": updated_adjustments,
             "credits": updated_credits,
             "other_taxes": updated_other_taxes,
             "payments": updated_payments,

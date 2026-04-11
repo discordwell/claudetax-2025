@@ -12,7 +12,24 @@ from __future__ import annotations
 from functools import lru_cache
 
 from skill.scripts.models import StateCode
-from skill.scripts.states import az, ca, dc, ma, mi, nj, ny, pa, va, wa
+from skill.scripts.states import (
+    az,
+    ca,
+    co,
+    dc,
+    ga,
+    il,
+    ma,
+    mi,
+    nc,
+    nj,
+    ny,
+    oh,
+    or_,
+    pa,
+    va,
+    wa,
+)
 from skill.scripts.states._no_income_tax import ALL_NO_TAX_PLUGINS
 from skill.scripts.states._plugin_api import StatePlugin
 
@@ -62,6 +79,14 @@ def _build_registry() -> StateRegistry:
         reg.register(plugin_module.PLUGIN)
     # Fan-out wave 2: AZ, MA, MI, NJ, PA, VA (all tenforty-backed)
     for plugin_module in (az, ma, mi, nj, pa, va):
+        reg.register(plugin_module.PLUGIN)
+    # Fan-out wave 3:
+    #   Tenforty-backed: NC (flat 4.25%), OH (graduated), OR (graduated, file
+    #     named or_.py because `or` is a Python keyword).
+    #   Hand-rolled: IL (flat 4.95%), CO (flat 4.40% from federal taxable
+    #     income), GA (flat 5.19%). All three v1 approximations — state
+    #     additions/subtractions deferred, documented in plugin docstrings.
+    for plugin_module in (nc, oh, or_, il, co, ga):
         reg.register(plugin_module.PLUGIN)
     return reg
 

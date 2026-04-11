@@ -12,6 +12,18 @@
           "title": "Country",
           "type": "string"
         },
+        "county": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "County"
+        },
         "state": {
           "description": "Two-letter USPS state code",
           "maxLength": 2,
@@ -3748,6 +3760,34 @@
           "title": "Box14 Other",
           "type": "array"
         },
+        "box14_qualified_overtime_obbba": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box14 Qualified Overtime Obbba"
+        },
+        "box14_qualified_tips_obbba": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box14 Qualified Tips Obbba"
+        },
         "box1_wages": {
           "anyOf": [
             {
@@ -4068,6 +4108,13 @@
     "filing_status": {
       "$ref": "#/$defs/FilingStatus"
     },
+    "foreign_account_countries": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Foreign Account Countries",
+      "type": "array"
+    },
     "forms_1099_b": {
       "items": {
         "$ref": "#/$defs/Form1099B"
@@ -4116,6 +4163,16 @@
       },
       "title": "Forms Ssa 1099",
       "type": "array"
+    },
+    "has_foreign_financial_account_over_10k": {
+      "default": false,
+      "title": "Has Foreign Financial Account Over 10K",
+      "type": "boolean"
+    },
+    "has_foreign_trust_transaction": {
+      "default": false,
+      "title": "Has Foreign Trust Transaction",
+      "type": "boolean"
     },
     "itemize_deductions": {
       "default": false,

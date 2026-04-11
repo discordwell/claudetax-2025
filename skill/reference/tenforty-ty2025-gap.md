@@ -40,20 +40,124 @@ Prior-wave agents also have `OTSState` entries but were NOT verified at
 fan-out time; they may or may not work. Treat the enum as **aspirational
 metadata**, not a capability oracle. **Always probe before assuming.**
 
-### ⚠️ tenforty GRAPH BACKEND (partial, only WI confirmed)
+### ⚠️ tenforty GRAPH BACKEND — broad TY2025 coverage (CP8-B finding)
 
-WI has a `wi_form1_2025.json` graph definition. Invoked via
-`tenforty.evaluate_return(backend="graph", state="WI", ...)`. Known gaps
-of the graph backend:
+WI had a `wi_form1_2025.json` graph definition discovered in wave 4.
+The initial assumption was that WI was a one-off. **CP8-B probed the
+remaining 21 taxing states and every single one is supported on the
+graph backend at TY2025.** Invoked via `tenforty.evaluate_return(
+backend="graph", state="ST", ...)`.
+
+#### TY2025 probe results ($65k Single, standard deduction, no deps)
+
+| State | Default | Graph | Graph-backend state_total_tax | Notes |
+|-------|---------|-------|-------------------------------|-------|
+| AL    | FAIL    | OK    | $3,210.00                     |       |
+| AR    | FAIL    | OK    | $2,031.15                     |       |
+| DE    | FAIL    | OK    | $3,059.00                     |       |
+| HI    | FAIL    | OK    | $3,496.80                     |       |
+| IA    | FAIL    | OK    | $1,871.50                     |       |
+| ID    | FAIL    | OK    | $2,355.27                     |       |
+| IN    | FAIL    | OK    | $1,950.00                     |       |
+| LA    | FAIL    | OK    | $1,575.00                     |       |
+| ME    | FAIL    | OK    | $3,069.78                     |       |
+| MO    | FAIL    | OK    | $2,200.52                     |       |
+| MS    | FAIL    | OK    | $2,054.80                     |       |
+| MT    | FAIL    | OK    | $2,652.55                     |       |
+| ND    | FAIL    | OK    | **$15.11**                    | ⚠️ suspect — verify against ND DOR Form ND-1 (ND has a very low flat rate but $15 on $65k looks like a stub) |
+| NE    | FAIL    | OK    | $2,454.83                     |       |
+| NM    | FAIL    | OK    | $1,905.75                     |       |
+| OK    | FAIL    | OK    | $2,597.38                     |       |
+| RI    | FAIL    | OK    | $2,028.75                     |       |
+| SC    | FAIL    | OK    | $2,313.30                     |       |
+| UT    | FAIL    | OK    | $1,980.00                     |       |
+| VT    | FAIL    | OK    | $2,244.85                     |       |
+| WV    | FAIL    | OK    | $2,294.50                     |       |
+
+The probe was performed via `skill/scripts/probe_tenforty_states.py`
+(re-runnable) on 2026-04-11 against tenforty version installed in the
+project venv.
+
+#### Known graph backend output-field gaps (from WI, wave 4)
 
 - `state_tax_bracket` returns `0.0` (no marginal rate exposed).
 - `state_effective_tax_rate` returns `0.0`.
-- `state_taxable_income` echoes AGI (the WI sliding-scale standard
-  deduction and personal exemption are applied internally but not
-  reflected on the output side).
+- `state_taxable_income` may echo AGI instead of applying the
+  state-specific standard deduction / personal exemption on the output
+  side (verified on WI; affects other graph-backend states too).
 
-The final `state_total_tax` number IS authoritative — the bracket calc
-is correct; only the display fields are gapped.
+#### Observed graph-backend correctness gaps (CP8-B cross-check)
+
+CP8-B cross-checked the graph-backend $65k Single result against our
+hand-rolled wave-3/wave-4 plugins for the 10 states we've already
+authored. **Graph backend is NOT a drop-in replacement** — it has real
+per-state gaps in which state-specific exemptions/credits are applied:
+
+| State | Hand-rolled | Graph     | Delta     | Root cause                                         |
+|-------|-------------|-----------|-----------|----------------------------------------------------|
+| CO    | $2,167.00   | $2,167.00 | match     | —                                                  |
+| GA    | $2,750.70   | $2,750.70 | match     | —                                                  |
+| KY    | $2,469.20   | $2,469.20 | match     | —                                                  |
+| MN    | $2,931.14   | $2,931.14 | match     | —                                                  |
+| WI    | $2,861.80   | $2,861.80 | match     | (WI IS the graph wrapper — tautological)           |
+| **IL** | $3,076.43  | $3,217.50 | **+$141** | Graph does NOT apply IL $2,850 personal exemption  |
+| **KS** | $2,827.71  | $3,338.44 | **+$510** | Graph does NOT apply KS $9,160 exemption           |
+| **CT** | $2,875.00  | $2,825.00 | **−$50**  | Graph missing line 5 phase-out recapture add-back  |
+| **MD** | $2,723.88¹ | $2,875.88 | **+$152** | Graph missing something (verify)                   |
+| **ND** | n/a        | $15.11    | **stub?** | $15 on $65k is implausible — likely broken graph   |
+
+¹ MD hand-rolled state-only (local tax is separate).
+
+Five of ten agree; five have material gaps. This means graph backend
+wrapping is a **starting point**, not a finished wrap — wave 5 state
+agents must cross-check the graph backend against a DOR primary-source
+$65k Single worked example before committing to the wrap.
+
+#### Implication for wave 5 (REVISED)
+
+Wave 5's 21 remaining-state plugins should follow this decision tree:
+
+1. **Probe**: run the graph backend on a $65k Single return.
+2. **Verify**: compute the same return by hand against the state DOR's
+   primary instructions.
+3. **Three outcomes**:
+   - **Exact match**: wrap with graph backend (like `wi.py`). Pin the
+     state-specific output-field gaps in tests (state_taxable_income,
+     state_tax_bracket, state_effective_tax_rate).
+   - **Close match (within ~$5)**: wrap with graph backend AND document
+     the discrepancy in the plugin docstring as a loud TODO. Pin the
+     graph-backend number in tests so drift is visible.
+   - **Material mismatch (>$5)**: hand-roll from DOR primary source,
+     mirroring the CT/KS/KY/MN pattern. The graph backend is doing
+     something wrong for this state — do NOT trust it.
+
+The five wave-4 hand-rolled plugins (CT/KS/KY/MN/MD) are all correct as
+written — do NOT convert them to graph wrappers. ND's $15.11 on $65k
+specifically means the ND graph definition is broken or stubbed; wave
+5's ND agent must hand-roll from ND DOR Form ND-EZ / ND-1 rather than
+trust the graph output. Wave 4's pattern of 5-out-of-6 hand-rolled
+recoveries from an enum that silently over-claims coverage was
+well-calibrated.
+
+#### Implication for wave 5
+
+Wave 5's 21 remaining-state plugins should each use the **graph backend
+wrapper pattern established by `wi.py`**, NOT the hand-rolled path used
+by CT/KS/KY/MD/MN in wave 4. Hand-rolling should be reserved for:
+- States where the graph-backend tax number diverges materially from
+  DOR primary-source verification (wave 5 agents must verify).
+- States where the graph backend produces a suspicious number (e.g. ND
+  at $15.11 on $65k — flagged above).
+- Cases where local taxes / county-level piggyback are required (MD
+  was hand-rolled in wave 4 specifically because of the 22-county
+  local tax table — not because the state tax itself was missing).
+
+The five wave-4 hand-rolled plugins (CT/KS/KY/MN — not MD, which has
+county local tax — plus optionally revisiting them) could eventually
+be converted to graph-backend wrappers for lower maintenance. That is
+**optional** — the hand-rolled plugins are correct, tested, and cite
+DOR primary sources. Conversion is a cleanup task, not a correctness
+fix.
 
 ## Decision rubric for future state plugins
 

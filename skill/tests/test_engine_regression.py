@@ -234,6 +234,13 @@ class TestTotalPayments:
 
 
 class TestItemizedWithSALTCap:
+    """All of these tests pin the SALT-cap logic with ``agi=Decimal("0")``.
+    At zero AGI the 7.5%-of-AGI medical floor is zero, so the raw-medical
+    path exercised here is unchanged by the CP8-A fix. The medical-floor
+    path is exercised separately in ``TestItemizedMedicalFloor`` below
+    and in ``test_output_schedule_a.py::test_line17_vs_engine_delta...``.
+    """
+
     def test_includes_all_schedule_a_categories(self):
         it = ItemizedDeductions(
             medical_and_dental_total=Decimal("1000"),
@@ -251,7 +258,8 @@ class TestItemizedWithSALTCap:
         )
         # SALT raw = 5000 + 3000 + 500 = 8500, under 10000 cap → 8500
         # Medical 1000 + SALT 8500 + interest 10700 + charity 2600 + other 50 = 22850
-        assert itemized_total_capped(it, FilingStatus.SINGLE) == Decimal("22850")
+        # (no floor fires at AGI=0)
+        assert itemized_total_capped(it, FilingStatus.SINGLE, Decimal("0")) == Decimal("22850")
 
     def test_salt_cap_10k_applied_single(self):
         it = ItemizedDeductions(
@@ -263,7 +271,7 @@ class TestItemizedWithSALTCap:
         # SALT raw = 21000, capped at 10000
         # Interest = 5000
         # Total = 10000 + 5000 = 15000
-        assert itemized_total_capped(it, FilingStatus.SINGLE) == Decimal("15000")
+        assert itemized_total_capped(it, FilingStatus.SINGLE, Decimal("0")) == Decimal("15000")
 
     def test_salt_cap_5k_applied_mfs(self):
         it = ItemizedDeductions(
@@ -271,7 +279,7 @@ class TestItemizedWithSALTCap:
             real_estate_tax=Decimal("4000"),
         )
         # SALT raw = 12000, MFS cap 5000
-        assert itemized_total_capped(it, FilingStatus.MFS) == Decimal("5000")
+        assert itemized_total_capped(it, FilingStatus.MFS, Decimal("0")) == Decimal("5000")
 
     def test_salt_cap_10k_applied_mfj(self):
         it = ItemizedDeductions(
@@ -279,7 +287,7 @@ class TestItemizedWithSALTCap:
             real_estate_tax=Decimal("7000"),
         )
         # SALT raw = 22000, MFJ cap 10000
-        assert itemized_total_capped(it, FilingStatus.MFJ) == Decimal("10000")
+        assert itemized_total_capped(it, FilingStatus.MFJ, Decimal("0")) == Decimal("10000")
 
     def test_elect_sales_tax_uses_sales_not_income(self):
         it = ItemizedDeductions(
@@ -289,7 +297,7 @@ class TestItemizedWithSALTCap:
             real_estate_tax=Decimal("4000"),
         )
         # SALT raw = 3000 + 4000 = 7000, under cap
-        assert itemized_total_capped(it, FilingStatus.SINGLE) == Decimal("7000")
+        assert itemized_total_capped(it, FilingStatus.SINGLE, Decimal("0")) == Decimal("7000")
 
     def test_compute_applies_salt_cap(self):
         """End-to-end: a user with $30k SALT should see the cap applied through tenforty."""
@@ -305,6 +313,106 @@ class TestItemizedWithSALTCap:
         result = compute(ret)
         # Deduction should reflect SALT cap: 10000 SALT + 8000 mortgage = 18000
         assert result.computed.deduction_taken == Decimal("18000")
+
+
+# ---------------------------------------------------------------------------
+# CP8-A: medical 7.5% floor (real-money calc correctness fix)
+# ---------------------------------------------------------------------------
+
+
+class TestItemizedMedicalFloor:
+    """End-to-end regression for the CP8-A fix.
+
+    Before CP8-A, ``engine.itemized_total_capped`` summed raw medical
+    and tenforty interpreted ``itemized_deductions`` as the final Sch A
+    line 17 value. The combination over-deducted by exactly
+    ``min(raw_medical, 0.075 * AGI)``, inflating refunds by real money.
+
+    After CP8-A, ``itemized_total_capped`` applies the 7.5% floor
+    itself and ``compute()`` threads the correct AGI through a second
+    tenforty pass whenever medical > 0 on an itemized return.
+    """
+
+    def test_single_100k_medical_20k_salt_8k_mortgage_5k(self):
+        """$100k single-filer, $20k medical, $8k SALT, $5k mortgage.
+
+        Hand calc (post-fix):
+          AGI = 100000 (no OBBBA triggers, standard adjustments = 0)
+          Floor = 100000 * 0.075 = 7500
+          Medical deductible = 20000 - 7500 = 12500
+          SALT under $10k cap = 8000 (no cap applied)
+          Interest = 5000
+          Schedule A line 17 = 12500 + 8000 + 5000 = 25500
+          Taxable income = 100000 - 25500 = 74500
+
+        Pre-fix, tenforty would have received itemized_deductions=33000
+        (raw medical path), producing taxable income $67,000 and
+        ~$1,650 LESS federal tax than the filer actually owes.
+        """
+        ret = _base_return(
+            w2s=[W2(
+                employer_name="Acme",
+                box1_wages=Decimal("100000.00"),
+                box2_federal_income_tax_withheld=Decimal("12000.00"),
+            )],
+            itemize_deductions=True,
+            itemized=ItemizedDeductions(
+                medical_and_dental_total=Decimal("20000.00"),
+                state_and_local_income_tax=Decimal("8000.00"),
+                home_mortgage_interest=Decimal("5000.00"),
+            ),
+        )
+        result = compute(ret)
+        c = result.computed
+
+        # The core invariant: post-floor medical is applied.
+        assert c.adjusted_gross_income == Decimal("100000.00")
+        assert c.deduction_taken == Decimal("25500.00"), (
+            f"Expected $25,500 (medical $12,500 post-floor + SALT $8,000 + "
+            f"interest $5,000), got {c.deduction_taken}. Pre-fix this was "
+            f"$33,000 — the $7,500 delta is the 7.5%-of-AGI floor."
+        )
+        assert c.taxable_income == Decimal("74500.00")
+
+    def test_itemized_total_capped_unit_with_floor(self):
+        """Unit test for ``itemized_total_capped`` with AGI populated.
+
+        Medical $10k, AGI $80k → floor $6k → medical deductible $4k.
+        Plus $10k SALT (capped), $5k interest → total $19,000.
+        """
+        it = ItemizedDeductions(
+            medical_and_dental_total=Decimal("10000"),
+            state_and_local_income_tax=Decimal("12000"),  # will cap to 10k
+            home_mortgage_interest=Decimal("5000"),
+        )
+        result = itemized_total_capped(it, FilingStatus.SINGLE, Decimal("80000"))
+        # 4000 medical + 10000 SALT + 5000 interest = 19000
+        assert result == Decimal("19000.00")
+
+    def test_floor_zero_when_medical_is_zero(self):
+        """Hot path: no medical → itemized_total_capped behaves identically
+        regardless of AGI. Locks the fast-path gate used by compute()."""
+        it = ItemizedDeductions(
+            state_and_local_income_tax=Decimal("10000"),
+            home_mortgage_interest=Decimal("5000"),
+        )
+        with_agi = itemized_total_capped(it, FilingStatus.SINGLE, Decimal("500000"))
+        without_agi = itemized_total_capped(it, FilingStatus.SINGLE, Decimal("0"))
+        assert with_agi == without_agi == Decimal("15000")
+
+    def test_floor_zeroes_out_medical_when_fully_absorbed(self):
+        """High AGI, low medical — floor absorbs all of the medical.
+
+        $5k medical, $200k AGI → floor $15k > medical → deductible $0.
+        """
+        it = ItemizedDeductions(
+            medical_and_dental_total=Decimal("5000"),
+            state_and_local_income_tax=Decimal("8000"),
+        )
+        # medical post-floor = max(0, 5000 - 15000) = 0
+        # SALT 8000 (under cap) → 8000
+        result = itemized_total_capped(it, FilingStatus.SINGLE, Decimal("200000"))
+        assert result == Decimal("8000")
 
 
 # ---------------------------------------------------------------------------

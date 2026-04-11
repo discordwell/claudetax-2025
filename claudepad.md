@@ -6,6 +6,53 @@ Session memory for this project. Top section = most recent session summaries (ne
 
 ## Session Summaries
 
+### 2026-04-11 14:00 UTC — Wave 5 dispatch plan (pending, written during CP8)
+
+**Goal**: 21 remaining taxing states + real AcroForm overlays + K-1 ingester + SKILL.md scaffold, in a single ~12-agent fan-out.
+
+**CP8 pre-flight serial work** (must land before wave 5 dispatch):
+1. **CP8-A ✅**: engine medical 7.5% floor fix (real-money calc bug) — DONE
+2. **CP8-B ✅**: probe of 21 remaining tenforty states via graph backend — DONE. Finding: graph covers all 21 but has material gaps vs DOR for at least 4 of the 10 states we've already hand-rolled. NOT a drop-in replacement.
+3. **CP8-C**: extract `skill/scripts/states/_hand_rolled_base.py` with shared Decimal helpers, day-proration, bracket lookup, and a StatePluginMeta factory. Reduces wave-5 state boilerplate.
+4. **CP8-D**: canonical model extensions (serial). `Address.county` for MD-style local tax, top-level foreign-accounts flag for Schedule B Part III, W2 `box14_qualified_tips` / `box14_qualified_overtime` for OBBBA Schedule 1-A structured input. Regen schema.
+5. **CP8-E**: minimal `skill/scripts/pipeline.py` end-to-end: input PDFs + taxpayer.json → classifier → ingesters → CanonicalReturn → compute() → renders Form 1040 + Sch A/B/C/SE PDFs → emits validation_report + result.json. First real wet-test harness.
+
+**Wave 5 dispatch (post-CP8, 12 agents)**:
+
+Group A — States (6 agents, each covers 3-4 states using the post-probe rubric):
+  - A1: AL, AR, DE (Southeast + DE) — probe graph → DOR-verify → wrap or hand-roll per state
+  - A2: HI, ID, MT (mountain/pacific) — same rubric
+  - A3: IA, IN, NE (plains) — same rubric
+  - A4: LA, MS, OK (gulf) — same rubric
+  - A5: ME, RI, VT, WV (new england + WV) — same rubric
+  - A6: MO, NM, ND, SC, UT (leftovers) — **ND must be hand-rolled** (probe returned $15.11 on $65k, graph is broken/stubbed)
+
+  Each agent must: (1) probe graph backend, (2) hand-compute against DOR primary source for $65k Single as the ground-truth test, (3) decide match→wrap or mismatch→hand-roll PER STATE (not per agent), (4) use `_hand_rolled_base.py` helpers for any hand-rolled paths, (5) pin the decision with a gatekeeper test so drift trips CI.
+
+  **Critical prompt language**: explicit warning that the graph backend is NOT a drop-in replacement, with the wave-4 IL/KS/CT/MD divergences cited as examples. Agents must cross-check, not assume.
+
+Group B — Real IRS AcroForm overlays (2 agents):
+  - B1: Form 1040 real AcroForm renderer (Layer 2 replacement) using the wave-4 widget map at `skill/reference/form-1040-acroform-map.json`. Delete the reportlab scaffold; fill the real IRS f1040.pdf widgets via pypdf.
+  - B2: Schedule A/B/C/SE AcroForm renderers (Layer 2 replacements, bundled). Reuses the wave-4 methodology doc to enumerate widgets for each form, produces per-form maps as reference JSON, and replaces Layer 2 for all four schedules.
+
+Group C — Ingesters (1 agent):
+  - C1: Schedule K-1 pypdf ingester following the 1099-R/G/NEC/SSA pattern. Synthetic widget names with TODOs.
+
+Group D — Pipeline extensions (2 agents):
+  - D1: SKILL.md interview flow scaffold (natural-language Claude-driven interview that populates CanonicalReturn step by step; handoff to `pipeline.py`).
+  - D2: Paper-file bundle generator (iterates all rendered PDFs + state PDFs + signature page + mailing instructions).
+
+Group E — Fixtures (1 agent):
+  - E1: Expand golden fixture coverage with a real-looking "multi-state part-year" case exercising CT residency + PA job (reciprocity) + IL job (no reciprocity), day-prorated. Tests the full ingest→compute→render→state plugin chain.
+
+**Not in scope for wave 5** (deferred):
+- Remaining ingester AcroForm real widget research (W-2 / 1099 family) — lower priority than state coverage.
+- Azure DI expansion beyond W-2.
+- Wave-4 hand-rolled state conversion to graph wrappers — do NOT do this; the hand-rolled plugins are correct and the graph backend has gaps.
+- Per-state nonresident apportionment beyond day-proration — still deferred.
+
+---
+
 ### 2026-04-11 10:00 UTC — Session 2: wave 3 finish + wave 4 fan-out
 
 **Wave 3 serial cleanup** (commit `8d260b1` — 3 deferred items the user split off for "finish wave 3" before wave 4 dispatch):

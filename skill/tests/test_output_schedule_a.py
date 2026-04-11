@@ -200,14 +200,15 @@ def test_salt_elect_sales_tax_reads_sales_line() -> None:
     assert fields.line_5e_salt_capped == Decimal("7500")
 
 
-def test_salt_cap_matches_engine_itemized_total_capped_zero_medical() -> None:
+def test_line17_matches_engine_itemized_total_capped_zero_medical() -> None:
     """Cross-check: with medical=0, line 17 equals engine's capped total.
 
-    With zero medical there is no 7.5%-floor divergence, so line 17
-    (renderer form-level total, medical post-floor) agrees bit-for-bit
-    with ``itemized_total_capped`` (engine param total, medical raw).
-    See the companion test below that locks the expected delta when
-    medical > 0.
+    With zero medical the 7.5% floor is a no-op on both sides, so line 17
+    and ``itemized_total_capped`` agree. See
+    ``test_line17_matches_engine_with_medical_floor`` for the non-zero-
+    medical case where both sides apply the floor identically (CP8-A
+    fix — they used to diverge until the engine was taught to apply the
+    floor too).
     """
     it = ItemizedDeductions(
         state_and_local_income_tax=Decimal("15000"),
@@ -218,7 +219,9 @@ def test_salt_cap_matches_engine_itemized_total_capped_zero_medical() -> None:
     r = _minimal_return(filing_status=FilingStatus.MFJ, itemized=it)
     fields = compute_schedule_a_fields(r)
 
-    engine_total = itemized_total_capped(it, FilingStatus.MFJ)
+    # Pass AGI=0 explicitly — no medical to floor, so any AGI gives the
+    # same answer. Matches the renderer's no-AGI path on this fixture.
+    engine_total = itemized_total_capped(it, FilingStatus.MFJ, Decimal("0"))
     # engine_total breakdown:
     #   medical 0 + SALT_capped 10000 + interest 20000 + charity 5000 = 35000
     assert engine_total == Decimal("35000")
@@ -227,15 +230,17 @@ def test_salt_cap_matches_engine_itemized_total_capped_zero_medical() -> None:
     assert fields.line_17_total_itemized == engine_total
 
 
-def test_line17_vs_engine_delta_equals_7_5pct_agi_floor_on_medical() -> None:
-    """Form-vs-engine semantic gap: with medical > 0, line 17 DIVERGES
-    from ``itemized_total_capped`` by exactly ``min(raw_medical, floor)``.
+def test_line17_matches_engine_with_medical_floor() -> None:
+    """CP8-A invariant: with medical > 0 AND AGI > 0, the engine and the
+    renderer produce the SAME number when the engine is given the AGI
+    used by the form.
 
-    - Renderer (form-level): medical line 4 = max(0, raw - 7.5% * AGI)
-    - Engine (tenforty param): raw medical (floor applied inside tenforty)
-
-    This test locks the delta so future drift on either side trips CI.
-    The goldens pass because they use medical=0.
+    Pre-CP8-A, ``itemized_total_capped`` used RAW medical and tenforty
+    treated the parameter as the final Sch A line 17 amount, over-
+    deducting by exactly ``min(raw_medical, 0.075 * AGI)``. Post-fix,
+    ``itemized_total_capped`` applies the floor itself, producing a
+    number the filer's real Form 1040 line 12 (and Sch A line 17) will
+    match bit-for-bit.
     """
     from skill.scripts.models import ComputedTotals
 
@@ -245,29 +250,34 @@ def test_line17_vs_engine_delta_equals_7_5pct_agi_floor_on_medical() -> None:
         home_mortgage_interest=Decimal("10000"),
         gifts_to_charity_cash=Decimal("1000"),
     )
-    # Construct a return with a populated AGI so the 7.5% floor bites.
-    # We don't need compute() — the renderer only reads
-    # return_.computed.adjusted_gross_income.
     r_pre = _minimal_return(filing_status=FilingStatus.SINGLE, itemized=it)
     agi = Decimal("65000")
     r = r_pre.model_copy(
         update={"computed": ComputedTotals(adjusted_gross_income=agi)}
     )
-
     fields = compute_schedule_a_fields(r)
 
-    # 7.5% floor: quantize to cents as the renderer does.
+    # 7.5% floor: quantize to cents as both sides do.
     floor = (agi * Decimal("0.075")).quantize(Decimal("0.01"))
     raw_medical = Decimal("20000")
-    expected_delta = min(raw_medical, floor)
+    expected_medical_after_floor = max(Decimal("0"), raw_medical - floor)
+    # Expected line 17: medical post-floor + SALT 5000 + interest 10000 + charity 1000
+    expected_line_17 = (
+        expected_medical_after_floor
+        + Decimal("5000")
+        + Decimal("10000")
+        + Decimal("1000")
+    )
+    assert fields.line_17_total_itemized == expected_line_17
 
-    engine_total = itemized_total_capped(it, FilingStatus.SINGLE)
-    delta = engine_total - fields.line_17_total_itemized
-    assert delta == expected_delta, (
-        f"Expected line_17 to lag engine_total by the floor ({expected_delta}), "
-        f"got delta={delta}. "
-        f"engine_total={engine_total}, line_17={fields.line_17_total_itemized}, "
-        f"floor={floor}, raw_medical={raw_medical}"
+    # The engine must now produce the identical number when passed the
+    # same AGI. Pre-CP8-A this was raw_medical + SALT + interest + charity
+    # (i.e. $4,875 higher than the IRS form).
+    engine_total = itemized_total_capped(it, FilingStatus.SINGLE, agi)
+    assert engine_total == fields.line_17_total_itemized, (
+        f"CP8-A invariant violated: engine={engine_total}, "
+        f"renderer line_17={fields.line_17_total_itemized}. "
+        f"Expected both to equal {expected_line_17}."
     )
 
 

@@ -197,19 +197,65 @@ def schedule_e_total_net(sched_e: ScheduleE) -> Decimal:
 # ---------------------------------------------------------------------------
 
 
-def itemized_total_capped(it: ItemizedDeductions, status: FilingStatus) -> Decimal:
-    """Sum Schedule A items applying the SALT cap.
+def itemized_total_capped(
+    it: ItemizedDeductions,
+    status: FilingStatus,
+    agi: Decimal,
+) -> Decimal:
+    """Sum Schedule A items applying the SALT cap AND the 7.5% medical floor.
 
-    Taxpayer can elect state/local SALES tax instead of income tax on one line
-    (Schedule A line 5a). Whichever is used, the combined SALT total (that
-    election + real estate + personal property) is capped at $10k ($5k MFS).
+    CRITICAL SEMANTICS — tenforty interprets its ``itemized_deductions``
+    parameter as the **final Schedule A line 17 amount**, not as raw
+    pre-floor medical + everything else. This was empirically verified
+    in wave 4 (see ``skill/reference/tenforty-ty2025-gap.md`` and the
+    CP8 commit message). Passing raw medical here caused tenforty to
+    over-deduct medical by ``min(raw_medical, 0.075 * agi)`` for every
+    itemizer with nonzero medical — a real-money calc correctness bug.
 
-    Mortgage insurance premium deduction (line 8d) expired for TY2022 unless
-    reinstated; TY2025 status — assume not allowed; reserved in model but
-    excluded from total. Fan-out can re-enable if law changes.
+    The fix: apply the 7.5%-of-AGI floor to medical BEFORE summing. AGI
+    is Form 1040 line 11 (after adjustments, including OBBBA). When
+    compute() runs a multi-pass tenforty strategy, the AGI passed here
+    must reflect the FINAL post-adjustments AGI that will land on the
+    filed form (see the three-pass path in ``compute()`` for the
+    OBBBA+medical combo).
+
+    Parameters
+    ----------
+    it
+        The ItemizedDeductions block from a canonical return.
+    status
+        FilingStatus — drives SALT cap selection (MFS = $5k, else $10k).
+    agi
+        AGI against which to compute the 7.5% medical floor. Pass
+        ``Decimal("0")`` in unit tests that deliberately want the
+        no-floor edge case (e.g., isolated SALT-cap tests). Callers in
+        ``compute()`` thread a preliminary tenforty-computed AGI.
+
+    Notes
+    -----
+    Taxpayer can elect state/local SALES tax instead of income tax on
+    Schedule A line 5a. Whichever is used, the combined SALT total
+    (that election + real estate + personal property) is capped at
+    $10k ($5k MFS).
+
+    Mortgage insurance premium deduction (line 8d) expired for TY2022
+    unless reinstated; TY2025 status — assume not allowed; reserved in
+    model but excluded from total. Fan-out can re-enable if law changes.
+
+    Charity AGI-percentage limits (50%/30%/20%) are NOT applied here —
+    tenforty still enforces them on the post-sum total. Casualty/theft
+    restricted to federal-disaster-declared events post-TCJA.
     """
-    # Medical: full amount (the 7.5% AGI floor is applied by tenforty, not here)
-    medical = it.medical_and_dental_total
+    # Medical: apply the 7.5%-of-AGI floor (Schedule A lines 2-4).
+    # medical_deductible = max(0, raw - 0.075 * AGI)
+    raw_medical = it.medical_and_dental_total
+    if raw_medical > 0 and agi > 0:
+        medical_floor = (agi * Decimal("0.075")).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        medical = max(Decimal("0"), raw_medical - medical_floor)
+    else:
+        medical = raw_medical
 
     # SALT: sales OR income + real estate + personal property, capped
     salt_elected_tax = (
@@ -225,7 +271,7 @@ def itemized_total_capped(it: ItemizedDeductions, status: FilingStatus) -> Decim
     interest = it.home_mortgage_interest + it.mortgage_points + it.investment_interest
 
     # Charity: cash + non-cash + carryover (subject to AGI-percentage limits
-    # which tenforty enforces — we pass the raw total)
+    # which tenforty enforces on the post-sum total — we pass the raw value)
     charity = (
         it.gifts_to_charity_cash
         + it.gifts_to_charity_other_than_cash
@@ -328,8 +374,18 @@ class TenfortyInput:
     num_dependents: int
 
 
-def _to_tenforty_input(return_: CanonicalReturn) -> TenfortyInput:
-    """Marshal a canonical return into tenforty.evaluate_return kwargs."""
+def _to_tenforty_input(
+    return_: CanonicalReturn,
+    agi_for_medical_floor: Decimal = Decimal("0"),
+) -> TenfortyInput:
+    """Marshal a canonical return into tenforty.evaluate_return kwargs.
+
+    ``agi_for_medical_floor`` is the AGI used to compute the 7.5% medical
+    floor in ``itemized_total_capped``. Pass ``Decimal("0")`` in the
+    first-pass tenforty call (before AGI is known); pass the computed
+    AGI in subsequent passes where the medical floor matters. See the
+    three-pass strategy in ``compute()``.
+    """
     w2_sum = sum((w2.box1_wages for w2 in return_.w2s), start=Decimal("0"))
 
     interest_sum = sum(
@@ -370,7 +426,9 @@ def _to_tenforty_input(return_: CanonicalReturn) -> TenfortyInput:
     )
 
     if return_.itemize_deductions and return_.itemized is not None:
-        itemized_total = itemized_total_capped(return_.itemized, return_.filing_status)
+        itemized_total = itemized_total_capped(
+            return_.itemized, return_.filing_status, agi_for_medical_floor
+        )
         standard_or_itemized = "Itemized"
     else:
         itemized_total = Decimal("0")
@@ -750,21 +808,32 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     Architecture:
       1. Marshal CanonicalReturn -> tenforty.evaluate_return kwargs.
       2. First tenforty call: produces a preliminary AGI that the MAGI-
-         driven OBBBA phase-outs need as input. For returns with no age 65+
-         filers AND no caller-declared tips/overtime, this is the final
-         call (the second pass is skipped).
+         driven OBBBA phase-outs need as input. Also used as the base
+         for the Schedule A 7.5% medical floor (when itemizing with
+         nonzero medical). The first pass uses ``agi_for_medical_floor=0``
+         because the floor is applied in the second pass — the first
+         pass just needs AGI. For returns with no OBBBA triggers AND no
+         medical-requiring-floor, this is the final call and the second
+         pass is skipped (bit-for-bit invariant on goldens without medical).
       3. **OBBBA pre-tax-bracket patch layer** — senior deduction and
          Schedule 1-A tips/overtime. Both REDUCE AGI, so if either one
          fires we fold the results into AdjustmentsToIncome and re-call
-         tenforty (Approach A: exact bracket re-application). Each patch
-         is gated behind a cheap "any trigger?" check so most returns
-         do not pay the second-call cost.
-      4. Unpack tenforty result (AGI, taxable income, federal income tax,
+         tenforty (Approach A: exact bracket re-application).
+      4. **Medical 7.5% floor (CP8-A)** — tenforty interprets the
+         ``itemized_deductions`` param as the *final* Sch A line 17
+         amount, NOT raw pre-floor medical. Passing raw medical over-
+         deducts by min(raw, 0.075*AGI). So whenever medical > 0 on an
+         itemized return, we compute AGI on the first pass and pass the
+         post-floor itemized total on the second pass. The post-OBBBA
+         "real" AGI used for the floor is computed algebraically:
+         ``real_agi = prelim_agi - obbba_total`` (AGI = total_income -
+         adjustments, so OBBBA reduction flows directly).
+      5. Unpack tenforty result (AGI, taxable income, federal income tax,
          federal total tax = fed tax + SE + Add'l Medicare, effective/marginal
          rates).
-      5. Apply the post-tax-bracket patch layer (CTC, NIIT, EITC) — these
+      6. Apply the post-tax-bracket patch layer (CTC, NIIT, EITC) — these
          do NOT change AGI so they run on the final tenforty result.
-      6. Fold patch results into Credits / Payments / OtherTaxes on a copy
+      7. Fold patch results into Credits / Payments / OtherTaxes on a copy
          of the canonical return, and recompute the top-line totals so the
          caller's `computed` block reflects the full federal picture.
     """
@@ -801,14 +870,26 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     run_senior_patch = _any_filer_age_65_plus(return_)
     run_schedule_1a_patch = _any_tips_or_overtime_declared(return_)
 
+    # CP8-A: medical-floor trigger. Whenever itemizing with nonzero
+    # medical, the SECOND pass must use a post-floor itemized total
+    # (tenforty does not apply the 7.5% floor itself).
+    need_medical_floor = (
+        return_.itemize_deductions
+        and return_.itemized is not None
+        and return_.itemized.medical_and_dental_total > Decimal("0")
+    )
+
     senior_deduction_amount = Decimal("0")
     sched_1a_tips_amount = Decimal("0")
     sched_1a_overtime_amount = Decimal("0")
 
     updated_adjustments = return_.adjustments
 
-    if run_senior_patch or run_schedule_1a_patch:
+    if run_senior_patch or run_schedule_1a_patch or need_medical_floor:
         # First pass MUST exclude the OBBBA adjustments so MAGI is clean.
+        # First pass uses agi_for_medical_floor=0 because AGI isn't known
+        # yet — we're running this pass precisely to discover AGI. The
+        # first-pass TI/tax values are thrown away; only AGI matters.
         adjustments_without_obbba = return_.adjustments.model_copy(
             update={
                 "senior_deduction_obbba": Decimal("0"),
@@ -819,7 +900,9 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
         return_for_first_pass = return_.model_copy(
             update={"adjustments": adjustments_without_obbba}
         )
-        tf_input = _to_tenforty_input(return_for_first_pass)
+        tf_input = _to_tenforty_input(
+            return_for_first_pass, agi_for_medical_floor=Decimal("0")
+        )
         tf_result = _call_tenforty(tf_input)
 
         # First-pass AGI is MAGI (== AGI before any OBBBA deduction).
@@ -862,27 +945,40 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
             }
         )
 
-        # Second tenforty pass with the updated adjustments. This is the
-        # authoritative bracket calculation. (If the sum of OBBBA fields
-        # happens to equal zero — e.g. full phase-out, year gate, or no
-        # trigger survived the patch — we skip the second call and reuse
-        # the first-pass result to save a round trip.)
         obbba_total = (
             senior_deduction_amount
             + sched_1a_tips_amount
             + sched_1a_overtime_amount
         )
-        if obbba_total != Decimal("0"):
+
+        # Real filed-form AGI for the medical floor. AGI = total_income -
+        # adjustments, so the OBBBA adjustments (which reduce adjustments-
+        # total in favor of the filer) reduce AGI by exactly their sum.
+        # No second tenforty call is needed to discover this.
+        real_agi = prelim_agi - obbba_total
+
+        # Second tenforty pass with the updated adjustments AND the post-
+        # floor itemized total. Skipped only when NOTHING changed — i.e.
+        # no OBBBA patches fired AND no medical-floor pass needed.
+        # (If OBBBA patches net to zero — full phase-out, year gate, etc.
+        # — and no medical, we also skip.)
+        second_pass_needed = (
+            obbba_total != Decimal("0") or need_medical_floor
+        )
+        if second_pass_needed:
             return_for_second_pass = return_.model_copy(
                 update={"adjustments": updated_adjustments}
             )
-            tf_input = _to_tenforty_input(return_for_second_pass)
+            tf_input = _to_tenforty_input(
+                return_for_second_pass,
+                agi_for_medical_floor=real_agi,
+            )
             tf_result = _call_tenforty(tf_input)
     else:
-        # No OBBBA patches fire — single tenforty call, identical to the
-        # pre-wave-3 behavior. This is the hot path for most returns and
-        # preserves the bit-for-bit invariant on the existing golden
-        # fixtures.
+        # No OBBBA patches fire AND no medical floor — single tenforty
+        # call, identical to the pre-CP8 behavior. Hot path for most
+        # returns and preserves bit-for-bit invariance on all goldens
+        # that do not have medical expenses.
         tf_input = _to_tenforty_input(return_)
         tf_result = _call_tenforty(tf_input)
 

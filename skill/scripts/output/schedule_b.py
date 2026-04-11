@@ -47,13 +47,14 @@ Simplifications loudly deferred (TODO for later waves)
 * Line 3 (Form 8815 excludable savings bond interest) is always 0. The
   8815 interview / worksheet is not yet in the canonical model. Callers
   who need this should patch Layer 1 once the model exposes it.
-* Part III foreign account / trust flags: the canonical return model
-  does NOT currently carry any foreign account flag. We default every
-  Part III boolean to ``False`` and emit a ``# TODO`` in the code. This
-  means our ``schedule_b_required`` helper will NEVER flag foreign-based
-  filing requirement; it only checks the $1,500 interest/dividend
-  thresholds. When the model grows a ``foreign_accounts`` field, update
-  both ``compute_schedule_b_fields`` and ``schedule_b_required`` here.
+* Part III foreign account / trust flags: **wired in CP8-D** to the
+  canonical return fields ``has_foreign_financial_account_over_10k``,
+  ``has_foreign_trust_transaction``, and ``foreign_account_countries``.
+  ``schedule_b_required`` now correctly flags foreign-based filing
+  triggers independent of the $1,500 interest/dividend threshold.
+  Line 7b country renders the first entry of ``foreign_account_countries``;
+  multi-country enumeration is handled by FinCEN Form 114 (FBAR), not
+  Schedule B itself.
 * Line 1 "nominee" adjustment lines (the IRS instructions allow a
   subtotal followed by a negative "nominee distribution" line) are not
   modeled. Nominee handling is a follow-up.
@@ -210,14 +211,24 @@ def compute_schedule_b_fields(return_: CanonicalReturn) -> ScheduleBFields:
     line_6 = sum((row.amount for row in line_5_rows), start=_ZERO)
 
     # -- Part III ------------------------------------------------------
-    # TODO: The canonical return model does not yet carry foreign
-    # account / trust flags. Default every Part III boolean to False.
-    # When the model grows a foreign_accounts field, update BOTH this
-    # block AND the schedule_b_required() threshold below.
-    line_7a_foreign_account = False
-    line_7a_fincen114_required = False
-    line_7b_country = ""
-    line_8_foreign_trust = False
+    # CP8-D: canonical model now carries the Schedule B Part III flags.
+    # Line 7a: "At any time during YYYY, did you have a financial
+    # interest in or signature authority over a financial account
+    # located in a foreign country?" — maps to
+    # has_foreign_financial_account_over_10k.
+    # Line 7a FinCEN 114 requirement: same flag (true => FBAR required).
+    # Line 7b country: first country from foreign_account_countries
+    # (renderer shows a single country; multi-country reporting is
+    # deferred — FinCEN 114 itself handles the enumeration).
+    # Line 8: maps to has_foreign_trust_transaction.
+    line_7a_foreign_account = return_.has_foreign_financial_account_over_10k
+    line_7a_fincen114_required = return_.has_foreign_financial_account_over_10k
+    line_7b_country = (
+        return_.foreign_account_countries[0]
+        if return_.foreign_account_countries
+        else ""
+    )
+    line_8_foreign_trust = return_.has_foreign_trust_transaction
 
     # -- Required? -----------------------------------------------------
     required = _is_schedule_b_required(

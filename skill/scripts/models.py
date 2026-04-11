@@ -125,6 +125,14 @@ class Address(_StrictModel):
     state: StateCode
     zip: ZipCode
     country: str = "US"
+    county: str | None = None
+    """County / local-subdivision name. Optional for most filers but
+    **required** by states with county-level local income tax (e.g.
+    Maryland — see `skill/scripts/states/md.py`). Canonical form is
+    lower-case without punctuation or the " County" suffix (e.g.
+    "baltimore city", "anne arundel", "prince georges"). Callers who
+    don't need it can omit it; the MD plugin falls back to the 2.25%
+    nonresident default rate when county is absent."""
 
 
 class Person(_StrictModel):
@@ -210,6 +218,33 @@ class W2(_StrictModel):
     box13_retirement_plan: bool = False
     box13_third_party_sick_pay: bool = False
     box14_other: list[str] = Field(default_factory=list)
+
+    # OBBBA Schedule 1-A structured employer-attested inputs.
+    # Employers who attest qualified tips or qualified overtime under
+    # IRC §224 (OBBBA) report these amounts in a structured W-2 box 14
+    # sub-field. Wave 4's Schedule 1-A patch treats
+    # `AdjustmentsToIncome.qualified_tips_deduction_schedule_1a` as the
+    # raw caller-supplied number because the ingestion layer couldn't
+    # distinguish qualifying tips from `box7_social_security_tips` (which
+    # includes non-qualifying tips). These box-14 OBBBA fields let the
+    # ingester populate the structured amount directly when the employer
+    # attests it, and let `_any_tips_or_overtime_declared` detect OBBBA-
+    # eligible W-2s without the caller having to hand-populate the
+    # adjustment field.
+    box14_qualified_tips_obbba: Money = Decimal("0")
+    """Employer-attested qualified tips per OBBBA §224 (Schedule 1-A
+    line 1). Zero if the employer has not attested any qualifying tips
+    on the W-2 — not every tipped job generates OBBBA-qualifying tips
+    (the OBBBA IRS guidance lists qualifying occupations). Until the
+    ingestion layer gains structured box-14 parsing, this field is
+    caller-populated."""
+
+    box14_qualified_overtime_obbba: Money = Decimal("0")
+    """Employer-attested qualified overtime per OBBBA §225 (Schedule
+    1-A line 2). Same semantics as `box14_qualified_tips_obbba` — only
+    the FLSA §207 half-time premium portion qualifies, not straight-
+    time overtime hours."""
+
     state_rows: list[W2StateRow] = Field(default_factory=list)
     """W-2 box 15/16/17 (+ 18/19/20 locality) as a list to support multi-state."""
 
@@ -694,6 +729,24 @@ class CanonicalReturn(_StrictModel):
     other_income: dict[str, Any] = Field(default_factory=dict)
     """Catch-all for income types without a typed form yet. Prefer adding a
     typed model and moving out of here."""
+
+    # Schedule B Part III — Foreign Accounts and Trusts
+    has_foreign_financial_account_over_10k: bool = False
+    """Schedule B Part III line 7a: at any time during the tax year,
+    had a financial interest in or signature authority over a financial
+    account located in a foreign country whose aggregate value exceeded
+    $10,000 USD. True triggers FinCEN Form 114 (FBAR) filing requirement
+    and forces Schedule B regardless of interest/dividend thresholds."""
+
+    has_foreign_trust_transaction: bool = False
+    """Schedule B Part III line 8: during the tax year, received a
+    distribution from, or was grantor of, or transferor to, a foreign
+    trust. True triggers Form 3520 filing requirement and forces
+    Schedule B."""
+
+    foreign_account_countries: list[str] = Field(default_factory=list)
+    """Schedule B Part III line 7b: countries where foreign financial
+    accounts are located. ISO 3166-1 alpha-2 codes (e.g. "FR", "JP")."""
 
     # Adjustments / deductions / credits / taxes / payments
     adjustments: AdjustmentsToIncome = Field(default_factory=AdjustmentsToIncome)

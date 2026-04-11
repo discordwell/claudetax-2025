@@ -222,21 +222,24 @@ class TestCLIRun:
         assert not (output_dir / "ffff_entries.json").exists()
         assert not (output_dir / "ffff_entries.txt").exists()
 
-    def test_run_missing_input_dir_raises(self, tmp_path: Path):
+    def test_run_missing_input_dir_returns_exit_code_2(self, tmp_path: Path):
+        """Missing input dir exits with code 2 and a friendly stderr
+        message — NOT a raw FileNotFoundError traceback. Caught during
+        the wave 6 hard wet test."""
         taxpayer_info = tmp_path / "taxpayer_info.json"
         _write_minimal_taxpayer_json(taxpayer_info)
-        with pytest.raises(FileNotFoundError):
-            main(
-                [
-                    "run",
-                    "--input",
-                    str(tmp_path / "does_not_exist"),
-                    "--taxpayer-info",
-                    str(taxpayer_info),
-                    "--output",
-                    str(tmp_path / "output"),
-                ]
-            )
+        rc = main(
+            [
+                "run",
+                "--input",
+                str(tmp_path / "does_not_exist"),
+                "--taxpayer-info",
+                str(taxpayer_info),
+                "--output",
+                str(tmp_path / "output"),
+            ]
+        )
+        assert rc == 2
 
 
 # ---------------------------------------------------------------------------
@@ -287,3 +290,144 @@ class TestCLIConsoleScript:
         )
         assert proc.returncode == 0
         assert "tax-prep" in proc.stdout
+
+
+class TestCLIFriendlyErrors:
+    """Wet-test fallout: CLI should translate common errors into a
+    one-line friendly message on stderr and a non-zero exit code, NOT
+    a raw Python traceback.
+
+    Caught during the wave 6 hard wet test: a malformed taxpayer JSON
+    leaked ``json.decoder.JSONDecodeError`` and a missing ``--input``
+    directory leaked ``FileNotFoundError``. Both should exit with
+    code 2 and print a human-readable error instead.
+    """
+
+    def test_missing_input_dir_is_friendly(self, tmp_path, capsys):
+        taxpayer = tmp_path / "taxpayer.json"
+        _write_minimal_taxpayer_json(taxpayer)
+        parser = build_parser()
+        args = parser.parse_args([
+            "run",
+            "--input", str(tmp_path / "does_not_exist"),
+            "--taxpayer-info", str(taxpayer),
+            "--output", str(tmp_path / "out"),
+        ])
+        rc = args.func(args)
+        captured = capsys.readouterr()
+        assert rc == 2
+        assert "error:" in captured.err
+        assert "input_dir not found" in captured.err
+        assert "Traceback" not in captured.err
+
+    def test_malformed_taxpayer_json_is_friendly(self, tmp_path, capsys):
+        bad = tmp_path / "taxpayer.json"
+        bad.write_text("{ not valid json")
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+        parser = build_parser()
+        args = parser.parse_args([
+            "run",
+            "--input", str(input_dir),
+            "--taxpayer-info", str(bad),
+            "--output", str(tmp_path / "out"),
+        ])
+        rc = args.func(args)
+        captured = capsys.readouterr()
+        assert rc == 2
+        assert "error:" in captured.err
+        assert "not valid JSON" in captured.err
+        assert "Traceback" not in captured.err
+
+    def test_schema_mismatch_taxpayer_json_is_friendly(self, tmp_path, capsys):
+        bad = tmp_path / "taxpayer.json"
+        bad.write_text(json.dumps({
+            "schema_version": "0.1.0",
+            "tax_year": 2025,
+            "filing_status": "single",
+            # Missing required "taxpayer" and "address" fields
+        }))
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+        parser = build_parser()
+        args = parser.parse_args([
+            "run",
+            "--input", str(input_dir),
+            "--taxpayer-info", str(bad),
+            "--output", str(tmp_path / "out"),
+        ])
+        rc = args.func(args)
+        captured = capsys.readouterr()
+        assert rc == 2
+        assert "does not match the CanonicalReturn schema" in captured.err
+        assert "Traceback" not in captured.err
+
+
+class TestStateReturnsPersistedToResultJson:
+    """Wet-test fallout: state plugin dispatch was computing real state
+    returns (CA $3,661 on a $60k CA + $25k NY W-2 fixture) but the
+    result.json on disk had ``state_returns: []`` because the dispatch
+    stored its output on ``PipelineResult.state_returns`` without
+    copying it onto ``canonical.state_returns``. Pipeline now calls
+    ``canonical.model_copy(update=...)`` to keep them in sync.
+    """
+
+    def test_state_returns_survive_result_json_roundtrip(self, tmp_path):
+        taxpayer_path = tmp_path / "taxpayer.json"
+        data = {
+            "schema_version": "0.1.0",
+            "tax_year": 2025,
+            "filing_status": "single",
+            "taxpayer": {
+                "first_name": "Multi",
+                "last_name": "Stater",
+                "ssn": "555-22-3333",
+                "date_of_birth": "1990-01-01",
+            },
+            "address": {
+                "street1": "1 Test Lane",
+                "city": "San Francisco",
+                "state": "CA",
+                "zip": "94102",
+                "country": "US",
+            },
+            "w2s": [
+                {
+                    "employer_name": "CA Employer",
+                    "box1_wages": "60000.00",
+                    "box2_federal_income_tax_withheld": "7000.00",
+                    "state_rows": [
+                        {"state": "CA", "state_wages": "60000.00", "state_tax_withheld": "3500.00"},
+                    ],
+                }
+            ],
+        }
+        taxpayer_path.write_text(json.dumps(data))
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+        output_dir = tmp_path / "out"
+
+        from skill.scripts.pipeline import run_pipeline
+
+        result = run_pipeline(
+            input_dir=input_dir,
+            taxpayer_info_path=taxpayer_path,
+            output_dir=output_dir,
+            build_paper_bundle=False,
+            emit_ffff_map=False,
+        )
+
+        # In-memory: PipelineResult.state_returns is populated.
+        assert len(result.state_returns) == 1
+        assert result.state_returns[0].state == "CA"
+
+        # And critically: canonical_return.state_returns (which feeds
+        # result.json via model_dump) is ALSO populated.
+        assert len(result.canonical_return.state_returns) == 1
+        assert result.canonical_return.state_returns[0].state == "CA"
+
+        # Round-trip through result.json on disk — the bug was that
+        # this list came back empty.
+        on_disk = json.loads((output_dir / "result.json").read_text())
+        assert len(on_disk["state_returns"]) == 1
+        assert on_disk["state_returns"][0]["state"] == "CA"

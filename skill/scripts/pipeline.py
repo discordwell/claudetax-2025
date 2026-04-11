@@ -523,6 +523,12 @@ def run_pipeline(
             canonical, output_dir
         )
         warnings.extend(state_warnings)
+        # Persist dispatched state returns onto the canonical return so
+        # they survive the result.json serialization (which goes through
+        # ``canonical.model_dump``). Without this the state_returns field
+        # on the wire is always empty even when plugins computed real
+        # numbers.
+        canonical = canonical.model_copy(update={"state_returns": state_returns})
 
     # ------------------------------------------------------------------
     # 4. Render federal PDFs

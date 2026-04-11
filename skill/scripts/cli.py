@@ -57,19 +57,41 @@ def _package_version() -> str:
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
+    from pydantic import ValidationError
+
     from skill.scripts.pipeline import run_pipeline
 
     input_dir = Path(args.input).expanduser().resolve()
     taxpayer_info = Path(args.taxpayer_info).expanduser().resolve()
     output_dir = Path(args.output).expanduser().resolve()
 
-    result = run_pipeline(
-        input_dir=input_dir,
-        taxpayer_info_path=taxpayer_info,
-        output_dir=output_dir,
-        build_paper_bundle=not args.no_bundle,
-        emit_ffff_map=not args.no_ffff,
-    )
+    try:
+        result = run_pipeline(
+            input_dir=input_dir,
+            taxpayer_info_path=taxpayer_info,
+            output_dir=output_dir,
+            build_paper_bundle=not args.no_bundle,
+            emit_ffff_map=not args.no_ffff,
+        )
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except json.JSONDecodeError as exc:
+        print(
+            f"error: {taxpayer_info} is not valid JSON: {exc.msg} "
+            f"(line {exc.lineno}, column {exc.colno})",
+            file=sys.stderr,
+        )
+        return 2
+    except ValidationError as exc:
+        print(
+            f"error: {taxpayer_info} does not match the CanonicalReturn schema:",
+            file=sys.stderr,
+        )
+        for err in exc.errors():
+            loc = ".".join(str(x) for x in err["loc"])
+            print(f"  {loc}: {err['msg']}", file=sys.stderr)
+        return 2
 
     # Human-readable summary on stdout. Structured data stays in
     # ``result.json`` inside ``output_dir``.

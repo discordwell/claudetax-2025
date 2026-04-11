@@ -226,25 +226,32 @@ class TestStateRegistry:
         for code in ("AK", "FL", "NV", "NH", "SD", "TN", "TX", "WY"):
             assert registry.has(code), f"{code} should be registered"
 
-    def test_taxing_state_not_yet_registered(self):
-        """Taxing states land in fan-out. Registry should not have them yet."""
-        assert not registry.has("CA")
-        assert not registry.has("NY")
+    def test_fanout_wave_1_taxing_states_registered(self):
+        """Fan-out wave 1 landed CA, NY, WA, DC as state plugins."""
+        for code in ("CA", "NY", "WA", "DC"):
+            assert registry.has(code), f"{code} should be registered"
 
-    def test_get_unknown_state_raises(self):
+    def test_unregistered_state_still_raises(self):
+        """States not yet implemented should still raise cleanly."""
         with pytest.raises(KeyError, match="no state plugin registered"):
-            registry.get("CA")
+            registry.get("TX_UNKNOWN")  # type: ignore[arg-type]
 
     def test_get_returns_plugin_instance(self):
         plugin = registry.get("FL")
         assert plugin.meta.code == "FL"
+
+    def test_get_taxing_state_plugin(self):
+        plugin = registry.get("CA")
+        assert plugin.meta.code == "CA"
+        assert plugin.meta.has_income_tax
 
     def test_codes_are_sorted(self):
         codes = registry.codes()
         assert codes == sorted(codes)
 
     def test_registry_len(self):
-        assert len(registry) == 8
+        """8 no-tax + 4 wave-1 taxing states = 12 registered plugins."""
+        assert len(registry) == 12
 
 
 # ---------------------------------------------------------------------------

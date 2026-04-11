@@ -12,6 +12,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from skill.scripts.models import StateCode
+from skill.scripts.states import ca, dc, ny, wa
 from skill.scripts.states._no_income_tax import ALL_NO_TAX_PLUGINS
 from skill.scripts.states._plugin_api import StatePlugin
 
@@ -53,8 +54,12 @@ class StateRegistry:
 @lru_cache(maxsize=1)
 def _build_registry() -> StateRegistry:
     reg = StateRegistry()
+    # No-income-tax batch (AK, FL, NV, NH, SD, TN, TX, WY)
     for plugin in ALL_NO_TAX_PLUGINS.values():
         reg.register(plugin)
+    # Fan-out wave 1: tenforty-backed + from-scratch taxing states
+    for plugin_module in (ca, ny, wa, dc):
+        reg.register(plugin_module.PLUGIN)
     return reg
 
 

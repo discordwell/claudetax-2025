@@ -1,0 +1,225 @@
+{
+  "_source": {
+    "url": "https://www.irs.gov/filing/where-to-file-paper-tax-returns-with-or-without-a-payment",
+    "international_url": "https://www.irs.gov/filing/international-where-to-file-form-1040-addresses-for-taxpayers-and-tax-professionals",
+    "fetched_on": "2026-04-11",
+    "tax_year": 2025,
+    "form": "Form 1040 (and 1040-SR)",
+    "notes": [
+      "Addresses are organized by primary taxpayer state of residence and whether a payment (check or money order) is enclosed with the paper return.",
+      "All 50 states + District of Columbia are present. Use the 'INTL' key for taxpayers living abroad, in U.S. territories (PR, GU, VI, AS, MP), or with APO/FPO/DPO addresses.",
+      "The 'without_payment' address routes to the IRS submission processing center; the 'with_payment' address routes payments to a Lockbox bank P.O. Box.",
+      "If the IRS retires or relocates a service center mid-cycle, update this file FIRST and bump the fetched_on date."
+    ]
+  },
+  "addresses": {
+    "AL": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 1214, Charlotte, NC 28201-1214"
+    },
+    "AK": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "AZ": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "AR": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "CA": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "CO": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "CT": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "DE": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "DC": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "FL": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 1214, Charlotte, NC 28201-1214"
+    },
+    "GA": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 1214, Charlotte, NC 28201-1214"
+    },
+    "HI": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "ID": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "IL": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "IN": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "IA": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "KS": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 802501, Cincinnati, OH 45280-2501"
+    },
+    "KY": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "LA": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 1214, Charlotte, NC 28201-1214"
+    },
+    "ME": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "MD": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "MA": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "MI": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "MN": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "MS": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 1214, Charlotte, NC 28201-1214"
+    },
+    "MO": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "MT": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "NE": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "NV": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "NH": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "NJ": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "NM": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "NY": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "NC": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 1214, Charlotte, NC 28201-1214"
+    },
+    "ND": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "OH": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "OK": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "OR": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "PA": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "RI": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "SC": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 1214, Charlotte, NC 28201-1214"
+    },
+    "SD": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "TN": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 1214, Charlotte, NC 28201-1214"
+    },
+    "TX": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 1214, Charlotte, NC 28201-1214"
+    },
+    "UT": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "VT": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "VA": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "WA": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "WV": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "WI": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "WY": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+      "with_payment": "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000"
+    },
+    "INTL": {
+      "without_payment": "Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0215 USA",
+      "with_payment": "Internal Revenue Service, P.O. Box 1303, Charlotte, NC 28201-1303 USA"
+    }
+  }
+}

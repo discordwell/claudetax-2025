@@ -648,6 +648,14 @@ class ComputedTotals(_StrictModel):
     mutated after compute(), a fresh hash will differ and consumers can
     recompute. Set by the calc engine; do not populate manually."""
 
+    validation_report: dict[str, Any] | None = None
+    """Opaque JSON-serializable validation report produced by
+    `skill.scripts.validate.run_return_validation`. Today it carries the
+    FFFF compatibility report under the `ffff` key; future validation
+    passes (schema cross-checks, missing-document warnings, state-level
+    rules) will add new top-level keys additively. Downstream consumers
+    should treat the dict as opaque. Set by the calc engine."""
+
 
 # ---------------------------------------------------------------------------
 # Root

@@ -625,6 +625,19 @@
           ],
           "default": null,
           "title": "Total Tax"
+        },
+        "validation_report": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Validation Report"
         }
       },
       "title": "ComputedTotals",

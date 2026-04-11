@@ -1,0 +1,43 @@
+{
+  "description": "Single filer, age 67 (born 1958), one W-2 with $80,000 wages and $5,000 box7 social security tips (also declared as qualified tips on Schedule 1-A), $10,000 federal withheld, standard deduction, no dependents. Exercises BOTH OBBBA pre-tax-bracket patches (senior deduction + Schedule 1-A tips) in a single compute() call AND the wave-3-cleanup validation pipeline. The return is FFFF-compatible — no blockers triggered.",
+  "authority": [
+    "skill/reference/ty2025-constants.json for OBBBA standard deduction $15,750 (single)",
+    "skill/scripts/calc/patches/obbba_senior_deduction.py: single base $6,000, phase-out starts at $75,000, 6% rate",
+    "skill/scripts/calc/patches/obbba_schedule_1a.py: tips cap $25,000, single phase-out starts at $150,000, no phase-out at MAGI $80k",
+    "CP4 tenforty verification locked Single TY2025 brackets for federal income tax"
+  ],
+  "expected_computed_totals": {
+    "total_income": "80000.00",
+    "adjustments_total": "10700.00",
+    "adjusted_gross_income": "69300.00",
+    "deduction_taken": "15750.00",
+    "taxable_income": "53550.00",
+    "tentative_tax": "6701.00",
+    "total_tax": "6701.00",
+    "total_payments": "10000.00",
+    "refund": "3299.00",
+    "amount_owed": null,
+    "marginal_rate": 22.0
+  },
+  "expected_adjustments": {
+    "senior_deduction_obbba": "5700.00",
+    "qualified_tips_deduction_schedule_1a": "5000.00",
+    "qualified_overtime_deduction_schedule_1a": "0",
+    "trump_account_deduction_form_4547": "0"
+  },
+  "expected_validation_report": {
+    "ffff_compatible": true,
+    "ffff_blockers_count": 0
+  },
+  "hand_check": {
+    "obbba_std_ded_single": 15750,
+    "senior_deduction_calc": "base 1 * $6000 = $6000; MAGI $80000; phase-out excess $80000 - $75000 = $5000; reduction 6% * $5000 = $300; final $6000 - $300 = $5700",
+    "tips_deduction_calc": "$5000 < cap $25000; MAGI $80000 < single phase-out $150000; final $5000",
+    "adjustments_total": "5700 + 5000 = 10700",
+    "agi_calc": "80000 - 10700 = 69300",
+    "taxable_income_calc": "69300 - 15750 = 53550",
+    "bracket_formula_tax": "10% * 11925 + 12% * (48475 - 11925) + 22% * (53550 - 48475) = 1192.50 + 4386.00 + 1116.50 = 6695.00",
+    "tax_tables_delta": "IRS tax tables use $50 midpoints; $53,550 lands in the bracket centered at $53,575. tenforty rounds to 6701 (+6 vs bracket formula — same mechanism as simple_w2_standard)",
+    "refund_calc": "10000 withheld - 6701 total tax = 3299 refund"
+  }
+}

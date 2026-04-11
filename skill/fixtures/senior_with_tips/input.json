@@ -1,0 +1,47 @@
+{
+  "schema_version": "0.1.0",
+  "tax_year": 2025,
+  "filing_status": "single",
+  "taxpayer": {
+    "first_name": "Morgan",
+    "last_name": "Eldersmith",
+    "ssn": "111-22-3333",
+    "date_of_birth": "1958-03-03",
+    "is_blind": false,
+    "is_age_65_or_older": true
+  },
+  "address": {
+    "street1": "1 Maple St",
+    "city": "Springfield",
+    "state": "IL",
+    "zip": "62701",
+    "country": "US"
+  },
+  "w2s": [
+    {
+      "employer_name": "The Diner",
+      "employer_ein": "12-3456789",
+      "employee_is_taxpayer": true,
+      "box1_wages": "80000.00",
+      "box2_federal_income_tax_withheld": "10000.00",
+      "box3_social_security_wages": "80000.00",
+      "box4_social_security_tax_withheld": "4960.00",
+      "box5_medicare_wages": "80000.00",
+      "box6_medicare_tax_withheld": "1160.00",
+      "box7_social_security_tips": "5000.00",
+      "box8_allocated_tips": "0",
+      "box10_dependent_care_benefits": "0",
+      "box11_nonqualified_plans": "0",
+      "box12_entries": [],
+      "box13_statutory_employee": false,
+      "box13_retirement_plan": false,
+      "box13_third_party_sick_pay": false,
+      "box14_other": [],
+      "state_rows": []
+    }
+  ],
+  "adjustments": {
+    "qualified_tips_deduction_schedule_1a": "5000.00"
+  },
+  "itemize_deductions": false
+}

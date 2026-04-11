@@ -253,8 +253,16 @@ def _sum_adjustments(adj: AdjustmentsToIncome) -> Decimal:
     automatically from self_employment_income, so passing it again would double
     count.
 
-    OBBBA additions (Schedule 1-A tips/overtime, senior deduction, Trump
-    Account) are included — they reduce AGI just like traditional Part II items.
+    OBBBA additions (Schedule 1-A tips/overtime, senior deduction) are included —
+    they reduce AGI just like traditional Part II items.
+
+    Form 4547 (Trump Account) is EXCLUDED: IRC §219 disallows any individual
+    deduction for Trump Account contributions per the 12/2025 Form 4547
+    instructions. The canonical model still carries
+    `trump_account_deduction_form_4547` for schema stability, but wave-3 patch
+    research confirmed it must always be $0. `compute()` forces it to 0 on the
+    returned adjustments object; folding it into the sum here would leak a
+    nonzero value if a caller populated it by mistake.
     """
     return (
         adj.educator_expenses
@@ -270,7 +278,6 @@ def _sum_adjustments(adj: AdjustmentsToIncome) -> Decimal:
         + adj.qualified_tips_deduction_schedule_1a
         + adj.qualified_overtime_deduction_schedule_1a
         + adj.senior_deduction_obbba
-        + adj.trump_account_deduction_form_4547
         + sum(adj.other_adjustments.values(), start=Decimal("0"))
     )
 
@@ -764,6 +771,9 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     # Lazy import to avoid circular import: niit.py imports from this module.
     from skill.scripts.calc.patches.ctc import compute_ctc
     from skill.scripts.calc.patches.eitc import compute_eitc
+    from skill.scripts.calc.patches.form_4547_trump_account import (
+        compute_trump_account_deduction,
+    )
     from skill.scripts.calc.patches.niit import compute_niit
     from skill.scripts.calc.patches.obbba_schedule_1a import compute_schedule_1a
     from skill.scripts.calc.patches.obbba_senior_deduction import (
@@ -925,6 +935,30 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     )
 
     # -------------------------------------------------------------------
+    # Patch: Form 4547 Trump Account (OBBBA)
+    # -------------------------------------------------------------------
+    # Audit-only: IRC §219 disallows any individual deduction for Trump
+    # Account contributions (confirmed against the 12/2025 Form 4547
+    # instructions in wave-3 research). `compute_trump_account_deduction`
+    # always returns $0 and is kept as a single canonical check that will
+    # fire a loud warning if final Treasury regulations (NPRM 2026-04533)
+    # ever add a deductible path. We run it unconditionally because it is
+    # cheap (no tenforty call) and year-gated internally, and we force the
+    # canonical model's `trump_account_deduction_form_4547` to $0 on the
+    # returned adjustments object so a mis-populated caller-supplied value
+    # cannot leak into downstream consumers.
+    form_4547_result = compute_trump_account_deduction(
+        return_=return_, magi=magi_val
+    )
+    assert form_4547_result.deduction == Decimal("0"), (
+        "Form 4547 patch returned a nonzero deduction — §219 invariant "
+        "violated. Re-read the patch module docstring."
+    )
+    updated_adjustments = updated_adjustments.model_copy(
+        update={"trump_account_deduction_form_4547": Decimal("0")}
+    )
+
+    # -------------------------------------------------------------------
     # Fold patch outputs into the Credits / Payments / OtherTaxes objects
     # -------------------------------------------------------------------
     # CTC nonrefundable credits (child tax credit + ODC) reduce tax dollar
@@ -993,6 +1027,18 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     )
     payments_val = _cents(total_payments(return_with_patches))
 
+    # -------------------------------------------------------------------
+    # Validation pass (FFFF compatibility + future cross-checks)
+    # -------------------------------------------------------------------
+    # Runs against `return_with_patches` so the report reflects any
+    # patch-driven state changes (e.g. a forced-zero Form 4547 field). The
+    # result is an opaque JSON-serializable dict stored on ComputedTotals
+    # for downstream consumers (SKILL.md interview, output bundlers,
+    # FFFF/paper channel selector).
+    from skill.scripts.validate import run_return_validation
+
+    validation_report = run_return_validation(return_with_patches)
+
     refund: Decimal | None = None
     owed: Decimal | None = None
     if final_total_tax is not None and payments_val is not None:
@@ -1031,6 +1077,7 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
         effective_rate=effective_rate,
         marginal_rate=marginal_rate,
         computed_input_hash=_input_hash(return_),
+        validation_report=validation_report,
     )
 
     return return_with_patches.model_copy(update={"computed": computed})

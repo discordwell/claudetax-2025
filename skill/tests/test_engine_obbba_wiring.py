@@ -406,3 +406,83 @@ class TestGoldenFixtureRegressionBitForBit:
         ret, exp = _load_golden(fixtures_dir, "se_home_office")
         result = compute(ret)
         _assert_golden_matches(result.computed, exp)
+
+
+# ---------------------------------------------------------------------------
+# 6. Form 4547 Trump Account — AGI leak regression.
+# ---------------------------------------------------------------------------
+
+
+class TestForm4547TrumpAccountAGILeak:
+    """Lock the wave-3 Form 4547 fix: IRC §219 disallows any individual
+    deduction for Trump Account contributions. The canonical model still
+    carries `AdjustmentsToIncome.trump_account_deduction_form_4547` for
+    schema stability, but `compute()` must never let a caller-supplied
+    nonzero value reduce AGI, and must force the field to $0 on the
+    returned canonical model.
+
+    Without the fix:
+      - `_sum_adjustments` folded the field into the Schedule 1 Part II
+        total, so tenforty saw the reduced AGI and bracket-calculated the
+        wrong tax.
+      - The returned CanonicalReturn exposed the caller's leaked value.
+
+    With the fix:
+      - `_sum_adjustments` excludes the field entirely.
+      - `compute()` runs `compute_trump_account_deduction` (audit-only,
+        always returns $0) and force-zeros the field on the returned
+        adjustments object so downstream consumers see the invariant.
+    """
+
+    def _leaked_return(self) -> CanonicalReturn:
+        return CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=_person(),
+            address=_addr(),
+            w2s=[
+                W2(
+                    employer_name="Acme",
+                    box1_wages=Decimal("65000.00"),
+                    box2_federal_income_tax_withheld=Decimal("7500.00"),
+                )
+            ],
+            # A misbehaving caller populates the field. Pre-wave-3 this
+            # would silently reduce AGI by $1,000 and bracket-shift the
+            # tax owed.
+            adjustments=AdjustmentsToIncome(
+                trump_account_deduction_form_4547=Decimal("1000.00")
+            ),
+        )
+
+    def test_leaked_value_does_not_reduce_agi(self):
+        """AGI must match the simple_w2_standard baseline exactly,
+        ignoring the leaked $1,000."""
+        r = compute(self._leaked_return())
+        assert r.computed.adjusted_gross_income == Decimal("65000.00")
+        assert r.computed.taxable_income == Decimal("49250.00")
+        assert r.computed.tentative_tax == Decimal("5755.00")
+        assert r.computed.total_tax == Decimal("5755.00")
+        assert r.computed.refund == Decimal("1745.00")
+
+    def test_returned_adjustments_field_is_forced_to_zero(self):
+        """The canonical return produced by compute() must expose the
+        §219 invariant: trump_account_deduction_form_4547 is $0."""
+        r = compute(self._leaked_return())
+        assert r.adjustments.trump_account_deduction_form_4547 == Decimal("0")
+
+    def test_adjustments_total_excludes_trump_account(self):
+        """`_sum_adjustments` must not include the field. With no other
+        Schedule 1 Part II items populated, the total is $0."""
+        r = compute(self._leaked_return())
+        assert r.computed.adjustments_total == Decimal("0.00")
+
+    def test_clean_return_also_zero(self):
+        """A return that never touched the field should also come back
+        with trump_account_deduction_form_4547 = $0 (idempotent)."""
+        clean = _simple_single_return(
+            wages=Decimal("65000.00"), withheld=Decimal("7500.00")
+        )
+        r = compute(clean)
+        assert r.adjustments.trump_account_deduction_form_4547 == Decimal("0")
+        assert r.computed.adjusted_gross_income == Decimal("65000.00")

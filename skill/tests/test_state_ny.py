@@ -28,6 +28,7 @@ from skill.scripts.models import (
     Person,
     ResidencyStatus,
     W2,
+    W2StateRow,
 )
 from skill.scripts.states._plugin_api import (
     FederalTotals,
@@ -253,3 +254,162 @@ class TestOtherProtocolMethods:
     def test_form_ids_resident(self):
         """Resident form is IT-201."""
         assert PLUGIN.form_ids() == ["NY Form IT-201"]
+
+
+# ---------------------------------------------------------------------------
+# Wave 6 — IT-203 / IT-203-B sourcing scaffolding
+# ---------------------------------------------------------------------------
+
+
+class TestNewYorkPluginNonresidentSourcing:
+    """When the filer is a non-NY resident AND either (a) an
+    ``ny_workdays_in_ny`` count is present OR (b) a W-2 carries an NY
+    state row, the plugin must compute NY tax on a sourced wage amount.
+    """
+
+    @pytest.fixture
+    def nj_resident_with_ny_state_row(self) -> CanonicalReturn:
+        """NJ resident who commutes into NY (W-2 has NY state row)."""
+        return CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="Nash",
+                last_name="Commuter",
+                ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=Address(
+                street1="1 Hudson St",
+                city="Jersey City",
+                state="NJ",
+                zip="07302",
+            ),
+            w2s=[
+                W2(
+                    employer_name="Wall St Corp",
+                    box1_wages=Decimal("80000"),
+                    state_rows=[
+                        W2StateRow(
+                            state="NY",
+                            state_wages=Decimal("80000"),
+                        ),
+                    ],
+                ),
+            ],
+        )
+
+    @pytest.fixture
+    def nj_resident_with_workday_count(self) -> CanonicalReturn:
+        """NJ resident with an IT-203-B workday apportionment count."""
+        return CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="Nash",
+                last_name="Commuter",
+                ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+                ny_workdays_in_ny=130,  # half of 260
+            ),
+            address=Address(
+                street1="1 Hudson St",
+                city="Jersey City",
+                state="NJ",
+                zip="07302",
+            ),
+            w2s=[
+                W2(employer_name="Wall St Corp", box1_wages=Decimal("80000")),
+            ],
+        )
+
+    def test_state_rows_path_telemetry(
+        self, nj_resident_with_ny_state_row, federal_single_80k
+    ):
+        result = PLUGIN.compute(
+            nj_resident_with_ny_state_row,
+            federal_single_80k,
+            ResidencyStatus.NONRESIDENT,
+            days_in_state=0,
+        )
+        ss = result.state_specific
+        assert ss["ny_state_rows_present"] is True
+        assert ss["used_w2_state_rows"] is True
+        assert ss["used_it203_workdays"] is False
+        assert ss[
+            "ny_sourced_wages_from_w2_state_rows"
+        ] == Decimal("80000.00")
+
+    def test_workday_path_telemetry(
+        self, nj_resident_with_workday_count, federal_single_80k
+    ):
+        result = PLUGIN.compute(
+            nj_resident_with_workday_count,
+            federal_single_80k,
+            ResidencyStatus.NONRESIDENT,
+            days_in_state=0,
+        )
+        ss = result.state_specific
+        assert ss["used_it203_workdays"] is True
+        assert ss["used_w2_state_rows"] is False
+        assert ss["ny_workdays_in_ny"] == 130
+
+    def test_workday_path_takes_precedence_over_state_rows(
+        self, federal_single_80k
+    ):
+        """When both a workday count and state rows are present, the
+        workday path wins (it's the more-specific signal)."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="N",
+                last_name="C",
+                ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+                ny_workdays_in_ny=100,
+            ),
+            address=Address(
+                street1="1 Hudson St",
+                city="Jersey City",
+                state="NJ",
+                zip="07302",
+            ),
+            w2s=[
+                W2(
+                    employer_name="X",
+                    box1_wages=Decimal("80000"),
+                    state_rows=[
+                        W2StateRow(
+                            state="NY", state_wages=Decimal("60000")
+                        ),
+                    ],
+                ),
+            ],
+        )
+        result = PLUGIN.compute(
+            ret,
+            federal_single_80k,
+            ResidencyStatus.NONRESIDENT,
+            days_in_state=0,
+        )
+        assert result.state_specific["used_it203_workdays"] is True
+        assert result.state_specific["used_w2_state_rows"] is False
+
+    def test_fallback_day_prorate_when_no_signals(
+        self, canonical_return_single_80k, federal_single_80k
+    ):
+        """Without workday count OR W-2 state rows, legacy day-proration
+        fallback still applies."""
+        result = PLUGIN.compute(
+            canonical_return_single_80k,
+            federal_single_80k,
+            ResidencyStatus.NONRESIDENT,
+            days_in_state=182,
+        )
+        ss = result.state_specific
+        assert ss["used_it203_workdays"] is False
+        assert ss["used_w2_state_rows"] is False
+        assert ss["ny_state_rows_present"] is False
+        # Legacy day-prorate: state_tax < full_year_state_tax strictly.
+        assert ss["state_tax"] < ss["full_year_state_tax"]

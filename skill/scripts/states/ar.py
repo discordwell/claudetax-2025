@@ -155,6 +155,11 @@ from skill.scripts.states._hand_rolled_base import (
     cents,
     d,
     day_prorate,
+    sourced_or_prorated_schedule_c,
+    sourced_or_prorated_wages,
+    state_has_w2_state_rows,
+    state_source_schedule_c,
+    state_source_wages_from_w2s,
 )
 from skill.scripts.states._plugin_api import (
     FederalTotals,
@@ -408,7 +413,7 @@ class ArkansasPlugin:
         )
 
         return IncomeApportionment(
-            state_source_wages=day_prorate(wages, days_in_state)
+            state_source_wages=sourced_or_prorated_wages(return_, "AR", wages, days_in_state)
             if residency != ResidencyStatus.RESIDENT
             else cents(wages),
             state_source_interest=day_prorate(interest, days_in_state)
@@ -422,7 +427,7 @@ class ArkansasPlugin:
             )
             if residency != ResidencyStatus.RESIDENT
             else cents(capital_gains),
-            state_source_self_employment=day_prorate(se_net, days_in_state)
+            state_source_self_employment=sourced_or_prorated_schedule_c(return_, "AR", se_net, days_in_state)
             if residency != ResidencyStatus.RESIDENT
             else cents(se_net),
             state_source_rental=day_prorate(rental_net, days_in_state)

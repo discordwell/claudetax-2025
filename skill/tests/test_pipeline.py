@@ -334,3 +334,237 @@ class TestPipelineEndToEndW2Only:
         assert len(result.canonical_return.w2s) == 0
         assert result.canonical_return.computed.adjusted_gross_income == Decimal("0.00")
         assert result.canonical_return.computed.total_tax == Decimal("0.00")
+
+
+# ---------------------------------------------------------------------------
+# Wave 6 pipeline state plugin dispatch
+# ---------------------------------------------------------------------------
+
+
+def _write_taxpayer_json_for_state(
+    path: Path,
+    state_code: str,
+    *,
+    city: str = "Test City",
+    zip_code: str = "12345",
+) -> None:
+    data = {
+        "schema_version": "0.1.0",
+        "tax_year": 2025,
+        "filing_status": "single",
+        "taxpayer": {
+            "first_name": "Alex",
+            "last_name": "Doe",
+            "ssn": "111-22-3333",
+            "date_of_birth": "1985-01-01",
+        },
+        "address": {
+            "street1": "1 Test Lane",
+            "city": city,
+            "state": state_code,
+            "zip": zip_code,
+            "country": "US",
+        },
+    }
+    path.write_text(json.dumps(data, indent=2))
+
+
+class TestPipelineStateDispatch:
+    """End-to-end state plugin dispatch (wave 6).
+
+    Exercises ``run_pipeline`` with the new ``render_state_returns``
+    kwarg and the state registry wiring. The test cases cover:
+
+    1. A no-income-tax resident state (FL) — the plugin runs, returns
+       a ``StateReturn`` with ``state_tax == 0`` and
+       ``no_return_required == True``, and no PDFs are emitted.
+    2. A taxing resident state (CA) with a CA W-2 — the plugin runs,
+       tenforty computes a real CA tax, and the returned
+       ``state_specific`` carries the tax plus the CA state-row sourcing
+       telemetry.
+    3. ``render_state_returns=False`` disables the whole block.
+    """
+
+    def test_fl_resident_no_income_tax_state_produces_zero_tax(
+        self, tmp_path: Path
+    ):
+        input_dir = tmp_path / "input"
+        output_dir = tmp_path / "output"
+        input_dir.mkdir()
+
+        taxpayer_info_path = tmp_path / "taxpayer_info.json"
+        _write_taxpayer_json_for_state(
+            taxpayer_info_path, "FL", city="Miami", zip_code="33101"
+        )
+
+        # No W-2s, no state_rows — just a FL resident.
+        result = run_pipeline(
+            input_dir=input_dir,
+            taxpayer_info_path=taxpayer_info_path,
+            output_dir=output_dir,
+        )
+
+        assert isinstance(result, PipelineResult)
+        # The FL plugin produces a StateReturn even with no income.
+        assert len(result.state_returns) == 1
+        sr = result.state_returns[0]
+        assert sr.state == "FL"
+        assert sr.state_specific["state_tax"] == 0
+        assert sr.state_specific["no_return_required"] is True
+        # FL emits no PDFs and no paper artifacts.
+        assert not any(
+            p.name.lower().startswith("fl_") for p in result.rendered_paths
+        )
+
+    def test_ca_resident_w2_runs_ca_plugin(self, tmp_path: Path):
+        input_dir = tmp_path / "input"
+        output_dir = tmp_path / "output"
+        input_dir.mkdir()
+
+        taxpayer_info_path = tmp_path / "taxpayer_info.json"
+        # CA resident with an inline W-2 including a CA state row.
+        # (The pipeline ingests PDFs; here we pre-populate the W-2 in
+        # the taxpayer_info.json base dict so we don't need a synthetic
+        # PDF fixture for the CA case.)
+        data = {
+            "schema_version": "0.1.0",
+            "tax_year": 2025,
+            "filing_status": "single",
+            "taxpayer": {
+                "first_name": "Cali",
+                "last_name": "Doe",
+                "ssn": "111-22-3333",
+                "date_of_birth": "1985-01-01",
+            },
+            "address": {
+                "street1": "1 Market St",
+                "city": "San Francisco",
+                "state": "CA",
+                "zip": "94105",
+                "country": "US",
+            },
+            "w2s": [
+                {
+                    "employer_name": "Bay Tech",
+                    "box1_wages": "65000.00",
+                    "box2_federal_income_tax_withheld": "5000.00",
+                    "state_rows": [
+                        {
+                            "state": "CA",
+                            "state_wages": "65000.00",
+                            "state_tax_withheld": "2000.00",
+                        }
+                    ],
+                }
+            ],
+        }
+        taxpayer_info_path.write_text(json.dumps(data))
+
+        result = run_pipeline(
+            input_dir=input_dir,
+            taxpayer_info_path=taxpayer_info_path,
+            output_dir=output_dir,
+        )
+
+        assert isinstance(result, PipelineResult)
+        ca_returns = [sr for sr in result.state_returns if sr.state == "CA"]
+        assert len(ca_returns) == 1
+        ca = ca_returns[0]
+        # Tenforty computes a real CA tax for a Single $65k W-2 —
+        # regression-locked to the CP4 empirical number.
+        assert ca.state_specific["state_total_tax"] > Decimal("0")
+        # Wave 6 sourcing telemetry must be present.
+        assert ca.state_specific["ca_state_rows_present"] is True
+        assert ca.state_specific[
+            "ca_sourced_wages_from_w2_state_rows"
+        ] == Decimal("65000.00")
+
+    def test_render_state_returns_false_disables_dispatch(
+        self, tmp_path: Path
+    ):
+        input_dir = tmp_path / "input"
+        output_dir = tmp_path / "output"
+        input_dir.mkdir()
+
+        taxpayer_info_path = tmp_path / "taxpayer_info.json"
+        _write_taxpayer_json_for_state(
+            taxpayer_info_path, "CA", city="Los Angeles", zip_code="90001"
+        )
+
+        result = run_pipeline(
+            input_dir=input_dir,
+            taxpayer_info_path=taxpayer_info_path,
+            output_dir=output_dir,
+            render_state_returns=False,
+        )
+        assert result.state_returns == []
+
+    def test_multi_state_w2_dispatches_both_states(self, tmp_path: Path):
+        """When a filer has W-2 state_rows for more than one state, the
+        pipeline dispatches a plugin for each. This is the end-to-end
+        version of the multi-state fixture's direct-dispatch test.
+        """
+        input_dir = tmp_path / "input"
+        output_dir = tmp_path / "output"
+        input_dir.mkdir()
+
+        taxpayer_info_path = tmp_path / "taxpayer_info.json"
+        # IL resident with a single W-2 that carries state rows for both
+        # PA and IL — the pipeline should call both PA and IL plugins.
+        data = {
+            "schema_version": "0.1.0",
+            "tax_year": 2025,
+            "filing_status": "single",
+            "taxpayer": {
+                "first_name": "Jordan",
+                "last_name": "Mover",
+                "ssn": "123-45-6789",
+                "date_of_birth": "1985-06-15",
+            },
+            "address": {
+                "street1": "500 N Michigan Ave",
+                "city": "Chicago",
+                "state": "IL",
+                "zip": "60611",
+                "country": "US",
+            },
+            "w2s": [
+                {
+                    "employer_name": "Multi Corp",
+                    "box1_wages": "65000.00",
+                    "state_rows": [
+                        {
+                            "state": "PA",
+                            "state_wages": "30000.00",
+                            "state_tax_withheld": "921.00",
+                        },
+                        {
+                            "state": "IL",
+                            "state_wages": "35000.00",
+                            "state_tax_withheld": "1732.50",
+                        },
+                    ],
+                }
+            ],
+        }
+        taxpayer_info_path.write_text(json.dumps(data))
+
+        result = run_pipeline(
+            input_dir=input_dir,
+            taxpayer_info_path=taxpayer_info_path,
+            output_dir=output_dir,
+        )
+
+        state_codes = {sr.state for sr in result.state_returns}
+        # IL (resident) + PA (from state_rows).
+        assert state_codes == {"IL", "PA"}
+        il_return = next(sr for sr in result.state_returns if sr.state == "IL")
+        pa_return = next(sr for sr in result.state_returns if sr.state == "PA")
+        # The resident IL side is full-year (365 days), while PA is
+        # nonresident (0 days) relying entirely on the sourced path.
+        assert il_return.days_in_state == 365
+        assert pa_return.days_in_state == 0
+        # Wave 6 real sourcing: PA taxes exactly its $30k state-row sum
+        # at 3.07% = $921.00.
+        assert pa_return.state_specific["state_total_tax"] == Decimal("921.00")
+        assert pa_return.state_specific["pa_state_rows_present"] is True

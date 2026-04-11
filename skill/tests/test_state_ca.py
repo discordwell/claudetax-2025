@@ -22,6 +22,7 @@ from skill.scripts.models import (
     ResidencyStatus,
     StateReturn,
     W2,
+    W2StateRow,
 )
 from skill.scripts.states._plugin_api import (
     FederalTotals,
@@ -413,3 +414,109 @@ class TestCaliforniaPluginFormIds:
         )
         # Even with a nonexistent path, a no-op render should not raise.
         assert PLUGIN.render_pdfs(state_return, Path("/tmp")) == []
+
+
+# ---------------------------------------------------------------------------
+# Wave 6 — Schedule CA (540NR) sourcing scaffolding
+# ---------------------------------------------------------------------------
+
+
+class TestCaliforniaPluginNonresidentSourcing:
+    """When the filer is a non-CA resident AND at least one W-2 carries
+    a CA state row, the plugin must compute CA tax on the sourced wages
+    directly rather than day-prorating the resident-basis tax.
+    """
+
+    @pytest.fixture
+    def nonresident_ca_w2_return(self) -> CanonicalReturn:
+        """NY resident with a CA state row on a W-2 (partial sourcing)."""
+        return CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="Alex",
+                last_name="Doe",
+                ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=Address(
+                street1="1 Broadway",
+                city="New York",
+                state="NY",
+                zip="10004",
+            ),
+            w2s=[
+                W2(
+                    employer_name="Multi Corp",
+                    box1_wages=Decimal("65000"),
+                    state_rows=[
+                        W2StateRow(
+                            state="CA",
+                            state_wages=Decimal("20000"),
+                        ),
+                    ],
+                ),
+            ],
+        )
+
+    def test_ca_state_rows_telemetry(
+        self, nonresident_ca_w2_return, federal_single_65k
+    ):
+        result = PLUGIN.compute(
+            nonresident_ca_w2_return,
+            federal_single_65k,
+            ResidencyStatus.NONRESIDENT,
+            days_in_state=0,
+        )
+        ss = result.state_specific
+        assert ss["ca_state_rows_present"] is True
+        assert ss[
+            "ca_sourced_wages_from_w2_state_rows"
+        ] == Decimal("20000.00")
+
+    def test_ca_sourced_tax_lower_than_resident_basis(
+        self, nonresident_ca_w2_return, federal_single_65k
+    ):
+        """Sourced tax on $20k wages must be strictly less than the
+        resident-basis tax on $65k wages — the core correctness
+        property of real sourcing."""
+        result = PLUGIN.compute(
+            nonresident_ca_w2_return,
+            federal_single_65k,
+            ResidencyStatus.NONRESIDENT,
+            days_in_state=0,
+        )
+        ss = result.state_specific
+        assert ss["state_total_tax"] < ss["state_total_tax_resident_basis"]
+        # And above zero — $20k is above the CA standard deduction.
+        assert ss["state_total_tax"] >= Decimal("0")
+
+    def test_ca_sourced_path_skips_day_proration(
+        self, nonresident_ca_w2_return, federal_single_65k
+    ):
+        """When the state-row path is taken, apportionment_fraction is
+        stamped as exactly 1 (meaning "no day-proration applied")."""
+        result = PLUGIN.compute(
+            nonresident_ca_w2_return,
+            federal_single_65k,
+            ResidencyStatus.NONRESIDENT,
+            days_in_state=91,
+        )
+        assert result.state_specific["apportionment_fraction"] == Decimal("1")
+
+    def test_ca_no_state_rows_falls_back_to_day_proration(
+        self, single_65k_return, federal_single_65k
+    ):
+        """When no W-2 state rows are present, the plugin falls back
+        to the legacy day-proration behavior. This preserves existing
+        test locks in test_state_ca.py."""
+        result = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.NONRESIDENT,
+            days_in_state=182,
+        )
+        ss = result.state_specific
+        assert ss["ca_state_rows_present"] is False
+        # Day-prorated fraction = 182/365.
+        assert ss["apportionment_fraction"] == Decimal(182) / Decimal("365")

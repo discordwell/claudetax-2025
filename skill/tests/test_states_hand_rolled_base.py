@@ -10,6 +10,17 @@ from decimal import Decimal
 
 import pytest
 
+import datetime as dt
+
+from skill.scripts.models import (
+    Address,
+    CanonicalReturn,
+    FilingStatus,
+    Person,
+    ScheduleC,
+    W2,
+    W2StateRow,
+)
 from skill.scripts.states._hand_rolled_base import (
     CENT,
     GraduatedBracket,
@@ -17,6 +28,11 @@ from skill.scripts.states._hand_rolled_base import (
     d,
     day_prorate,
     graduated_tax,
+    sourced_or_prorated_schedule_c,
+    sourced_or_prorated_wages,
+    state_has_w2_state_rows,
+    state_source_schedule_c,
+    state_source_wages_from_w2s,
 )
 
 
@@ -242,3 +258,253 @@ class TestGraduatedTax:
         )
         # 10000 * 0.02 + 90000 * 0.05 = 200 + 4500 = 4700
         assert graduated_tax(Decimal("100000"), brackets) == Decimal("4700.00")
+
+
+# ---------------------------------------------------------------------------
+# Wave 6 — W-2 state-row sourcing helpers
+# ---------------------------------------------------------------------------
+
+
+def _return_with_w2s(w2s: list[W2]) -> CanonicalReturn:
+    return CanonicalReturn(
+        tax_year=2025,
+        filing_status=FilingStatus.SINGLE,
+        taxpayer=Person(
+            first_name="Alex",
+            last_name="Doe",
+            ssn="111-22-3333",
+            date_of_birth=dt.date(1990, 1, 1),
+        ),
+        address=Address(
+            street1="1 A", city="B", state="CA", zip="90001"
+        ),
+        w2s=w2s,
+    )
+
+
+class TestStateHasW2StateRows:
+    def test_no_w2s(self):
+        r = _return_with_w2s([])
+        assert state_has_w2_state_rows(r, "CA") is False
+
+    def test_no_rows_on_w2(self):
+        r = _return_with_w2s([
+            W2(employer_name="Acme", box1_wages=Decimal("50000")),
+        ])
+        assert state_has_w2_state_rows(r, "CA") is False
+
+    def test_row_present_matching(self):
+        r = _return_with_w2s([
+            W2(
+                employer_name="Acme",
+                box1_wages=Decimal("50000"),
+                state_rows=[
+                    W2StateRow(state="CA", state_wages=Decimal("50000")),
+                ],
+            ),
+        ])
+        assert state_has_w2_state_rows(r, "CA") is True
+        assert state_has_w2_state_rows(r, "NY") is False
+
+    def test_multi_row_multi_state(self):
+        r = _return_with_w2s([
+            W2(
+                employer_name="Acme",
+                box1_wages=Decimal("50000"),
+                state_rows=[
+                    W2StateRow(state="CA", state_wages=Decimal("20000")),
+                    W2StateRow(state="NY", state_wages=Decimal("30000")),
+                ],
+            ),
+        ])
+        assert state_has_w2_state_rows(r, "CA")
+        assert state_has_w2_state_rows(r, "NY")
+        assert not state_has_w2_state_rows(r, "PA")
+
+
+class TestStateSourceWagesFromW2s:
+    def test_single_row(self):
+        r = _return_with_w2s([
+            W2(
+                employer_name="Acme",
+                box1_wages=Decimal("50000"),
+                state_rows=[
+                    W2StateRow(state="CA", state_wages=Decimal("50000")),
+                ],
+            ),
+        ])
+        assert state_source_wages_from_w2s(r, "CA") == Decimal("50000.00")
+        assert state_source_wages_from_w2s(r, "NY") == Decimal("0.00")
+
+    def test_sum_across_multiple_w2s(self):
+        r = _return_with_w2s([
+            W2(
+                employer_name="Acme",
+                box1_wages=Decimal("50000"),
+                state_rows=[
+                    W2StateRow(state="CA", state_wages=Decimal("50000")),
+                ],
+            ),
+            W2(
+                employer_name="Omega",
+                box1_wages=Decimal("30000"),
+                state_rows=[
+                    W2StateRow(state="CA", state_wages=Decimal("20000")),
+                    W2StateRow(state="NY", state_wages=Decimal("10000")),
+                ],
+            ),
+        ])
+        assert state_source_wages_from_w2s(r, "CA") == Decimal("70000.00")
+        assert state_source_wages_from_w2s(r, "NY") == Decimal("10000.00")
+
+    def test_empty_returns_zero(self):
+        r = _return_with_w2s([])
+        assert state_source_wages_from_w2s(r, "CA") == Decimal("0.00")
+
+
+class TestSourcedOrProratedWages:
+    def test_state_rows_take_precedence(self):
+        r = _return_with_w2s([
+            W2(
+                employer_name="Acme",
+                box1_wages=Decimal("60000"),
+                state_rows=[
+                    W2StateRow(state="CA", state_wages=Decimal("40000")),
+                ],
+            ),
+        ])
+        # Even though full-year wages are $60k and only 182 days,
+        # state_row sum wins.
+        assert sourced_or_prorated_wages(
+            r, "CA", Decimal("60000"), 182
+        ) == Decimal("40000.00")
+
+    def test_fallback_to_day_prorate(self):
+        r = _return_with_w2s([
+            W2(employer_name="Acme", box1_wages=Decimal("60000")),
+        ])
+        expected = day_prorate(Decimal("60000"), 182)
+        assert sourced_or_prorated_wages(
+            r, "CA", Decimal("60000"), 182
+        ) == expected
+
+    def test_different_state_fallback(self):
+        r = _return_with_w2s([
+            W2(
+                employer_name="Acme",
+                box1_wages=Decimal("60000"),
+                state_rows=[
+                    W2StateRow(state="NY", state_wages=Decimal("40000")),
+                ],
+            ),
+        ])
+        # Asking for CA when only NY rows exist falls back to
+        # day-prorate of full-year wages.
+        expected = day_prorate(Decimal("60000"), 182)
+        assert sourced_or_prorated_wages(
+            r, "CA", Decimal("60000"), 182
+        ) == expected
+
+
+class TestStateSourceScheduleC:
+    def test_business_location_state_match(self):
+        sc = ScheduleC(
+            business_name="Test Co",
+            principal_business_or_profession="Consulting",
+            line1_gross_receipts=Decimal("50000"),
+            business_location_state="CA",
+        )
+        r = _return_with_w2s([])
+        r = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="Alex",
+                last_name="Doe",
+                ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=Address(
+                street1="1 A", city="B", state="CA", zip="90001"
+            ),
+            schedules_c=[sc],
+        )
+        # Net profit = gross - expenses = 50000 (no expenses).
+        assert state_source_schedule_c(r, "CA") == Decimal("50000.00")
+        assert state_source_schedule_c(r, "NY") == Decimal("0.00")
+
+    def test_business_location_state_none_not_sourced(self):
+        sc = ScheduleC(
+            business_name="Test Co",
+            principal_business_or_profession="Consulting",
+            line1_gross_receipts=Decimal("50000"),
+        )
+        r = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="Alex",
+                last_name="Doe",
+                ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=Address(
+                street1="1 A", city="B", state="CA", zip="90001"
+            ),
+            schedules_c=[sc],
+        )
+        # No business_location_state set → not included.
+        assert state_source_schedule_c(r, "CA") == Decimal("0.00")
+
+
+class TestSourcedOrProratedScheduleC:
+    def test_sourced_wins_when_business_matches(self):
+        sc = ScheduleC(
+            business_name="Test Co",
+            principal_business_or_profession="Consulting",
+            line1_gross_receipts=Decimal("50000"),
+            business_location_state="CA",
+        )
+        r = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="Alex",
+                last_name="Doe",
+                ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=Address(
+                street1="1 A", city="B", state="CA", zip="90001"
+            ),
+            schedules_c=[sc],
+        )
+        assert sourced_or_prorated_schedule_c(
+            r, "CA", Decimal("50000"), 91
+        ) == Decimal("50000.00")
+
+    def test_falls_back_to_day_prorate_when_no_match(self):
+        sc = ScheduleC(
+            business_name="Test Co",
+            principal_business_or_profession="Consulting",
+            line1_gross_receipts=Decimal("50000"),
+            # No business_location_state.
+        )
+        r = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="Alex",
+                last_name="Doe",
+                ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=Address(
+                street1="1 A", city="B", state="CA", zip="90001"
+            ),
+            schedules_c=[sc],
+        )
+        expected = day_prorate(Decimal("50000"), 91)
+        assert sourced_or_prorated_schedule_c(
+            r, "CA", Decimal("50000"), 91
+        ) == expected

@@ -33,6 +33,11 @@ from skill.scripts.models import (
     ResidencyStatus,
     StateReturn,
 )
+from skill.scripts.states._hand_rolled_base import (
+    state_has_w2_state_rows,
+    state_source_schedule_c,
+    state_source_wages_from_w2s,
+)
 from skill.scripts.states._plugin_api import (
     FederalTotals,
     IncomeApportionment,
@@ -106,17 +111,84 @@ class NewYorkPlugin:
         state_bracket = _d(getattr(tf_result, "state_tax_bracket", 0))
         state_effective_rate = _d(getattr(tf_result, "state_effective_tax_rate", 0))
 
-        if residency in (ResidencyStatus.NONRESIDENT, ResidencyStatus.PART_YEAR):
-            # TODO(ny-it203): This days-based proration is a v0.1 stopgap.
-            # The correct NY nonresident / part-year calculation is Form
-            # IT-203, which computes tax on the full federal AGI as if a
-            # resident and then multiplies by the NY-source-income ratio
-            # (NY income / federal income), not a days ratio. Replace once
-            # we add per-state NY-source sourcing logic to apportion_income.
+        # Wave 6: real IT-203 allocation scaffolding. For NONRESIDENT /
+        # PART_YEAR, prefer (in priority order):
+        #
+        #   1. IT-203-B workday apportionment when the filer supplied
+        #      ``taxpayer.ny_workdays_in_ny`` — allocate wages by the
+        #      NY_workdays / 260 ratio.
+        #   2. W-2 state_rows[state=NY].state_wages sum — the employer-
+        #      reported sourcing on Copy 2 box 16.
+        #   3. Day-proration fallback when neither signal is present.
+        #
+        # Paths 1 and 2 recompute NY tax on the sourced wage amount via
+        # a second tenforty call; path 3 prorates the full-year tax by
+        # days_in_state/365 (legacy behavior, tests still lock this).
+        ny_state_rows_present = state_has_w2_state_rows(return_, "NY")
+        ny_sourced_wages = state_source_wages_from_w2s(return_, "NY")
+        ny_sourced_se = state_source_schedule_c(return_, "NY")
+        ny_workdays_in_ny = return_.taxpayer.ny_workdays_in_ny
+        used_it203_workdays = False
+        used_w2_state_rows = False
+
+        if residency == ResidencyStatus.RESIDENT:
+            state_tax = full_year_state_tax.quantize(Decimal("0.01"))
+        elif ny_workdays_in_ny is not None and ny_workdays_in_ny > 0:
+            # IT-203-B: allocate total wages by the workday ratio.
+            # Standard NY IT-203-B denominator is 260 (5-day workweek)
+            # unless the taxpayer overrides — we accept the raw
+            # numerator against 260 as the v1 implementation.
+            total_wages = Decimal(str(tf_input.w2_income or 0))
+            workdays_denom = Decimal("260")
+            ratio = Decimal(ny_workdays_in_ny) / workdays_denom
+            if ratio > Decimal("1"):
+                ratio = Decimal("1")
+            allocated_wages = (total_wages * ratio).quantize(Decimal("0.01"))
+            tf_sourced = tenforty.evaluate_return(
+                year=tf_input.year,
+                state="NY",
+                filing_status=tf_input.filing_status,
+                w2_income=float(allocated_wages),
+                taxable_interest=0.0,
+                qualified_dividends=0.0,
+                ordinary_dividends=0.0,
+                short_term_capital_gains=0.0,
+                long_term_capital_gains=0.0,
+                self_employment_income=float(ny_sourced_se),
+                rental_income=0.0,
+                schedule_1_income=0.0,
+                standard_or_itemized=tf_input.standard_or_itemized,
+                itemized_deductions=tf_input.itemized_deductions,
+                num_dependents=tf_input.num_dependents,
+            )
+            state_tax = _d(tf_sourced.state_total_tax).quantize(Decimal("0.01"))
+            used_it203_workdays = True
+        elif ny_state_rows_present:
+            tf_sourced = tenforty.evaluate_return(
+                year=tf_input.year,
+                state="NY",
+                filing_status=tf_input.filing_status,
+                w2_income=float(ny_sourced_wages),
+                taxable_interest=0.0,
+                qualified_dividends=0.0,
+                ordinary_dividends=0.0,
+                short_term_capital_gains=0.0,
+                long_term_capital_gains=0.0,
+                self_employment_income=float(ny_sourced_se),
+                rental_income=0.0,
+                schedule_1_income=0.0,
+                standard_or_itemized=tf_input.standard_or_itemized,
+                itemized_deductions=tf_input.itemized_deductions,
+                num_dependents=tf_input.num_dependents,
+            )
+            state_tax = _d(tf_sourced.state_total_tax).quantize(Decimal("0.01"))
+            used_w2_state_rows = True
+        else:
+            # Legacy day-proration fallback. Tests that cover nonresident
+            # behavior without W-2 state rows or an IT-203-B workday
+            # count still lock this path.
             proration = Decimal(days_in_state) / Decimal("365")
             state_tax = (full_year_state_tax * proration).quantize(Decimal("0.01"))
-        else:
-            state_tax = full_year_state_tax.quantize(Decimal("0.01"))
 
         return StateReturn(
             state=self.meta.code,
@@ -130,6 +202,12 @@ class NewYorkPlugin:
                 "state_effective_tax_rate": state_effective_rate,
                 "full_year_state_tax": full_year_state_tax,
                 "engine": "tenforty/OpenTaxSolver",
+                "ny_sourced_wages_from_w2_state_rows": ny_sourced_wages,
+                "ny_sourced_schedule_c_net": ny_sourced_se,
+                "ny_state_rows_present": ny_state_rows_present,
+                "ny_workdays_in_ny": ny_workdays_in_ny,
+                "used_it203_workdays": used_it203_workdays,
+                "used_w2_state_rows": used_w2_state_rows,
             },
         )
 
@@ -195,12 +273,25 @@ class NewYorkPlugin:
             start=Decimal("0"),
         )
 
+        # Wave 6: prefer W-2 state-row sourcing for wages / Schedule C
+        # when non-resident. Other categories stay on days-proration
+        # until a real IT-203 Schedule B is wired up.
+        if residency == ResidencyStatus.RESIDENT:
+            ny_wages = wages
+            ny_se = se_income
+        elif state_has_w2_state_rows(return_, "NY"):
+            ny_wages = state_source_wages_from_w2s(return_, "NY")
+            ny_se = state_source_schedule_c(return_, "NY")
+        else:
+            ny_wages = wages * factor
+            ny_se = se_income * factor
+
         return IncomeApportionment(
-            state_source_wages=wages * factor,
+            state_source_wages=ny_wages,
             state_source_interest=interest * factor,
             state_source_dividends=ord_div * factor,
             state_source_capital_gains=capital_gains * factor,
-            state_source_self_employment=se_income * factor,
+            state_source_self_employment=ny_se,
             state_source_rental=rental * factor,
         )
 

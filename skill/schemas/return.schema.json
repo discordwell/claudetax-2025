@@ -2492,6 +2492,18 @@
           "default": null,
           "title": "Middle Initial"
         },
+        "ny_workdays_in_ny": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ny Workdays In Ny"
+        },
         "occupation": {
           "anyOf": [
             {
@@ -2688,6 +2700,22 @@
             }
           ],
           "default": null
+        },
+        "business_location_state": {
+          "anyOf": [
+            {
+              "description": "Two-letter USPS state code",
+              "maxLength": 2,
+              "minLength": 2,
+              "pattern": "^[A-Z]{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Business Location State"
         },
         "business_name": {
           "title": "Business Name",

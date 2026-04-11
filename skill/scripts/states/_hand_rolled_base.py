@@ -46,7 +46,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from skill.scripts.models import CanonicalReturn
 
 __all__ = [
     "CENT",
@@ -55,6 +58,11 @@ __all__ = [
     "day_prorate",
     "GraduatedBracket",
     "graduated_tax",
+    "state_source_wages_from_w2s",
+    "state_has_w2_state_rows",
+    "state_source_schedule_c",
+    "sourced_or_prorated_wages",
+    "sourced_or_prorated_schedule_c",
 ]
 
 
@@ -226,4 +234,142 @@ def graduated_tax(
         if round_each_tier:
             tier_tax = cents(tier_tax)
         total += tier_tax
+    return cents(total)
+
+
+# ---------------------------------------------------------------------------
+# Real per-state income sourcing from W-2 state rows and Schedule C metadata
+# ---------------------------------------------------------------------------
+
+
+def state_has_w2_state_rows(
+    canonical: "CanonicalReturn", state_code: str
+) -> bool:
+    """True iff any W-2 has a state_rows[] entry matching ``state_code``.
+
+    Used by state plugins to pick between the real W-2 state-row sourcing
+    path (when True) and the day-proration fallback (when False).
+    """
+    for w2 in canonical.w2s:
+        for row in w2.state_rows:
+            if row.state == state_code:
+                return True
+    return False
+
+
+def state_source_wages_from_w2s(
+    canonical: "CanonicalReturn", state_code: str
+) -> Decimal:
+    """Sum every W-2 state row whose ``state`` matches ``state_code``.
+
+    This is the real per-state wage sourcing path: when a W-2 carries
+    Copy 2 state rows (box 15 / 16 / 17), the ``state_wages`` field is
+    the employer-reported amount sourced to that state — the exact number
+    a state nonresident / part-year return is supposed to tax. This
+    helper is the intended replacement for ``day_prorate(box1_wages,
+    days_in_state)`` across every hand-rolled plugin.
+
+    Callers should fall back to ``day_prorate`` (the "unknown sourcing"
+    path) when this helper returns Decimal("0.00") AND the W-2 list has
+    no state_rows for ``state_code`` — that's the legacy behavior for
+    W-2s that were ingested before state-row tracking landed, or W-2s
+    whose Copy 2 page was not scanned. Use ``state_has_w2_state_rows``
+    to disambiguate.
+
+    Parameters
+    ----------
+    canonical
+        The full CanonicalReturn.
+    state_code
+        Two-letter USPS state code (e.g. "CA", "NY", "PA").
+
+    Returns
+    -------
+    Decimal
+        Sum of matching ``state_wages`` values, quantized to the cent.
+        Returns Decimal("0.00") if no matching rows are present.
+    """
+    total = Decimal("0")
+    for w2 in canonical.w2s:
+        for row in w2.state_rows:
+            if row.state == state_code:
+                total += d(row.state_wages)
+    return cents(total)
+
+
+def sourced_or_prorated_wages(
+    canonical: "CanonicalReturn",
+    state_code: str,
+    full_year_wages: Decimal | int | float,
+    days_in_state: int,
+    total_days: int = 365,
+) -> Decimal:
+    """Wave 6 unified wage-sourcing primitive for hand-rolled plugins.
+
+    Returns the W-2 state-row sourced wage amount for ``state_code``
+    when at least one W-2 carries a matching row; otherwise falls back
+    to ``day_prorate(full_year_wages, days_in_state)``.
+
+    Used from each hand-rolled plugin's ``apportion_income`` to keep
+    the state-row / day-prorate branching logic in one place.
+    """
+    if state_has_w2_state_rows(canonical, state_code):
+        return state_source_wages_from_w2s(canonical, state_code)
+    return day_prorate(full_year_wages, days_in_state, total_days)
+
+
+def sourced_or_prorated_schedule_c(
+    canonical: "CanonicalReturn",
+    state_code: str,
+    full_year_se_net: Decimal | int | float,
+    days_in_state: int,
+    total_days: int = 365,
+) -> Decimal:
+    """Wave 6 unified Schedule C sourcing primitive.
+
+    Returns the sum of Schedule C net profit for businesses whose
+    ``business_location_state`` matches ``state_code``. When NO Schedule
+    C business is sourced to the state (either because the field is
+    unset or no match), falls back to day-proration of
+    ``full_year_se_net``.
+    """
+    sourced = state_source_schedule_c(canonical, state_code)
+    if sourced != Decimal("0.00"):
+        return sourced
+    # Even an explicit zero-profit C sourced to the state returns 0.00,
+    # which equals the day-proration fallback at zero days. Otherwise
+    # day-prorate the full-year SE amount as the ambiguous-sourcing
+    # fallback.
+    any_sc_sourced = any(
+        sc.business_location_state == state_code
+        for sc in canonical.schedules_c
+    )
+    if any_sc_sourced:
+        return sourced
+    return day_prorate(full_year_se_net, days_in_state, total_days)
+
+
+def state_source_schedule_c(
+    canonical: "CanonicalReturn", state_code: str
+) -> Decimal:
+    """Sum Schedule C net profit for businesses sourced to ``state_code``.
+
+    A Schedule C business is sourced to a state via its
+    ``business_location_state`` field. When that field is unset, the
+    business is considered ambiguously sourced and this helper does NOT
+    include it — callers should fall back to day_prorate for the
+    ambiguous-sourcing path.
+
+    Net profit is the calc-engine primitive (line 1 gross + line 6 other
+    income - line 2 returns - line 4 COGS - line 28 total expenses -
+    line 30 home office), reused from ``calc.engine.schedule_c_net_profit``.
+    """
+    # Imported locally to avoid a module-scope circular import — calc.engine
+    # depends on plenty of skill.scripts modules transitively.
+    from skill.scripts.calc.engine import schedule_c_net_profit
+
+    total = Decimal("0")
+    for sc in canonical.schedules_c:
+        if sc.business_location_state == state_code:
+            total += schedule_c_net_profit(sc)
     return cents(total)

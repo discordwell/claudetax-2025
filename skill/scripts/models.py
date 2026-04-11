@@ -147,6 +147,13 @@ class Person(_StrictModel):
     is_age_65_or_older: bool | None = None
     """If not set, caller should derive from date_of_birth and the tax year."""
     occupation: str | None = None
+    ny_workdays_in_ny: int | None = None
+    """NY IT-203-B workday apportionment numerator: the number of days
+    actually worked in New York State (not just days present). Used by
+    the NY plugin's nonresident path to compute the Schedule A
+    allocation percentage = ny_workdays / total_workdays. When None,
+    the NY plugin falls back to summing W-2 ``state_rows[].state_wages``
+    where ``state == 'NY'`` for the sourced-wages estimate."""
 
 
 class Dependent(_StrictModel):
@@ -447,6 +454,15 @@ class ScheduleC(_StrictModel):
     principal_business_code: str | None = None  # NAICS-style code, Part I line B
     ein: EIN | None = None
     business_address: Address | None = None
+    business_location_state: StateCode | None = None
+    """Primary state where the business operates. Used by state plugins
+    to source Schedule C net profit to the correct state for nonresident
+    / part-year returns (see ``states._hand_rolled_base.state_source_
+    schedule_c``). Distinct from ``business_address.state`` — a business
+    can have a mailing address in one state but operate primarily in
+    another (home-office SE running inventory from a warehouse). When
+    None, the plugin's ambiguous-sourcing fallback (day-proration) kicks
+    in."""
     accounting_method: Literal["cash", "accrual", "other"] = "cash"
     material_participation: bool = True
     started_or_acquired_this_year: bool = False

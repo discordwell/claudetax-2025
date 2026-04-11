@@ -65,6 +65,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from decimal import Decimal
+
 from skill.scripts.calc.engine import compute
 from skill.scripts.ingest._pipeline import (
     DocumentKind,
@@ -72,7 +74,12 @@ from skill.scripts.ingest._pipeline import (
     IngestCascade,
     PartialReturn,
 )
-from skill.scripts.models import CanonicalReturn
+from skill.scripts.models import (
+    CanonicalReturn,
+    ResidencyStatus,
+    StateCode,
+    StateReturn,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -228,13 +235,15 @@ class PipelineResult:
     Callers can inspect ``canonical_return.computed`` for tax numbers,
     ``validation_report`` (mirrors ``canonical_return.computed.
     validation_report``) for FFFF / cross-check output, and
-    ``rendered_paths`` for on-disk PDF locations.
+    ``rendered_paths`` for on-disk PDF locations. ``state_returns``
+    holds the per-state plugin output when state dispatch ran.
     """
 
     canonical_return: CanonicalReturn
     ingest_results: list[IngestResult] = field(default_factory=list)
     rendered_paths: list[Path] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    state_returns: list[StateReturn] = field(default_factory=list)
 
     @property
     def validation_report(self) -> dict[str, Any] | None:
@@ -244,6 +253,147 @@ class PipelineResult:
         """Serialize ``canonical_return`` as a JSON file at ``path``."""
         data = self.canonical_return.model_dump(mode="json")
         path.write_text(json.dumps(data, indent=2))
+
+
+# ---------------------------------------------------------------------------
+# State plugin dispatch helpers
+# ---------------------------------------------------------------------------
+
+
+def _relevant_state_codes(canonical: CanonicalReturn) -> list[StateCode]:
+    """Return the ordered set of state codes this return touches.
+
+    Resident state appears first; every other state that shows up in a
+    W-2 ``state_rows[]`` entry follows, in first-seen order, de-duped.
+    """
+    seen: list[StateCode] = []
+    resident = canonical.address.state
+    seen.append(resident)
+    for w2 in canonical.w2s:
+        for row in w2.state_rows:
+            if row.state not in seen:
+                seen.append(row.state)
+    return seen
+
+
+def _build_federal_totals(canonical: CanonicalReturn) -> "FederalTotals":
+    """Build the ``FederalTotals`` struct a state plugin consumes.
+
+    Imported locally so the plugin-api dependency stays out of module
+    load order (keeps ``run_pipeline`` importable without the states
+    package eagerly loading).
+    """
+    from skill.scripts.states._plugin_api import FederalTotals
+
+    c = canonical.computed
+    total_tax = c.total_tax or Decimal("0")
+    tentative_tax = c.tentative_tax or Decimal("0")
+    agi = c.adjusted_gross_income or Decimal("0")
+    ti = c.taxable_income or Decimal("0")
+    deduction_taken = c.deduction_taken or Decimal("0")
+    # Standard deduction numbers live in ty2025-constants.json. For
+    # FederalTotals we just report what actually reduced AGI; if the
+    # filer itemized, federal_itemized_deductions_total comes from the
+    # itemized block's SALT-capped sum (approximated here as
+    # deduction_taken when itemize_deductions is True).
+    if canonical.itemize_deductions:
+        itemized_total = deduction_taken
+        std_ded = Decimal("0")
+    else:
+        itemized_total = Decimal("0")
+        std_ded = deduction_taken
+
+    fed_wh = sum(
+        (w2.box2_federal_income_tax_withheld for w2 in canonical.w2s),
+        start=Decimal("0"),
+    )
+    return FederalTotals(
+        filing_status=canonical.filing_status,
+        num_dependents=len(canonical.dependents),
+        adjusted_gross_income=agi,
+        taxable_income=ti,
+        total_federal_tax=total_tax,
+        federal_income_tax=tentative_tax,
+        federal_standard_deduction=std_ded,
+        federal_itemized_deductions_total=itemized_total,
+        deduction_taken=deduction_taken,
+        federal_withholding_from_w2s=fed_wh,
+        qbi_deduction=c.qbi_deduction or Decimal("0"),
+        se_tax=canonical.other_taxes.self_employment_tax,
+        additional_medicare_tax=canonical.other_taxes.additional_medicare_tax,
+        niit=canonical.other_taxes.net_investment_income_tax,
+    )
+
+
+def _dispatch_state_plugins(
+    canonical: CanonicalReturn,
+    output_dir: Path,
+) -> tuple[list[StateReturn], list[Path], list[str]]:
+    """Run every relevant state plugin for ``canonical``.
+
+    Returns a tuple of (state_returns, rendered_paths, warnings). This
+    is the first place in the codebase that walks the state registry
+    on behalf of a real return — CP8-E originally punted on this, and
+    wave 6 owns wiring it up.
+
+    Residency rule: the resident state is whichever state
+    ``canonical.address.state`` points at; every other state found in
+    ``W2.state_rows[]`` is treated as NONRESIDENT with ``days_in_state``
+    of 0 (a future wave will add real part-year / day-count tracking).
+    Plugins for states that are not registered get a warning but do not
+    abort the pipeline.
+    """
+    from skill.scripts.states._registry import registry
+
+    state_returns: list[StateReturn] = []
+    rendered: list[Path] = []
+    warnings: list[str] = []
+
+    federal = _build_federal_totals(canonical)
+    resident_state = canonical.address.state
+    codes = _relevant_state_codes(canonical)
+
+    for code in codes:
+        if not registry.has(code):
+            warnings.append(
+                f"no state plugin registered for {code!r}; skipping"
+            )
+            continue
+        plugin = registry.get(code)
+
+        if code == resident_state:
+            residency = ResidencyStatus.RESIDENT
+            days_in_state = 365
+        else:
+            residency = ResidencyStatus.NONRESIDENT
+            # Real day counts come from a future per-state
+            # day-tracking field on canonical; for now treat every
+            # non-resident as zero-days (the state-row path bypasses
+            # day_prorate entirely when state rows are present).
+            days_in_state = 0
+
+        try:
+            state_return = plugin.compute(
+                canonical, federal, residency, days_in_state
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            warnings.append(
+                f"state plugin {code!r} compute raised {type(exc).__name__}: {exc}"
+            )
+            continue
+        state_returns.append(state_return)
+
+        try:
+            paths = plugin.render_pdfs(state_return, output_dir)
+        except Exception as exc:  # pragma: no cover - defensive
+            warnings.append(
+                f"state plugin {code!r} render_pdfs raised "
+                f"{type(exc).__name__}: {exc}"
+            )
+            paths = []
+        rendered.extend(paths)
+
+    return state_returns, rendered, warnings
 
 
 # ---------------------------------------------------------------------------
@@ -262,6 +412,7 @@ def run_pipeline(
     render_schedule_c: bool = True,
     render_schedule_se: bool = True,
     render_form_6251: bool = True,
+    render_state_returns: bool = True,
 ) -> PipelineResult:
     """Run the full pipeline: ingest → compute → render → emit result.
 
@@ -342,9 +493,20 @@ def run_pipeline(
     canonical = compute(canonical)
 
     # ------------------------------------------------------------------
+    # 3b. State plugin dispatch (wave 6)
+    # ------------------------------------------------------------------
+    state_returns: list[StateReturn] = []
+    state_rendered: list[Path] = []
+    if render_state_returns:
+        state_returns, state_rendered, state_warnings = _dispatch_state_plugins(
+            canonical, output_dir
+        )
+        warnings.extend(state_warnings)
+
+    # ------------------------------------------------------------------
     # 4. Render federal PDFs
     # ------------------------------------------------------------------
-    rendered: list[Path] = []
+    rendered: list[Path] = list(state_rendered)
 
     if render_form_1040:
         from skill.scripts.output.form_1040 import (
@@ -424,6 +586,7 @@ def run_pipeline(
         ingest_results=ingest_results,
         rendered_paths=rendered,
         warnings=warnings,
+        state_returns=state_returns,
     )
     result.write_result_json(output_dir / "result.json")
     return result

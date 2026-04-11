@@ -1,52 +1,34 @@
-"""Wave-5 first multi-state golden fixture: PA -> IL part-year mover.
+"""Multi-state golden fixture: PA -> IL part-year mover (Wave 6 upgrade).
 
-This is the FIRST golden fixture that exercises the state plugin dispatch
-layer end-to-end. It loads a single canonical return for a TY2025 Single
-filer who moves from Pennsylvania to Illinois mid-year, runs the federal
-``compute()`` engine, then directly dispatches the PA and IL plugins via
-``skill.scripts.states._registry.registry`` to produce per-state
-``StateReturn`` objects.
+Originally landed in wave 5 as the first multi-state golden, with v1
+day-prorated tax outputs locked. Wave 6 replaced day-proration with real
+W-2 state-row sourcing on the wage side for PA and IL, so this test now
+locks the sourced-tax numbers instead.
 
-Why direct plugin dispatch instead of ``skill.scripts.pipeline.run_pipeline``?
-``run_pipeline`` ingests PDFs and produces a federal return; the state-
-plugin-dispatch wiring inside the pipeline lands in fan-out wave 6. Until
-then, golden state fixtures must call ``registry.get(<code>).compute(...)``
-themselves, exactly as the wave-6 dispatcher will.
-
-Locked-to-the-cent invariants (see ``expected.json`` for full hand-check):
-
-Federal (matches ``simple_w2_standard`` golden numbers, both at $65k AGI
+Federal (unchanged from simple_w2_standard golden, both at $65k AGI
 Single TY2025 standard deduction):
     AGI = $65,000, Std ded = $15,750, TI = $49,250, Fed tax = $5,755,
     Withheld = $6,500, Refund = $745.
 
-PA (resident-basis tax * 181/365 day-proration):
-    Resident-basis tax = $65,000 * 0.0307 = $1,995.50
-    Apportioned tax    = $1,995.50 * (181/365) = $989.55
-    Withheld           = $921.00 -> $68.55 OWED (not the brief's $0)
+PA (Wave 6 W-2 state-row sourced):
+    Sourced wages (state_rows[PA].state_wages)   = $30,000
+    Sourced tax (30000 * 0.0307)                 = $921.00
+    Resident-basis hypothetical (still stamped)  = $1,995.50
+    Withheld                                     = $921.00 -> $0 owed
 
-IL (resident-basis tax * 184/365 day-proration):
-    Base income (= federal AGI) = $65,000
-    Personal exemption          = $2,850 (Single, 1 exemption)
-    Net taxable income          = $62,150
-    Resident-basis tax          = $62,150 * 0.0495 = $3,076.43
-    Apportioned tax             = $3,076.43 * (184/365) = $1,550.86
-    Withheld                    = $1,732.50 -> $181.64 REFUND (not $141.07)
+IL (Wave 6 W-2 state-row sourced):
+    Sourced wages (state_rows[IL].state_wages)   = $35,000
+    Personal exemption                           = $2,850 (Single)
+    Sourced taxable                              = $32,150
+    Sourced tax (32150 * 0.0495)                 = $1,591.43
+    Resident-basis hypothetical (still stamped)  = $3,076.43
+    Withheld                                     = $1,732.50 -> $141.07 REFUND
 
-The brief's idealized hand-check (PA tax = $921, IL tax = $1,591.43)
-ASSUMES real per-state income sourcing — the wave-3/CP8-D plugins do NOT
-implement that. They prorate the resident-basis tax by days_in_state/365.
-The fixture LOCKS the v1 day-prorated outputs; ``expected.json`` calls out
-the discrepancy in ``TODO_real_sourcing_logic`` so when wave-N adds real
-PA Sch NRH-NR and IL Sch NR sourcing, this test will fail loudly and
-require explicit re-blessing.
-
-CP8-D IL adds/subs (Line 2 muni interest addback, Line 5 SS+retirement
-subtraction, Sch M Line 22 US Treasury subtraction) are all wired but
-evaluate to ZERO in this fixture because there are no 1099-INT, no
-1099-DIV, no SSA-1099, and no 1099-R forms attached. ``test_il_adds_subs_
-all_zero`` pins this no-op so a future regression in the adds/subs
-extraction code is caught here.
+Wave 6 still runs the IL adds/subs (Line 2 muni, Line 5 SS+retirement,
+Sch M Line 22 US Treasury) on the resident-basis hypothetical; they
+evaluate to zero on this fixture because there are no 1099-INT, 1099-DIV,
+SSA-1099, or 1099-R forms attached. ``test_il_adds_subs_all_zero`` still
+pins that no-op against future regressions.
 """
 from __future__ import annotations
 
@@ -367,18 +349,14 @@ class TestPennsylvaniaPluginDispatch:
             "1995.50"
         )
 
-    def test_pa_apportioned_tax_locked_to_the_cent(
+    def test_pa_sourced_tax_locked_to_the_cent(
         self,
         input_return: CanonicalReturn,
         federal_totals: FederalTotals,
         expected: dict,
     ):
-        """1995.50 * (181/365) = 989.55 (ROUND_HALF_UP at the cent).
-
-        TODO(real-sourcing): When PA Schedule NRH-NR sourcing lands and PA
-        only taxes the $30,000 Philly wages, this number must drop to
-        $30,000 * 0.0307 = $921.00 exactly. See expected.json
-        ``TODO_real_sourcing_logic`` for the bless-and-update procedure.
+        """Wave 6: PA plugin sources wages from W-2 state_rows[PA].state_wages
+        and taxes them at 3.07% directly. $30,000 * 0.0307 = $921.00 exactly.
         """
         plugin = registry.get("PA")
         result = plugin.compute(
@@ -391,11 +369,14 @@ class TestPennsylvaniaPluginDispatch:
         assert result.state_specific["state_total_tax"] == _d(
             exp["state_total_tax"]
         )
-        assert result.state_specific["state_total_tax"] == Decimal("989.55")
+        assert result.state_specific["state_total_tax"] == Decimal("921.00")
 
-    def test_pa_apportionment_fraction_is_181_over_365(
+    def test_pa_sourced_wages_from_w2_state_rows(
         self, input_return: CanonicalReturn, federal_totals: FederalTotals
     ):
+        """Wave 6 invariant: PA plugin must report the sourced wages
+        from W-2 state_rows under the canonical key. $30,000 exactly.
+        """
         plugin = registry.get("PA")
         result = plugin.compute(
             input_return,
@@ -403,8 +384,12 @@ class TestPennsylvaniaPluginDispatch:
             ResidencyStatus.PART_YEAR,
             days_in_state=181,
         )
-        expected_fraction = Decimal(181) / Decimal(365)
-        assert result.state_specific["apportionment_fraction"] == expected_fraction
+        assert result.state_specific[
+            "pa_sourced_wages_from_w2_state_rows"
+        ] == Decimal("30000.00")
+        assert result.state_specific["pa_state_rows_present"] is True
+        # The W-2 state-row path bypasses day-proration entirely.
+        assert result.state_specific["apportionment_fraction"] == Decimal("1")
 
     def test_pa_state_return_validates_via_pydantic(
         self, input_return: CanonicalReturn, federal_totals: FederalTotals
@@ -576,19 +561,15 @@ class TestIllinoisPluginDispatch:
             "state_total_tax_resident_basis"
         ] == Decimal("3076.43")
 
-    def test_il_apportioned_tax_locked_to_the_cent(
+    def test_il_sourced_tax_locked_to_the_cent(
         self,
         input_return: CanonicalReturn,
         federal_totals: FederalTotals,
         expected: dict,
     ):
-        """3,076.43 * (184/365) = 1,550.86 (ROUND_HALF_UP at the cent).
-
-        TODO(real-sourcing): When IL Schedule NR sourcing lands and IL
-        only taxes the $35,000 Chicago wages, this number must drop to
-        ($35,000 - $2,850) * 0.0495 = $1,591.43 exactly. See
-        expected.json ``TODO_real_sourcing_logic`` for the bless-and-
-        update procedure.
+        """Wave 6: IL plugin sources wages from W-2 state_rows[IL].state_wages,
+        applies the personal exemption, and multiplies by 4.95%.
+        ($35,000 - $2,850) * 0.0495 = $1,591.4250 -> $1,591.43 ROUND_HALF_UP.
         """
         plugin = registry.get("IL")
         result = plugin.compute(
@@ -601,11 +582,14 @@ class TestIllinoisPluginDispatch:
         assert result.state_specific["state_total_tax"] == _d(
             exp["state_total_tax"]
         )
-        assert result.state_specific["state_total_tax"] == Decimal("1550.86")
+        assert result.state_specific["state_total_tax"] == Decimal("1591.43")
 
-    def test_il_apportionment_fraction_is_184_over_365(
+    def test_il_sourced_wages_from_w2_state_rows(
         self, input_return: CanonicalReturn, federal_totals: FederalTotals
     ):
+        """Wave 6 invariant: IL plugin must report the sourced wages
+        from W-2 state_rows under the canonical key. $35,000 exactly.
+        """
         plugin = registry.get("IL")
         result = plugin.compute(
             input_return,
@@ -613,8 +597,12 @@ class TestIllinoisPluginDispatch:
             ResidencyStatus.PART_YEAR,
             days_in_state=184,
         )
-        expected_fraction = Decimal(184) / Decimal(365)
-        assert result.state_specific["apportionment_fraction"] == expected_fraction
+        assert result.state_specific[
+            "il_sourced_wages_from_w2_state_rows"
+        ] == Decimal("35000.00")
+        assert result.state_specific["il_state_rows_present"] is True
+        # The W-2 state-row path bypasses day-proration entirely.
+        assert result.state_specific["apportionment_fraction"] == Decimal("1")
 
     def test_il_v1_limitations_present(
         self, input_return: CanonicalReturn, federal_totals: FederalTotals

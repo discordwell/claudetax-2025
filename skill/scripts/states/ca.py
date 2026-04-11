@@ -35,6 +35,11 @@ from skill.scripts.models import (
     ResidencyStatus,
     StateReturn,
 )
+from skill.scripts.states._hand_rolled_base import (
+    state_has_w2_state_rows,
+    state_source_schedule_c,
+    state_source_wages_from_w2s,
+)
 from skill.scripts.states._plugin_api import (
     FederalTotals,
     IncomeApportionment,
@@ -135,10 +140,45 @@ class CaliforniaPlugin:
         state_bracket = _d(tf_result.state_tax_bracket)
         state_eff_rate = _d(tf_result.state_effective_tax_rate)
 
-        # Apportion tax for nonresident / part-year. TODO: replace with real
-        # CA Schedule CA (540NR) income-source apportionment in fan-out.
-        fraction = _apportionment_fraction(residency, days_in_state)
-        state_tax_apportioned = _cents(state_tax_full * fraction)
+        # Wave 6: real Schedule CA (540NR) scaffolding. When the filer is
+        # not a CA resident AND at least one W-2 carries a state_rows
+        # entry for CA, re-compute the state tax on the CA-sourced wages
+        # (W-2 box 16 sum) as if they were the full w2_income. This
+        # matches the 540NR Schedule CA-NR pattern: income items are
+        # sourced to CA via their state-specific columns, then the tax
+        # is computed on that sourced base. For the all-wage case this
+        # simplifies to "tenforty on the sourced wage sum." When no state
+        # rows are present, fall back to the legacy day-proration path.
+        ca_state_rows_present = state_has_w2_state_rows(return_, "CA")
+        ca_sourced_wages = state_source_wages_from_w2s(return_, "CA")
+        ca_sourced_se = state_source_schedule_c(return_, "CA")
+
+        if residency == ResidencyStatus.RESIDENT:
+            fraction = Decimal("1")
+            state_tax_apportioned = state_tax_full
+        elif ca_state_rows_present:
+            tf_sourced = tenforty.evaluate_return(
+                year=tf_input.year,
+                state="CA",
+                filing_status=tf_input.filing_status,
+                w2_income=float(ca_sourced_wages),
+                taxable_interest=0.0,
+                qualified_dividends=0.0,
+                ordinary_dividends=0.0,
+                short_term_capital_gains=0.0,
+                long_term_capital_gains=0.0,
+                self_employment_income=float(ca_sourced_se),
+                rental_income=0.0,
+                schedule_1_income=0.0,
+                standard_or_itemized=tf_input.standard_or_itemized,
+                itemized_deductions=tf_input.itemized_deductions,
+                num_dependents=tf_input.num_dependents,
+            )
+            state_tax_apportioned = _cents(tf_sourced.state_total_tax)
+            fraction = Decimal("1")  # no day-proration under sourcing
+        else:
+            fraction = _apportionment_fraction(residency, days_in_state)
+            state_tax_apportioned = _cents(state_tax_full * fraction)
 
         state_specific: dict[str, Any] = {
             "state_adjusted_gross_income": state_agi,
@@ -148,6 +188,9 @@ class CaliforniaPlugin:
             "state_tax_bracket": state_bracket,
             "state_effective_tax_rate": state_eff_rate,
             "apportionment_fraction": fraction,
+            "ca_sourced_wages_from_w2_state_rows": ca_sourced_wages,
+            "ca_sourced_schedule_c_net": ca_sourced_se,
+            "ca_state_rows_present": ca_state_rows_present,
         }
 
         return StateReturn(
@@ -216,12 +259,25 @@ class CaliforniaPlugin:
 
         fraction = _apportionment_fraction(residency, days_in_state)
 
+        # Wave 6: prefer real W-2 state-row sourcing when the filer is
+        # not a CA resident AND at least one W-2 carries a CA state row.
+        # Fall back to day-proration when no state rows are present.
+        if residency == ResidencyStatus.RESIDENT:
+            ca_wages = _cents(wages)
+            ca_se = _cents(se_net)
+        elif state_has_w2_state_rows(return_, "CA"):
+            ca_wages = state_source_wages_from_w2s(return_, "CA")
+            ca_se = state_source_schedule_c(return_, "CA")
+        else:
+            ca_wages = _cents(wages * fraction)
+            ca_se = _cents(se_net * fraction)
+
         return IncomeApportionment(
-            state_source_wages=_cents(wages * fraction),
+            state_source_wages=ca_wages,
             state_source_interest=_cents(interest * fraction),
             state_source_dividends=_cents(ord_div * fraction),
             state_source_capital_gains=_cents(capital_gains * fraction),
-            state_source_self_employment=_cents(se_net * fraction),
+            state_source_self_employment=ca_se,
             state_source_rental=_cents(rental_net * fraction),
         )
 

@@ -170,6 +170,11 @@ from skill.scripts.models import (
     ResidencyStatus,
     StateReturn,
 )
+from skill.scripts.states._hand_rolled_base import (
+    state_has_w2_state_rows,
+    state_source_schedule_c,
+    state_source_wages_from_w2s,
+)
 from skill.scripts.states._plugin_api import (
     FederalTotals,
     IncomeApportionment,
@@ -423,10 +428,40 @@ class IllinoisPlugin:
         # Step 4: flat-rate tax. ROUND_HALF_UP to the cent.
         tax_full = _cents(taxable * IL_FLAT_RATE)
 
-        # Step 5: apportion for nonresident / part-year. TODO(il-sched-nr):
-        # replace with real income-source sourcing.
-        fraction = _apportionment_fraction(residency, days_in_state)
-        tax_apportioned = _cents(tax_full * fraction)
+        # Wave 6: real IL Schedule NR scaffolding. When at least one W-2
+        # state row carries IL AND the filer is not an IL resident, the
+        # plugin computes a state-sourced IL tax directly instead of
+        # day-prorating the resident-basis tax:
+        #
+        #   il_sourced_base = sum(state_rows[IL].state_wages)
+        #                    + sum(Schedule C net for business_location_state=IL)
+        #   il_sourced_taxable = max(0, il_sourced_base - exemption_total)
+        #   il_sourced_tax = il_sourced_taxable * 0.0495
+        #
+        # This matches the Schedule NR pattern of taxing only income
+        # sourced to IL. When no state rows are present the plugin falls
+        # back to day-proration of the resident-basis tax (legacy path).
+        il_state_rows_present = state_has_w2_state_rows(return_, "IL")
+        il_sourced_wages = state_source_wages_from_w2s(return_, "IL")
+        il_sourced_se = state_source_schedule_c(return_, "IL")
+
+        if residency == ResidencyStatus.RESIDENT:
+            fraction = Decimal("1")
+            tax_apportioned = tax_full
+        elif il_state_rows_present:
+            il_sourced_base = il_sourced_wages + il_sourced_se
+            # IL-1040 additions/subtractions on top of the sourced base:
+            # in v1 we keep it simple and skip the adds/subs on the
+            # sourced path (they live under state_specific for audit),
+            # because the brief is strictly about W-2 wage sourcing.
+            il_sourced_after_exemption = il_sourced_base - exemption_total
+            if il_sourced_after_exemption < 0:
+                il_sourced_after_exemption = Decimal("0")
+            tax_apportioned = _cents(il_sourced_after_exemption * IL_FLAT_RATE)
+            fraction = Decimal("1")  # no day-proration under sourcing
+        else:
+            fraction = _apportionment_fraction(residency, days_in_state)
+            tax_apportioned = _cents(tax_full * fraction)
 
         state_specific: dict[str, Any] = {
             # NOTE: "state_base_income_approx" is preserved for backward
@@ -458,6 +493,9 @@ class IllinoisPlugin:
             "state_total_tax_resident_basis": tax_full,
             "flat_rate": IL_FLAT_RATE,
             "apportionment_fraction": fraction,
+            "il_sourced_wages_from_w2_state_rows": il_sourced_wages,
+            "il_sourced_schedule_c_net": il_sourced_se,
+            "il_state_rows_present": il_state_rows_present,
             "v1_limitations": list(_V1_LIMITATIONS),
         }
 
@@ -526,12 +564,23 @@ class IllinoisPlugin:
 
         fraction = _apportionment_fraction(residency, days_in_state)
 
+        # Wave 6: prefer W-2 state-row sourcing for wages / Schedule C.
+        if residency == ResidencyStatus.RESIDENT:
+            il_wages = _cents(wages)
+            il_se = _cents(se_net)
+        elif state_has_w2_state_rows(return_, "IL"):
+            il_wages = state_source_wages_from_w2s(return_, "IL")
+            il_se = state_source_schedule_c(return_, "IL")
+        else:
+            il_wages = _cents(wages * fraction)
+            il_se = _cents(se_net * fraction)
+
         return IncomeApportionment(
-            state_source_wages=_cents(wages * fraction),
+            state_source_wages=il_wages,
             state_source_interest=_cents(interest * fraction),
             state_source_dividends=_cents(ord_div * fraction),
             state_source_capital_gains=_cents(capital_gains * fraction),
-            state_source_self_employment=_cents(se_net * fraction),
+            state_source_self_employment=il_se,
             state_source_rental=_cents(rental_net * fraction),
         )
 

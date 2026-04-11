@@ -62,6 +62,11 @@ from skill.scripts.models import (
     ResidencyStatus,
     StateReturn,
 )
+from skill.scripts.states._hand_rolled_base import (
+    state_has_w2_state_rows,
+    state_source_schedule_c,
+    state_source_wages_from_w2s,
+)
 from skill.scripts.states._plugin_api import (
     FederalTotals,
     IncomeApportionment,
@@ -164,10 +169,29 @@ class PennsylvaniaPlugin:
         state_bracket = _d(tf_result.state_tax_bracket)
         state_eff_rate = _d(tf_result.state_effective_tax_rate)
 
-        # Apportion tax for nonresident / part-year. TODO: replace with real
-        # PA-40 NR income-source apportionment (PA Schedule NRH) in fan-out.
-        fraction = _apportionment_fraction(residency, days_in_state)
-        state_tax_apportioned = _cents(state_tax_full * fraction)
+        # Wave 6: real PA-40 NR class-1 (compensation) sourcing. When
+        # at least one W-2 state row carries PA, compute PA tax on the
+        # PA-sourced wages directly (flat 3.07% on the sourced sum plus
+        # sourced Schedule C net). Otherwise fall back to day-proration
+        # of the resident-basis tax.
+        pa_state_rows_present = state_has_w2_state_rows(return_, "PA")
+        pa_sourced_wages = state_source_wages_from_w2s(return_, "PA")
+        pa_sourced_se = state_source_schedule_c(return_, "PA")
+
+        if residency == ResidencyStatus.RESIDENT:
+            fraction = Decimal("1")
+            state_tax_apportioned = state_tax_full
+        elif pa_state_rows_present:
+            # PA's flat rate applies directly to the sourced amount.
+            # (PA has no standard deduction on compensation; class 1
+            # is the gross amount.) Include sourced SE (class 4) as
+            # a bonus when the business_location_state matches.
+            pa_base = pa_sourced_wages + pa_sourced_se
+            state_tax_apportioned = _cents(pa_base * Decimal("0.0307"))
+            fraction = Decimal("1")  # no day-proration under sourcing
+        else:
+            fraction = _apportionment_fraction(residency, days_in_state)
+            state_tax_apportioned = _cents(state_tax_full * fraction)
 
         state_specific: dict[str, Any] = {
             "state_adjusted_gross_income": state_agi,
@@ -177,6 +201,9 @@ class PennsylvaniaPlugin:
             "state_tax_bracket": state_bracket,
             "state_effective_tax_rate": state_eff_rate,
             "apportionment_fraction": fraction,
+            "pa_sourced_wages_from_w2_state_rows": pa_sourced_wages,
+            "pa_sourced_schedule_c_net": pa_sourced_se,
+            "pa_state_rows_present": pa_state_rows_present,
         }
 
         return StateReturn(
@@ -244,12 +271,24 @@ class PennsylvaniaPlugin:
 
         fraction = _apportionment_fraction(residency, days_in_state)
 
+        # Wave 6: PA class-1 (compensation) sourcing prefers W-2 state
+        # rows when the filer is not a PA resident.
+        if residency == ResidencyStatus.RESIDENT:
+            pa_wages = _cents(wages)
+            pa_se = _cents(se_net)
+        elif state_has_w2_state_rows(return_, "PA"):
+            pa_wages = state_source_wages_from_w2s(return_, "PA")
+            pa_se = state_source_schedule_c(return_, "PA")
+        else:
+            pa_wages = _cents(wages * fraction)
+            pa_se = _cents(se_net * fraction)
+
         return IncomeApportionment(
-            state_source_wages=_cents(wages * fraction),
+            state_source_wages=pa_wages,
             state_source_interest=_cents(interest * fraction),
             state_source_dividends=_cents(ord_div * fraction),
             state_source_capital_gains=_cents(capital_gains * fraction),
-            state_source_self_employment=_cents(se_net * fraction),
+            state_source_self_employment=pa_se,
             state_source_rental=_cents(rental_net * fraction),
         )
 

@@ -255,8 +255,8 @@ class TestStateRegistry:
         assert codes == sorted(codes)
 
     def test_registry_len(self):
-        """8 no-tax + 4 wave-1 + 6 wave-2 taxing states = 18 registered plugins."""
-        assert len(registry) == 18
+        """8 no-tax + 4 wave-1 + 6 wave-2 + 6 wave-3 taxing states = 24 registered plugins."""
+        assert len(registry) == 24
 
 
 # ---------------------------------------------------------------------------

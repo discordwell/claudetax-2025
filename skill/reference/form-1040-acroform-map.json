@@ -1,0 +1,2580 @@
+{
+  "source_pdf_url": "https://www.irs.gov/pub/irs-pdf/f1040.pdf",
+  "source_pdf_sha256": "3d31c226df0d189ced80e039d01cf0f8820c1019681a0f0ca6264de277b7e982",
+  "source_pdf_bytes": 220237,
+  "source_pdf_title": "2025 Form 1040",
+  "fetched_at": "2026-04-11",
+  "pypdf_version": "5.9.0",
+  "form_year": 2025,
+  "total_widgets": 199,
+  "mapped_count": 52,
+  "unmapped_count": 147,
+  "notes": [
+    "Widget enumeration uses page-level /Annots traversal (not reader.get_fields()) so that names include the full parent path (topmostSubform[0].PageN[0]...). reader.get_fields() also returns non-terminal group containers that do NOT have a widget annotation; we skip those and count only terminal widgets.",
+    "The IRS-hosted 2025 Form 1040 PDF (title \"2025 Form 1040\") was downloaded on 2026-04-11. Although this research wave was scoped to TY2024, the IRS has already published the TY2025 PDF at the canonical url and we mapped that instead \u2014 Layer 1 Form1040Fields was already written against the TY2024 layout and is mostly identical, but TY2025 renumbers line 12 into 12a..12e and splits line 13 into 13a/13b and line 27 into 27a/b/c. See the methodology doc and per-field `note` entries for the renumbering.",
+    "filing_status is a checkbox *group* \u2014 Layer 1 stores the string status and filling the PDF requires toggling exactly one of the five entries under `filing_status_checkboxes`. For MFJ/QSS/Single/HOH each row has TWO widget annotations (Checkbox_ReadOrder[0].c1_8[i] and .Page1[0].c1_8[i]) \u2014 these are mirrors of the same logical field; toggling either one in the PDF viewer sets both.",
+    "taxpayer_name and spouse_name are Layer 1 *strings*. The TY2025 PDF has separate widgets for first+middle-initial and last name. We map the first-name widget only; future Schedule A/B/C/SE agents should extend Layer 1 to carry the name split if signature overlay is needed.",
+    "line_11 carries a page-1 widget (f1_75 \u2014 line 11a AGI) AND a page-2 widget (f2_01 \u2014 line 11b brought-forward AGI). See computed_copies.",
+    "For every unmapped widget, a short reason describes *why* it is not in Form1040Fields. Most unmapped widgets fall into one of 5 categories: header identity (name/SSN/address), dependents table (16 rows \u00d7 4 cols), filing-status / Sched-B / digital-asset checkboxes, income sublines (1b-1i, 3c, 4c, 5c, 6c, 6d, 7b), and page-2 footer (refund banking, signatures, designee, preparer)."
+  ],
+  "mapping": {
+    "filing_status": {
+      "widget_name": "topmostSubform[0].Page1[0].Checkbox_ReadOrder[0].c1_8[*]",
+      "terminal_name": "c1_8",
+      "type": "checkbox_group",
+      "page": 1,
+      "note": "One of five mutually-exclusive filing-status checkboxes. See `filing_status_checkboxes` for the exact widget-per-status mapping. The Layer 1 filing_status string selects exactly one."
+    },
+    "taxpayer_name": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_01[0]",
+      "terminal_name": "f1_01[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        228.8,
+        732.502,
+        316.8,
+        743.501
+      ],
+      "note": "Taxpayer first name + middle initial. Layer 1 concatenates first+last into one string; filling requires splitting and also writing the last name into the companion widget f1_02."
+    },
+    "spouse_name": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_04[0]",
+      "terminal_name": "f1_04[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        209.8,
+        720.5,
+        370.8,
+        731.499
+      ],
+      "note": "Spouse first name + middle initial. The companion last-name widget on this row is inferred to also live in the identity block; see unmapped_widgets."
+    },
+    "line_1a_total_w2_box1": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_47[0]",
+      "terminal_name": "f1_47[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        330.001,
+        576.0,
+        342.0
+      ]
+    },
+    "line_1z_total_wages": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_57[0]",
+      "terminal_name": "f1_57[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        222.001,
+        576.0,
+        234.0
+      ]
+    },
+    "line_2a_tax_exempt_interest": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_58[0]",
+      "terminal_name": "f1_58[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        252.0,
+        210.002,
+        323.25,
+        222.001
+      ]
+    },
+    "line_2b_taxable_interest": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_59[0]",
+      "terminal_name": "f1_59[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        210.002,
+        576.0,
+        222.001
+      ]
+    },
+    "line_3a_qualified_dividends": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_60[0]",
+      "terminal_name": "f1_60[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        252.0,
+        198.0,
+        323.25,
+        209.999
+      ]
+    },
+    "line_3b_ordinary_dividends": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_61[0]",
+      "terminal_name": "f1_61[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        198.0,
+        576.0,
+        209.999
+      ]
+    },
+    "line_4a_ira_distributions": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_62[0]",
+      "terminal_name": "f1_62[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        252.0,
+        174.002,
+        323.25,
+        186.001
+      ]
+    },
+    "line_4b_ira_taxable_amount": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_63[0]",
+      "terminal_name": "f1_63[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        174.002,
+        576.0,
+        186.001
+      ]
+    },
+    "line_5a_pensions_and_annuities": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_65[0]",
+      "terminal_name": "f1_65[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        252.0,
+        150.001,
+        323.25,
+        162.0
+      ]
+    },
+    "line_5b_pensions_taxable_amount": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_66[0]",
+      "terminal_name": "f1_66[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        150.001,
+        576.0,
+        162.0
+      ]
+    },
+    "line_6a_social_security_benefits": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_68[0]",
+      "terminal_name": "f1_68[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        252.0,
+        126.0,
+        323.25,
+        137.999
+      ]
+    },
+    "line_6b_ss_taxable_amount": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_69[0]",
+      "terminal_name": "f1_69[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        126.0,
+        576.0,
+        137.999
+      ]
+    },
+    "line_7_capital_gain_or_loss": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_70[0]",
+      "terminal_name": "f1_70[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        90.0,
+        576.0,
+        101.999
+      ]
+    },
+    "line_8_additional_income_from_sch_1": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_72[0]",
+      "terminal_name": "f1_72[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        66.002,
+        576.0,
+        78.001
+      ]
+    },
+    "line_9_total_income": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_73[0]",
+      "terminal_name": "f1_73[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        54.0,
+        576.0,
+        65.999
+      ]
+    },
+    "line_10_adjustments_from_sch_1": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_74[0]",
+      "terminal_name": "f1_74[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        42.001,
+        576.0,
+        54.0
+      ]
+    },
+    "line_11_adjusted_gross_income": {
+      "widget_name": "topmostSubform[0].Page1[0].f1_75[0]",
+      "terminal_name": "f1_75[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        30.002,
+        576.0,
+        42.001
+      ],
+      "note": "Line 11a on page 1. The same value must also be copied into line 11b (f2_01) at the top of page 2 \u2014 see `computed_copies`."
+    },
+    "line_12_standard_or_itemized_deduction": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_02[0]",
+      "terminal_name": "f2_02[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        684.0,
+        576.0,
+        695.999
+      ],
+      "note": "TY2025 Form 1040 renumbered this to line 12e. Layer 1 uses the historical `line_12_` name; the widget is line 12e."
+    },
+    "line_13_qbi_deduction": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_03[0]",
+      "terminal_name": "f2_03[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        672.001,
+        576.0,
+        684.0
+      ],
+      "note": "TY2025 line 13a (QBI). Companion line 13b (additional deductions from Schedule 1-A, new OBBBA) is widget f2_04, tracked in unmapped_widgets until Layer 1 is extended."
+    },
+    "line_14_sum_12_13": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_05[0]",
+      "terminal_name": "f2_05[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        648.0,
+        576.0,
+        659.999
+      ],
+      "note": "TY2025 line 14 = 12e + 13a + 13b. Layer 1 computes 12+13 only \u2014 caller must ensure 13b is accounted for before overlaying."
+    },
+    "line_15_taxable_income": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_06[0]",
+      "terminal_name": "f2_06[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        636.001,
+        576.0,
+        648.0
+      ]
+    },
+    "line_16_tax": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_08[0]",
+      "terminal_name": "f2_08[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        624.002,
+        576.0,
+        636.001
+      ]
+    },
+    "line_17_amount_from_sch_2_line_3": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_09[0]",
+      "terminal_name": "f2_09[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        612.0,
+        576.0,
+        623.999
+      ]
+    },
+    "line_18_sum_16_17": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_10[0]",
+      "terminal_name": "f2_10[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        600.001,
+        576.0,
+        612.0
+      ]
+    },
+    "line_19_child_tax_credit_and_odc": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_11[0]",
+      "terminal_name": "f2_11[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        588.002,
+        576.0,
+        600.001
+      ]
+    },
+    "line_20_amount_from_sch_3_line_8": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_12[0]",
+      "terminal_name": "f2_12[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        576.0,
+        576.0,
+        587.999
+      ]
+    },
+    "line_21_sum_19_20": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_13[0]",
+      "terminal_name": "f2_13[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        564.001,
+        576.0,
+        576.0
+      ]
+    },
+    "line_22_subtract_21_from_18": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_14[0]",
+      "terminal_name": "f2_14[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        552.002,
+        576.0,
+        564.001
+      ]
+    },
+    "line_23_other_taxes_from_sch_2_line_21": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_15[0]",
+      "terminal_name": "f2_15[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        540.0,
+        576.0,
+        551.999
+      ]
+    },
+    "line_24_total_tax": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_16[0]",
+      "terminal_name": "f2_16[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        528.001,
+        576.0,
+        540.0
+      ]
+    },
+    "line_25a_w2_withholding": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_17[0]",
+      "terminal_name": "f2_17[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        410.4,
+        504.0,
+        481.65,
+        515.999
+      ]
+    },
+    "line_25b_1099_withholding": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_18[0]",
+      "terminal_name": "f2_18[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        410.4,
+        492.001,
+        481.65,
+        504.0
+      ]
+    },
+    "line_25c_other_withholding": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_19[0]",
+      "terminal_name": "f2_19[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        410.4,
+        480.002,
+        481.65,
+        492.001
+      ]
+    },
+    "line_25d_total_withholding": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_20[0]",
+      "terminal_name": "f2_20[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        468.0,
+        576.0,
+        479.999
+      ]
+    },
+    "line_26_estimated_and_prior_year_applied": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_21[0]",
+      "terminal_name": "f2_21[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        456.001,
+        576.0,
+        468.0
+      ]
+    },
+    "line_27_earned_income_credit": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_23[0]",
+      "terminal_name": "f2_23[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        410.4,
+        420.001,
+        481.65,
+        432.0
+      ],
+      "note": "TY2025 subline 27a. The 27a/b/c split (27a=EIC amount, 27b=clergy SE checkbox, 27c=opt-out checkbox) is new for 2025. Layer 1 carries only the amount."
+    },
+    "line_28_additional_child_tax_credit": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_24[0]",
+      "terminal_name": "f2_24[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        410.4,
+        372.002,
+        481.65,
+        384.001
+      ]
+    },
+    "line_29_american_opportunity_credit_refundable": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_25[0]",
+      "terminal_name": "f2_25[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        410.4,
+        360.0,
+        481.65,
+        371.999
+      ]
+    },
+    "line_31_amount_from_sch_3_line_15": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_27[0]",
+      "terminal_name": "f2_27[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        410.4,
+        336.002,
+        481.65,
+        348.001
+      ]
+    },
+    "line_32_sum_27_through_31": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_28[0]",
+      "terminal_name": "f2_28[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        324.0,
+        576.0,
+        335.999
+      ]
+    },
+    "line_33_total_payments": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_29[0]",
+      "terminal_name": "f2_29[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        312.001,
+        576.0,
+        324.0
+      ]
+    },
+    "line_34_overpayment": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_30[0]",
+      "terminal_name": "f2_30[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        300.002,
+        576.0,
+        312.001
+      ]
+    },
+    "line_35a_refund_requested": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_31[0]",
+      "terminal_name": "f2_31[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        288.0,
+        576.0,
+        299.999
+      ]
+    },
+    "line_37_amount_you_owe": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_35[0]",
+      "terminal_name": "f2_35[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        227.999,
+        576.0,
+        240.0
+      ]
+    }
+  },
+  "computed_copies": {
+    "line_11_adjusted_gross_income": [
+      {
+        "widget_name": "topmostSubform[0].Page2[0].f2_01[0]",
+        "terminal_name": "f2_01[0]",
+        "type": "text",
+        "page": 2,
+        "rect": [
+          504.0,
+          744.001,
+          576.0,
+          756.0
+        ],
+        "note": "Line 11b on page 2 \u2014 must be written to the same value as line 11a (f1_75) on page 1."
+      }
+    ]
+  },
+  "filing_status_checkboxes": {
+    "SINGLE": {
+      "widget_name": "topmostSubform[0].Page1[0].Checkbox_ReadOrder[0].c1_8[0]",
+      "terminal_name": "c1_8[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        97.599,
+        578.0,
+        105.599,
+        586.0
+      ]
+    },
+    "MFJ": {
+      "widget_name": "topmostSubform[0].Page1[0].Checkbox_ReadOrder[0].c1_8[1]",
+      "terminal_name": "c1_8[1]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        97.599,
+        566.001,
+        105.599,
+        574.001
+      ]
+    },
+    "MFS": {
+      "widget_name": "topmostSubform[0].Page1[0].Checkbox_ReadOrder[0].c1_8[2]",
+      "terminal_name": "c1_8[2]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        97.599,
+        554.002,
+        105.599,
+        562.002
+      ]
+    },
+    "HOH": {
+      "widget_name": "topmostSubform[0].Page1[0].c1_8[0]",
+      "terminal_name": "c1_8[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        349.599,
+        578.0,
+        357.599,
+        586.0
+      ]
+    },
+    "QSS": {
+      "widget_name": "topmostSubform[0].Page1[0].c1_8[1]",
+      "terminal_name": "c1_8[1]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        349.599,
+        566.001,
+        357.599,
+        574.001
+      ]
+    }
+  },
+  "unmapped_widgets": [
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_02[0]",
+      "terminal_name": "f1_02[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        365.6,
+        732.502,
+        453.6,
+        743.501
+      ],
+      "reason": "header_row1_2: top name/SSN/middle-initial cells (widget f1_02[0], y=743.501) \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_03[0]",
+      "terminal_name": "f1_03[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        468.6,
+        732.502,
+        485.6,
+        743.501
+      ],
+      "reason": "header_row1_2: top name/SSN/middle-initial cells (widget f1_03[0], y=743.501) \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_05[0]",
+      "terminal_name": "f1_05[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        417.6,
+        720.5,
+        432.0,
+        731.499
+      ],
+      "reason": "header_row1_2: top name/SSN/middle-initial cells (widget f1_05[0], y=731.499) \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_06[0]",
+      "terminal_name": "f1_06[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        439.2,
+        720.5,
+        453.6,
+        731.499
+      ],
+      "reason": "header_row1_2: top name/SSN/middle-initial cells (widget f1_06[0], y=731.499) \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_07[0]",
+      "terminal_name": "f1_07[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        460.8,
+        720.5,
+        482.4,
+        731.499
+      ],
+      "reason": "header_row1_2: top name/SSN/middle-initial cells (widget f1_07[0], y=731.499) \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_08[0]",
+      "terminal_name": "f1_08[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        511.2,
+        720.5,
+        525.6,
+        731.499
+      ],
+      "reason": "header_row1_2: top name/SSN/middle-initial cells (widget f1_08[0], y=731.499) \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_09[0]",
+      "terminal_name": "f1_09[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        532.8,
+        720.5,
+        547.2,
+        731.499
+      ],
+      "reason": "header_row1_2: top name/SSN/middle-initial cells (widget f1_09[0], y=731.499) \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_10[0]",
+      "terminal_name": "f1_10[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        554.4,
+        720.5,
+        576.0,
+        731.499
+      ],
+      "reason": "header_row1_2: top name/SSN/middle-initial cells (widget f1_10[0], y=731.499) \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_1[0]",
+      "terminal_name": "c1_1[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        36.0,
+        722.0,
+        44.0,
+        730.0
+      ],
+      "reason": "header_row1_2: top name/SSN/middle-initial cells (widget c1_1[0], y=730.0) \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_2[0]",
+      "terminal_name": "c1_2[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        155.2,
+        722.0,
+        163.2,
+        730.0
+      ],
+      "reason": "header_row1_2: top name/SSN/middle-initial cells (widget c1_2[0], y=730.0) \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_3[0]",
+      "terminal_name": "c1_3[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        374.8,
+        722.0,
+        382.8,
+        730.0
+      ],
+      "reason": "header_row1_2: top name/SSN/middle-initial cells (widget c1_3[0], y=730.0) \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_11[0]",
+      "terminal_name": "f1_11[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        68.4,
+        708.501,
+        236.6,
+        719.5
+      ],
+      "reason": "header_row1_2: top name/SSN/middle-initial cells (widget f1_11[0], y=719.5) \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_12[0]",
+      "terminal_name": "f1_12[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        238.6,
+        708.501,
+        409.4,
+        719.5
+      ],
+      "reason": "header_row1_2: top name/SSN/middle-initial cells (widget f1_12[0], y=719.5) \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_13[0]",
+      "terminal_name": "f1_13[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        411.4,
+        708.501,
+        576.0,
+        719.5
+      ],
+      "reason": "header_row1_2: top name/SSN/middle-initial cells (widget f1_13[0], y=719.5) \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_4[0]",
+      "terminal_name": "c1_4[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        36.0,
+        710.001,
+        44.0,
+        718.001
+      ],
+      "reason": "header_row1_2: top name/SSN/middle-initial cells (widget c1_4[0], y=718.001) \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_14[0]",
+      "terminal_name": "f1_14[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        36.0,
+        684.0,
+        251.25,
+        698.001
+      ],
+      "reason": "header_filing_status_or_presidential: widget f1_14[0] in presidential-fund / filing-status area \u2014 no Layer 1 field."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_15[0]",
+      "terminal_name": "f1_15[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        253.0,
+        684.0,
+        467.25,
+        698.001
+      ],
+      "reason": "header_filing_status_or_presidential: widget f1_15[0] in presidential-fund / filing-status area \u2014 no Layer 1 field."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_16[0]",
+      "terminal_name": "f1_16[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        469.0,
+        684.0,
+        576.0,
+        698.001
+      ],
+      "reason": "header_filing_status_or_presidential: widget f1_16[0] in presidential-fund / filing-status area \u2014 no Layer 1 field."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_17[0]",
+      "terminal_name": "f1_17[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        36.0,
+        659.999,
+        251.25,
+        674.0
+      ],
+      "reason": "header_filing_status_or_presidential: widget f1_17[0] in presidential-fund / filing-status area \u2014 no Layer 1 field."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_18[0]",
+      "terminal_name": "f1_18[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        253.0,
+        659.999,
+        467.25,
+        674.0
+      ],
+      "reason": "header_filing_status_or_presidential: widget f1_18[0] in presidential-fund / filing-status area \u2014 no Layer 1 field."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_19[0]",
+      "terminal_name": "f1_19[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        469.0,
+        659.999,
+        576.0,
+        674.0
+      ],
+      "reason": "header_filing_status_or_presidential: widget f1_19[0] in presidential-fund / filing-status area \u2014 no Layer 1 field."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Address_ReadOrder[0].f1_20[0]",
+      "terminal_name": "f1_20[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        36.0,
+        635.998,
+        416.85,
+        649.999
+      ],
+      "reason": "header_address: street/apt/city/state/zip/foreign-address \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Address_ReadOrder[0].f1_21[0]",
+      "terminal_name": "f1_21[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        418.6,
+        635.998,
+        467.25,
+        649.999
+      ],
+      "reason": "header_address: street/apt/city/state/zip/foreign-address \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_5[0]",
+      "terminal_name": "c1_5[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        568.0,
+        637.251,
+        576.0,
+        645.251
+      ],
+      "reason": "header_filing_status_or_presidential: widget c1_5[0] in presidential-fund / filing-status area \u2014 no Layer 1 field."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Address_ReadOrder[0].f1_22[0]",
+      "terminal_name": "f1_22[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        36.0,
+        612.0,
+        330.45,
+        626.001
+      ],
+      "reason": "header_address: street/apt/city/state/zip/foreign-address \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Address_ReadOrder[0].f1_23[0]",
+      "terminal_name": "f1_23[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        332.2,
+        612.0,
+        395.25,
+        626.001
+      ],
+      "reason": "header_address: street/apt/city/state/zip/foreign-address \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Address_ReadOrder[0].f1_24[0]",
+      "terminal_name": "f1_24[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        397.0,
+        612.0,
+        467.25,
+        626.001
+      ],
+      "reason": "header_address: street/apt/city/state/zip/foreign-address \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Address_ReadOrder[0].f1_25[0]",
+      "terminal_name": "f1_25[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        36.0,
+        587.999,
+        222.45,
+        602.0
+      ],
+      "reason": "header_address: street/apt/city/state/zip/foreign-address \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Address_ReadOrder[0].f1_26[0]",
+      "terminal_name": "f1_26[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        224.2,
+        587.999,
+        395.25,
+        602.0
+      ],
+      "reason": "header_address: street/apt/city/state/zip/foreign-address \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Address_ReadOrder[0].f1_27[0]",
+      "terminal_name": "f1_27[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        397.0,
+        587.999,
+        467.25,
+        602.0
+      ],
+      "reason": "header_address: street/apt/city/state/zip/foreign-address \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_6[0]",
+      "terminal_name": "c1_6[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        482.4,
+        589.502,
+        490.4,
+        597.502
+      ],
+      "reason": "header_checkbox_or_minor_label: widget c1_6[0] in filing-status / digital-asset area \u2014 no Layer 1 field."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_7[0]",
+      "terminal_name": "c1_7[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        525.6,
+        589.502,
+        533.6,
+        597.502
+      ],
+      "reason": "header_checkbox_or_minor_label: widget c1_7[0] in filing-status / digital-asset area \u2014 no Layer 1 field."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Checkbox_ReadOrder[0].f1_28[0]",
+      "terminal_name": "f1_28[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        180.0,
+        540.0,
+        324.0,
+        551.999
+      ],
+      "reason": "filing_status_checkbox_mirror: second annotation of a c1_8 checkbox (already recorded under filing_status_checkboxes)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_29[0]",
+      "terminal_name": "f1_29[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        362.0,
+        534.002,
+        576.0,
+        546.001
+      ],
+      "reason": "header_checkbox_or_minor_label: widget f1_29[0] in filing-status / digital-asset area \u2014 no Layer 1 field."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_9[0]",
+      "terminal_name": "c1_9[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        97.599,
+        525.875,
+        105.599,
+        533.875
+      ],
+      "reason": "header_checkbox_or_minor_label: widget c1_9[0] in filing-status / digital-asset area \u2014 no Layer 1 field."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_30[0]",
+      "terminal_name": "f1_30[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        313.2,
+        513.5,
+        576.0,
+        524.999
+      ],
+      "reason": "header_checkbox_or_minor_label: widget f1_30[0] in filing-status / digital-asset area \u2014 no Layer 1 field."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_10[0]",
+      "terminal_name": "c1_10[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        518.4,
+        497.0,
+        526.4,
+        505.0
+      ],
+      "reason": "header_checkbox_or_minor_label: widget c1_10[0] in filing-status / digital-asset area \u2014 no Layer 1 field."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_10[1]",
+      "terminal_name": "c1_10[1]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        554.4,
+        497.0,
+        562.4,
+        505.0
+      ],
+      "reason": "header_checkbox_or_minor_label: widget c1_10[1] in filing-status / digital-asset area \u2014 no Layer 1 field."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row1[0].f1_31[0]",
+      "terminal_name": "f1_31[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        145.0,
+        471.002,
+        251.25,
+        483.001
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row1[0].f1_32[0]",
+      "terminal_name": "f1_32[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        253.0,
+        471.002,
+        359.25,
+        483.001
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row1[0].f1_33[0]",
+      "terminal_name": "f1_33[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        361.0,
+        471.002,
+        467.25,
+        483.001
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row1[0].f1_34[0]",
+      "terminal_name": "f1_34[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        469.0,
+        471.002,
+        576.0,
+        483.001
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row2[0].f1_35[0]",
+      "terminal_name": "f1_35[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        145.0,
+        459.003,
+        251.25,
+        471.002
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row2[0].f1_36[0]",
+      "terminal_name": "f1_36[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        253.0,
+        459.003,
+        359.25,
+        471.002
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row2[0].f1_37[0]",
+      "terminal_name": "f1_37[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        361.0,
+        459.003,
+        467.25,
+        471.002
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row2[0].f1_38[0]",
+      "terminal_name": "f1_38[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        469.0,
+        459.003,
+        576.0,
+        471.002
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row3[0].f1_39[0]",
+      "terminal_name": "f1_39[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        145.0,
+        447.004,
+        251.25,
+        459.003
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row3[0].f1_40[0]",
+      "terminal_name": "f1_40[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        253.0,
+        447.004,
+        359.25,
+        459.003
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row3[0].f1_41[0]",
+      "terminal_name": "f1_41[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        361.0,
+        447.004,
+        467.25,
+        459.003
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row3[0].f1_42[0]",
+      "terminal_name": "f1_42[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        469.0,
+        447.004,
+        576.0,
+        459.003
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row4[0].f1_43[0]",
+      "terminal_name": "f1_43[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        145.0,
+        435.005,
+        251.25,
+        447.004
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row4[0].f1_44[0]",
+      "terminal_name": "f1_44[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        253.0,
+        435.005,
+        359.25,
+        447.004
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row4[0].f1_45[0]",
+      "terminal_name": "f1_45[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        361.0,
+        435.005,
+        467.25,
+        447.004
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row4[0].f1_46[0]",
+      "terminal_name": "f1_46[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        469.0,
+        435.005,
+        576.0,
+        447.004
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row5[0].Dependent1[0].c1_12[0]",
+      "terminal_name": "c1_12[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        169.6,
+        424.999,
+        177.6,
+        432.999
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row5[0].Dependent2[0].c1_14[0]",
+      "terminal_name": "c1_14[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        277.6,
+        424.999,
+        285.6,
+        432.999
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row5[0].Dependent3[0].c1_16[0]",
+      "terminal_name": "c1_16[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        385.6,
+        424.999,
+        393.6,
+        432.999
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row5[0].Dependent4[0].c1_18[0]",
+      "terminal_name": "c1_18[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        493.6,
+        424.999,
+        501.6,
+        432.999
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Dependents_ReadOrder[0].c1_11[0]",
+      "terminal_name": "c1_11[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        79.699,
+        415.5,
+        87.699,
+        423.5
+      ],
+      "reason": "dependents_header_checkbox: \"Check if more than four dependents\" \u2014 no Layer 1 field."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row5[0].Dependent1[0].c1_13[0]",
+      "terminal_name": "c1_13[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        169.6,
+        413.0,
+        177.6,
+        421.0
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row5[0].Dependent2[0].c1_15[0]",
+      "terminal_name": "c1_15[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        277.6,
+        413.0,
+        285.6,
+        421.0
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row5[0].Dependent3[0].c1_17[0]",
+      "terminal_name": "c1_17[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        385.6,
+        413.0,
+        393.6,
+        421.0
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row5[0].Dependent4[0].c1_19[0]",
+      "terminal_name": "c1_19[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        493.6,
+        413.0,
+        501.6,
+        421.0
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row6[0].Dependent1[0].c1_20[0]",
+      "terminal_name": "c1_20[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        148.0,
+        401.001,
+        156.0,
+        409.001
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row6[0].Dependent1[0].c1_21[0]",
+      "terminal_name": "c1_21[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        198.4,
+        401.001,
+        206.4,
+        409.001
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row6[0].Dependent2[0].c1_22[0]",
+      "terminal_name": "c1_22[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        256.0,
+        401.001,
+        264.0,
+        409.001
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row6[0].Dependent2[0].c1_23[0]",
+      "terminal_name": "c1_23[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        306.4,
+        401.001,
+        314.4,
+        409.001
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row6[0].Dependent3[0].c1_24[0]",
+      "terminal_name": "c1_24[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        364.0,
+        401.001,
+        372.0,
+        409.001
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row6[0].Dependent3[0].c1_25[0]",
+      "terminal_name": "c1_25[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        414.4,
+        401.001,
+        422.4,
+        409.001
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row6[0].Dependent4[0].c1_26[0]",
+      "terminal_name": "c1_26[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        472.0,
+        401.001,
+        480.0,
+        409.001
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row6[0].Dependent4[0].c1_27[0]",
+      "terminal_name": "c1_27[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        522.4,
+        401.001,
+        530.4,
+        409.001
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row7[0].Dependent1[0].c1_28[0]",
+      "terminal_name": "c1_28[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        148.0,
+        380.002,
+        156.0,
+        388.002
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row7[0].Dependent1[0].c1_28[1]",
+      "terminal_name": "c1_28[1]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        198.4,
+        380.002,
+        206.4,
+        388.002
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row7[0].Dependent2[0].c1_29[0]",
+      "terminal_name": "c1_29[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        256.0,
+        380.002,
+        264.0,
+        388.002
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row7[0].Dependent2[0].c1_29[1]",
+      "terminal_name": "c1_29[1]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        306.4,
+        380.002,
+        314.4,
+        388.002
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row7[0].Dependent3[0].c1_30[0]",
+      "terminal_name": "c1_30[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        364.0,
+        380.002,
+        372.0,
+        388.002
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row7[0].Dependent3[0].c1_30[1]",
+      "terminal_name": "c1_30[1]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        414.4,
+        380.002,
+        422.4,
+        388.002
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row7[0].Dependent4[0].c1_31[0]",
+      "terminal_name": "c1_31[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        472.0,
+        380.002,
+        480.0,
+        388.002
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].Table_Dependents[0].Row7[0].Dependent4[0].c1_31[1]",
+      "terminal_name": "c1_31[1]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        522.4,
+        380.002,
+        530.4,
+        388.002
+      ],
+      "reason": "dependents_table: dependents row (name/SSN/relationship/CTC/ODC checkbox) \u2014 not in Form1040Fields Layer 1 (Layer 1 has no dependents payload)."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_32[0]",
+      "terminal_name": "c1_32[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        95.599,
+        359.501,
+        103.599,
+        367.501
+      ],
+      "reason": "dependents_block: dependents section checkbox or cell \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_48[0]",
+      "terminal_name": "f1_48[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        318.002,
+        576.0,
+        330.001
+      ],
+      "reason": "income_subline: widget f1_48[0] \u2014 a line 1b-1h subfield (1b, 1c, 1d, 1e, 1f, 1g, 1h, 1i), or a 2a/3a/4a/5a/6a sub-amount, or a check-box sub-field. Layer 1 does not track these yet."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_49[0]",
+      "terminal_name": "f1_49[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        306.0,
+        576.0,
+        317.999
+      ],
+      "reason": "income_subline: widget f1_49[0] \u2014 a line 1b-1h subfield (1b, 1c, 1d, 1e, 1f, 1g, 1h, 1i), or a 2a/3a/4a/5a/6a sub-amount, or a check-box sub-field. Layer 1 does not track these yet."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_50[0]",
+      "terminal_name": "f1_50[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        294.001,
+        576.0,
+        306.0
+      ],
+      "reason": "income_subline: widget f1_50[0] \u2014 a line 1b-1h subfield (1b, 1c, 1d, 1e, 1f, 1g, 1h, 1i), or a 2a/3a/4a/5a/6a sub-amount, or a check-box sub-field. Layer 1 does not track these yet."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_51[0]",
+      "terminal_name": "f1_51[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        282.002,
+        576.0,
+        294.001
+      ],
+      "reason": "income_subline: widget f1_51[0] \u2014 a line 1b-1h subfield (1b, 1c, 1d, 1e, 1f, 1g, 1h, 1i), or a 2a/3a/4a/5a/6a sub-amount, or a check-box sub-field. Layer 1 does not track these yet."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_52[0]",
+      "terminal_name": "f1_52[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        270.0,
+        576.0,
+        281.999
+      ],
+      "reason": "income_subline: widget f1_52[0] \u2014 a line 1b-1h subfield (1b, 1c, 1d, 1e, 1f, 1g, 1h, 1i), or a 2a/3a/4a/5a/6a sub-amount, or a check-box sub-field. Layer 1 does not track these yet."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_53[0]",
+      "terminal_name": "f1_53[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        258.001,
+        576.0,
+        270.0
+      ],
+      "reason": "income_subline: widget f1_53[0] \u2014 a line 1b-1h subfield (1b, 1c, 1d, 1e, 1f, 1g, 1h, 1i), or a 2a/3a/4a/5a/6a sub-amount, or a check-box sub-field. Layer 1 does not track these yet."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_54[0]",
+      "terminal_name": "f1_54[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        344.2,
+        247.002,
+        475.2,
+        258.001
+      ],
+      "reason": "income_subline: widget f1_54[0] \u2014 a line 1b-1h subfield (1b, 1c, 1d, 1e, 1f, 1g, 1h, 1i), or a 2a/3a/4a/5a/6a sub-amount, or a check-box sub-field. Layer 1 does not track these yet."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_55[0]",
+      "terminal_name": "f1_55[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        504.0,
+        246.002,
+        576.0,
+        258.001
+      ],
+      "reason": "income_subline: widget f1_55[0] \u2014 a line 1b-1h subfield (1b, 1c, 1d, 1e, 1f, 1g, 1h, 1i), or a 2a/3a/4a/5a/6a sub-amount, or a check-box sub-field. Layer 1 does not track these yet."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_56[0]",
+      "terminal_name": "f1_56[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        410.4,
+        234.0,
+        481.65,
+        245.999
+      ],
+      "reason": "income_subline: widget f1_56[0] \u2014 a line 1b-1h subfield (1b, 1c, 1d, 1e, 1f, 1g, 1h, 1i), or a 2a/3a/4a/5a/6a sub-amount, or a check-box sub-field. Layer 1 does not track these yet."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_33[0]",
+      "terminal_name": "c1_33[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        283.8,
+        187.501,
+        291.8,
+        195.501
+      ],
+      "reason": "income_checkbox: widget c1_33[0] \u2014 3c/4c/5c/6c/7b-style modifier checkbox. Layer 1 does not track these."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_34[0]",
+      "terminal_name": "c1_34[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        363.0,
+        187.501,
+        371.0,
+        195.501
+      ],
+      "reason": "income_checkbox: widget c1_34[0] \u2014 3c/4c/5c/6c/7b-style modifier checkbox. Layer 1 does not track these."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_64[0]",
+      "terminal_name": "f1_64[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        439.2,
+        162.0,
+        475.2,
+        173.999
+      ],
+      "reason": "income_subline: widget f1_64[0] \u2014 a line 1b-1h subfield (1b, 1c, 1d, 1e, 1f, 1g, 1h, 1i), or a 2a/3a/4a/5a/6a sub-amount, or a check-box sub-field. Layer 1 does not track these yet."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_35[0]",
+      "terminal_name": "c1_35[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        283.8,
+        163.5,
+        291.8,
+        171.5
+      ],
+      "reason": "income_checkbox: widget c1_35[0] \u2014 3c/4c/5c/6c/7b-style modifier checkbox. Layer 1 does not track these."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_36[0]",
+      "terminal_name": "c1_36[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        363.0,
+        163.5,
+        371.0,
+        171.5
+      ],
+      "reason": "income_checkbox: widget c1_36[0] \u2014 3c/4c/5c/6c/7b-style modifier checkbox. Layer 1 does not track these."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_37[0]",
+      "terminal_name": "c1_37[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        427.799,
+        163.5,
+        435.799,
+        171.5
+      ],
+      "reason": "income_checkbox: widget c1_37[0] \u2014 3c/4c/5c/6c/7b-style modifier checkbox. Layer 1 does not track these."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_67[0]",
+      "terminal_name": "f1_67[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        439.2,
+        138.002,
+        475.2,
+        150.001
+      ],
+      "reason": "income_subline: widget f1_67[0] \u2014 a line 1b-1h subfield (1b, 1c, 1d, 1e, 1f, 1g, 1h, 1i), or a 2a/3a/4a/5a/6a sub-amount, or a check-box sub-field. Layer 1 does not track these yet."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_38[0]",
+      "terminal_name": "c1_38[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        283.8,
+        139.502,
+        291.8,
+        147.502
+      ],
+      "reason": "income_subline_or_checkbox: widget c1_38[0] near line 7/8/9 area sub-fields."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_39[0]",
+      "terminal_name": "c1_39[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        363.0,
+        139.502,
+        371.0,
+        147.502
+      ],
+      "reason": "income_subline_or_checkbox: widget c1_39[0] near line 7/8/9 area sub-fields."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_40[0]",
+      "terminal_name": "c1_40[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        427.799,
+        139.502,
+        435.799,
+        147.502
+      ],
+      "reason": "income_subline_or_checkbox: widget c1_40[0] near line 7/8/9 area sub-fields."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_41[0]",
+      "terminal_name": "c1_41[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        467.2,
+        116.001,
+        475.2,
+        124.001
+      ],
+      "reason": "income_subline_or_checkbox: widget c1_41[0] near line 7/8/9 area sub-fields."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_42[0]",
+      "terminal_name": "c1_42[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        467.2,
+        104.002,
+        475.2,
+        112.002
+      ],
+      "reason": "income_subline_or_checkbox: widget c1_42[0] near line 7/8/9 area sub-fields."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].f1_71[0]",
+      "terminal_name": "f1_71[0]",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        403.2,
+        78.001,
+        475.2,
+        90.0
+      ],
+      "reason": "income_subline_or_checkbox: widget f1_71[0] near line 7/8/9 area sub-fields."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_43[0]",
+      "terminal_name": "c1_43[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        153.2,
+        79.501,
+        161.2,
+        87.501
+      ],
+      "reason": "income_subline_or_checkbox: widget c1_43[0] near line 7/8/9 area sub-fields."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page1[0].c1_44[0]",
+      "terminal_name": "c1_44[0]",
+      "type": "checkbox",
+      "page": 1,
+      "rect": [
+        261.2,
+        79.501,
+        269.2,
+        87.501
+      ],
+      "reason": "income_subline_or_checkbox: widget c1_44[0] near line 7/8/9 area sub-fields."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_1[0]",
+      "terminal_name": "c2_1[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        203.6,
+        734.002,
+        211.6,
+        742.002
+      ],
+      "reason": "header_page2_name_ssn_or_standard_deduction_checkboxes: widget c2_1[0] \u2014 SSN repeat or the 12a/12b/12c dependent/dual-status checkboxes or 12d age/blindness checkboxes."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_2[0]",
+      "terminal_name": "c2_2[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        304.4,
+        734.002,
+        312.4,
+        742.002
+      ],
+      "reason": "header_page2_name_ssn_or_standard_deduction_checkboxes: widget c2_2[0] \u2014 SSN repeat or the 12a/12b/12c dependent/dual-status checkboxes or 12d age/blindness checkboxes."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_3[0]",
+      "terminal_name": "c2_3[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        115.2,
+        722.0,
+        123.2,
+        730.0
+      ],
+      "reason": "header_page2_name_ssn_or_standard_deduction_checkboxes: widget c2_3[0] \u2014 SSN repeat or the 12a/12b/12c dependent/dual-status checkboxes or 12d age/blindness checkboxes."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_4[0]",
+      "terminal_name": "c2_4[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        304.4,
+        722.0,
+        312.4,
+        730.0
+      ],
+      "reason": "header_page2_name_ssn_or_standard_deduction_checkboxes: widget c2_4[0] \u2014 SSN repeat or the 12a/12b/12c dependent/dual-status checkboxes or 12d age/blindness checkboxes."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_5[0]",
+      "terminal_name": "c2_5[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        153.2,
+        710.001,
+        161.2,
+        718.001
+      ],
+      "reason": "header_page2_name_ssn_or_standard_deduction_checkboxes: widget c2_5[0] \u2014 SSN repeat or the 12a/12b/12c dependent/dual-status checkboxes or 12d age/blindness checkboxes."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_6[0]",
+      "terminal_name": "c2_6[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        311.6,
+        710.001,
+        319.6,
+        718.001
+      ],
+      "reason": "header_page2_name_ssn_or_standard_deduction_checkboxes: widget c2_6[0] \u2014 SSN repeat or the 12a/12b/12c dependent/dual-status checkboxes or 12d age/blindness checkboxes."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_7[0]",
+      "terminal_name": "c2_7[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        153.2,
+        698.002,
+        161.2,
+        706.002
+      ],
+      "reason": "header_page2_name_ssn_or_standard_deduction_checkboxes: widget c2_7[0] \u2014 SSN repeat or the 12a/12b/12c dependent/dual-status checkboxes or 12d age/blindness checkboxes."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_8[0]",
+      "terminal_name": "c2_8[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        311.6,
+        698.002,
+        319.6,
+        706.002
+      ],
+      "reason": "header_page2_name_ssn_or_standard_deduction_checkboxes: widget c2_8[0] \u2014 SSN repeat or the 12a/12b/12c dependent/dual-status checkboxes or 12d age/blindness checkboxes."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_04[0]",
+      "terminal_name": "f2_04[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        660.002,
+        576.0,
+        672.001
+      ],
+      "reason": "page2_checkboxes_12d_13a_block_or_standard_deduction: widget f2_04[0] \u2014 12d age/blind checkboxes or Form 8814/4972 checkbox on line 16."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_07[0]",
+      "terminal_name": "f2_07[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        439.2,
+        624.002,
+        475.2,
+        636.001
+      ],
+      "reason": "page2_checkboxes_12d_13a_block_or_standard_deduction: widget f2_07[0] \u2014 12d age/blind checkboxes or Form 8814/4972 checkbox on line 16."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_9[0]",
+      "terminal_name": "c2_9[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        312.6,
+        626.002,
+        320.6,
+        634.002
+      ],
+      "reason": "page2_checkboxes_12d_13a_block_or_standard_deduction: widget c2_9[0] \u2014 12d age/blind checkboxes or Form 8814/4972 checkbox on line 16."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_10[0]",
+      "terminal_name": "c2_10[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        370.2,
+        626.002,
+        378.2,
+        634.002
+      ],
+      "reason": "page2_checkboxes_12d_13a_block_or_standard_deduction: widget c2_10[0] \u2014 12d age/blind checkboxes or Form 8814/4972 checkbox on line 16."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_11[0]",
+      "terminal_name": "c2_11[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        427.799,
+        626.002,
+        435.799,
+        634.002
+      ],
+      "reason": "page2_checkboxes_12d_13a_block_or_standard_deduction: widget c2_11[0] \u2014 12d age/blind checkboxes or Form 8814/4972 checkbox on line 16."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].SSN_ReadOrder[0].f2_22[0]",
+      "terminal_name": "f2_22[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        237.6,
+        432.0,
+        324.0,
+        443.999
+      ],
+      "reason": "refund_banking_or_exspouse_ssn: banking routing/account or former-spouse SSN \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_12[0]",
+      "terminal_name": "c2_12[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        467.2,
+        410.002,
+        475.2,
+        418.002
+      ],
+      "reason": "page2_subline_27b_or_former_spouse_SSN_or_check: widget c2_12[0] \u2014 27b clergy checkbox or former-spouse SSN box or line-30 ACTC optout."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_13[0]",
+      "terminal_name": "c2_13[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        467.2,
+        398.0,
+        475.2,
+        406.0
+      ],
+      "reason": "page2_subline_27b_or_former_spouse_SSN_or_check: widget c2_13[0] \u2014 27b clergy checkbox or former-spouse SSN box or line-30 ACTC optout."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].Line28_ReadOrder[0].c2_14[0]",
+      "terminal_name": "c2_14[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        373.6,
+        374.002,
+        381.6,
+        382.002
+      ],
+      "reason": "line_28_ctc_opt_out_checkbox: ACTC opt-out flag \u2014 no Layer 1 field."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_26[0]",
+      "terminal_name": "f2_26[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        410.4,
+        348.001,
+        481.65,
+        360.0
+      ],
+      "reason": "refund_banking_block: widget f2_26[0] \u2014 35b routing / 35c type checkbox / 35d account / 36 applied-to-2026-es box."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_15[0]",
+      "terminal_name": "c2_15[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        467.2,
+        290.0,
+        475.2,
+        298.0
+      ],
+      "reason": "refund_banking_block: widget c2_15[0] \u2014 35b routing / 35c type checkbox / 35d account / 36 applied-to-2026-es box."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].RoutingNo[0].f2_32[0]",
+      "terminal_name": "f2_32[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        180.0,
+        276.999,
+        309.6,
+        288.0
+      ],
+      "reason": "refund_banking_or_exspouse_ssn: banking routing/account or former-spouse SSN \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_16[0]",
+      "terminal_name": "c2_16[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        377.4,
+        278.001,
+        385.4,
+        286.001
+      ],
+      "reason": "refund_banking_block: widget c2_16[0] \u2014 35b routing / 35c type checkbox / 35d account / 36 applied-to-2026-es box."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_16[1]",
+      "terminal_name": "c2_16[1]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        435.0,
+        278.001,
+        443.0,
+        286.001
+      ],
+      "reason": "refund_banking_block: widget c2_16[1] \u2014 35b routing / 35c type checkbox / 35d account / 36 applied-to-2026-es box."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].AccountNo[0].f2_33[0]",
+      "terminal_name": "f2_33[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        180.0,
+        265.0,
+        424.8,
+        276.001
+      ],
+      "reason": "refund_banking_or_exspouse_ssn: banking routing/account or former-spouse SSN \u2014 not in Form1040Fields Layer 1."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_34[0]",
+      "terminal_name": "f2_34[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        410.4,
+        252.0,
+        481.65,
+        263.999
+      ],
+      "reason": "refund_banking_block: widget f2_34[0] \u2014 35b routing / 35c type checkbox / 35d account / 36 applied-to-2026-es box."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_36[0]",
+      "terminal_name": "f2_36[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        410.4,
+        216.0,
+        481.65,
+        227.999
+      ],
+      "reason": "signature_designee_preparer_block: widget f2_36[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_17[0]",
+      "terminal_name": "c2_17[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        432.0,
+        206.251,
+        440.0,
+        214.251
+      ],
+      "reason": "signature_designee_preparer_block: widget c2_17[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_17[1]",
+      "terminal_name": "c2_17[1]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        540.0,
+        206.251,
+        548.0,
+        214.251
+      ],
+      "reason": "signature_designee_preparer_block: widget c2_17[1] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_37[0]",
+      "terminal_name": "f2_37[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        129.6,
+        180.0,
+        295.2,
+        198.0
+      ],
+      "reason": "signature_designee_preparer_block: widget f2_37[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_38[0]",
+      "terminal_name": "f2_38[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        324.0,
+        180.0,
+        424.8,
+        198.0
+      ],
+      "reason": "signature_designee_preparer_block: widget f2_38[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_39[0]",
+      "terminal_name": "f2_39[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        180.5,
+        576.0,
+        191.999
+      ],
+      "reason": "signature_designee_preparer_block: widget f2_39[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_40[0]",
+      "terminal_name": "f2_40[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        325.0,
+        126.0,
+        460.05,
+        145.999
+      ],
+      "reason": "signature_designee_preparer_block: widget f2_40[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_41[0]",
+      "terminal_name": "f2_41[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        126.0,
+        576.0,
+        137.999
+      ],
+      "reason": "signature_designee_preparer_block: widget f2_41[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_42[0]",
+      "terminal_name": "f2_42[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        325.0,
+        96.001,
+        460.05,
+        116.0
+      ],
+      "reason": "signature_designee_preparer_block: widget f2_42[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_43[0]",
+      "terminal_name": "f2_43[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        96.001,
+        576.0,
+        108.0
+      ],
+      "reason": "signature_designee_preparer_block: widget f2_43[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_44[0]",
+      "terminal_name": "f2_44[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        127.599,
+        84.002,
+        272.85,
+        96.001
+      ],
+      "reason": "signature_designee_preparer_block: widget f2_44[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_45[0]",
+      "terminal_name": "f2_45[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        324.0,
+        84.002,
+        576.0,
+        96.001
+      ],
+      "reason": "signature_designee_preparer_block: widget f2_45[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_46[0]",
+      "terminal_name": "f2_46[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        91.599,
+        59.998,
+        222.45,
+        73.999
+      ],
+      "reason": "signature_designee_preparer_block: widget f2_46[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_47[0]",
+      "terminal_name": "f2_47[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        454.6,
+        59.998,
+        510.45,
+        73.999
+      ],
+      "reason": "signature_designee_preparer_block: widget f2_47[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].c2_18[0]",
+      "terminal_name": "c2_18[0]",
+      "type": "checkbox",
+      "page": 2,
+      "rect": [
+        518.4,
+        63.501,
+        526.4,
+        71.501
+      ],
+      "reason": "signature_designee_preparer_block: widget c2_18[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_48[0]",
+      "terminal_name": "f2_48[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        134.599,
+        48.002,
+        452.85,
+        60.001
+      ],
+      "reason": "signature_designee_preparer_block: widget f2_48[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_49[0]",
+      "terminal_name": "f2_49[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        494.6,
+        48.002,
+        576.0,
+        60.001
+      ],
+      "reason": "signature_designee_preparer_block: widget f2_49[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_50[0]",
+      "terminal_name": "f2_50[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        142.599,
+        36.0,
+        452.85,
+        47.999
+      ],
+      "reason": "signature_designee_preparer_block: widget f2_50[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    },
+    {
+      "widget_name": "topmostSubform[0].Page2[0].f2_51[0]",
+      "terminal_name": "f2_51[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        494.6,
+        36.0,
+        576.0,
+        47.999
+      ],
+      "reason": "signature_designee_preparer_block: widget f2_51[0] \u2014 third-party designee, signatures, occupation, IP PIN, phone/email, paid preparer, firm name/EIN/address."
+    }
+  ]
+}

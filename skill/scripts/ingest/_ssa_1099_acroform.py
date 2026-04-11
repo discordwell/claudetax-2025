@@ -45,14 +45,28 @@ A synthetic ``recipient_is_taxpayer`` field is exposed on the map anyway so
 a hand-crafted fixture can exercise the path rewriting; downstream code may
 override it once the taxpayer profile join is wired.
 
-SYNTHETIC FIELD NAMES
----------------------
-The keys in FORM_SSA_1099_FIELD_MAP below are SYNTHETIC placeholder names that
-match the fixture produced by the test suite's ``_make_acroform_pdf`` helper.
-The real SSA fillable SSA-1099 uses opaque internal field identifiers — those
-need to be captured from an official SSA form PDF and swapped in. See the
-TODO in the module footer. Until the real names are in place, this ingester
-is useful for:
+Real-SSA widget compatibility (wave 6)
+---------------------------------------
+Neither the IRS nor the SSA publishes a fillable Form SSA-1099 AcroForm
+template. Probed URLs (all returned HTTP 404 as of 2026-04-11):
+
+- ``https://www.irs.gov/pub/irs-pdf/fssa1099.pdf`` -- 404
+- ``https://www.irs.gov/pub/irs-pdf/fssa1099-dft.pdf`` -- 404
+
+The SSA-1099 is *generated per-beneficiary* by the SSA's internal
+benefits database and delivered either on paper or through the
+taxpayer's ``my Social Security`` portal as a flattened PDF. There is
+no blank fillable template to read widget names from, so this Tier 1
+AcroForm ingester cannot be upgraded to recognize real SSA PDFs.
+
+Upgrade path: the SSA-1099 OCR path via Azure Document Intelligence's
+Unified US Tax prebuilt model reads flattened SSA-1099 PDFs directly
+(including the Medicare Part B/D premium breakdown in the
+"Description of Amount in Box 3" text block). Use that for real SSA
+statements; this AcroForm ingester remains synthetic-only for unit
+testing the cascade plumbing.
+
+This ingester is therefore useful only for:
 
 - verifying the plumbing (classifier -> base ingester -> path rewrite)
 - providing a realistic fixture for downstream engine/integration tests

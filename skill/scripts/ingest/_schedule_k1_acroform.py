@@ -60,20 +60,36 @@ ScheduleK1 model fields mapped here (mirrors skill.scripts.models.ScheduleK1):
 - section_199a_ubia        (Box 20 code AB / 1120-S Box 17 code V)
 - other_items              (free-form code dictionary)
 
-SYNTHETIC FIELD NAMES
----------------------
-The keys in SCHEDULE_K1_FIELD_MAP below are SYNTHETIC placeholder names that
-match the fixture produced by the test suite's ``_make_acroform_pdf`` helper.
-The real IRS fillable Schedule K-1 forms use opaque internal field identifiers
-like ``topmostSubform[0].Page1[0].PartIII[0].f1_15[0]`` — those need to be
-captured from the official IRS fillable K-1 PDFs (one set per flavor) and
-swapped in. See the TODO in the module footer.
+Real-IRS widget compatibility (wave 6)
+---------------------------------------
+Fetched ``https://www.irs.gov/pub/irs-pdf/f1065sk1.pdf`` (1065 K-1,
+archived at ``skill/reference/irs_forms/f1065sk1_ty2024.pdf``, SHA-256
+``66098d4d48537ce2dac1f093d6351567957896e5843d8c524823b380068f6547``)
+and ``https://www.irs.gov/pub/irs-pdf/f1120ssk.pdf`` (1120-S K-1,
+archived at ``skill/reference/irs_forms/f1120ssk_ty2024.pdf``, SHA-256
+``104ac7b1137cb78c9051d4e3424630dca233887f17928b311fef6fd578baacd0``).
 
-Until the real names are in place, this ingester is useful for:
+Both PDFs are real AcroForms (137 and 122 widgets respectively). Part I
+(entity identity -- item A EIN, item B name) decodes cleanly to
+``Page1.LeftCol.f1_6[0]`` / ``f1_7[0]`` on the 1065 and
+``Page1.LeftCol.f1_06[0]`` / ``f1_07[0]`` on the 1120-S. Those are
+mapped below.
 
-- verifying the plumbing (classifier -> base ingester -> path rewrite)
-- providing a realistic fixture for downstream engine/integration tests
-- documenting which K-1 boxes the skill currently cares about
+Part III line amounts live under ``Page1.RightCol.RightCol1``
+(1065) and ``Page1.RightCol.Lines1-12`` / ``Lines13-17`` (1120-S).
+Each line number does NOT map cleanly to a single widget leaf because
+many lines have a (code, amount) pair and some (lines 11, 13, 14, 15,
+16, 17, 20 on 1065) repeat the (code, amount) pair for multiple
+entries. Decoding the exact line -> widget mapping requires wet-test
+confirmation against a filled K-1 sample (which is out of scope for
+this research pass). Part III line widgets are therefore LEFT UNMAPPED
+for now -- they fall through to ``_acroform_raw.*`` paths where an
+operator can inspect the values; wave 7+ can add the line mappings
+after a wet test confirms the widget ordering.
+
+The synthetic wave-1 fixture keys (``ordinary_business_income`` etc.)
+still map to canonical paths under ``schedules_k1[0]`` so existing
+tests continue to pass unchanged.
 
 CLASSIFIER LIMITATIONS
 ----------------------
@@ -115,6 +131,26 @@ from skill.scripts.ingest._pypdf_acroform import PyPdfAcroFormIngester
 # Values: canonical CanonicalReturn paths under ``schedules_k1[0]``.
 #
 # Covered fields track every attribute on skill.scripts.models.ScheduleK1.
+# Real IRS K-1 widget names (Part I entity identity only; Part III line
+# amounts left unmapped pending a wet test -- see module docstring).
+_SCHEDULE_K1_REAL_WIDGETS: dict[str, str] = {
+    # --- 1065 (partnership) K-1 -----------------------------------------
+    # Page1.LeftCol.f1_6 = Part I item A -- Partnership EIN
+    "topmostSubform[0].Page1[0].LeftCol[0].f1_6[0]":
+        "schedules_k1[0].source_ein",
+    # Page1.LeftCol.f1_7 = Part I item B -- Partnership name / address
+    "topmostSubform[0].Page1[0].LeftCol[0].f1_7[0]":
+        "schedules_k1[0].source_name",
+    # --- 1120-S K-1 -----------------------------------------------------
+    # Page1.LeftCol.f1_06 = Part I item A -- Corporation EIN
+    "topmostSubform[0].Page1[0].LeftCol[0].f1_06[0]":
+        "schedules_k1[0].source_ein",
+    # Page1.LeftCol.f1_07 = Part I item B -- Corporation name / address
+    "topmostSubform[0].Page1[0].LeftCol[0].f1_07[0]":
+        "schedules_k1[0].source_name",
+}
+
+
 SCHEDULE_K1_FIELD_MAP: dict[str, str] = {
     # Part I — Information About the Partnership / S Corporation
     "source_name": "schedules_k1[0].source_name",
@@ -162,6 +198,8 @@ SCHEDULE_K1_FIELD_MAP: dict[str, str] = {
     "section_199a_ubia": "schedules_k1[0].section_199a_ubia",
     # Catch-all for other coded items (Box 11/13/14/15/16/19/20 etc.)
     "other_items": "schedules_k1[0].other_items",
+    # --- Real IRS widget names (Part I entity identity only) ---------
+    **_SCHEDULE_K1_REAL_WIDGETS,
 }
 
 

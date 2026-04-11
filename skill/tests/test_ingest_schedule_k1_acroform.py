@@ -577,3 +577,83 @@ class TestIngestSparseK1:
     def test_sparse_document_kind_defaults_to_partnership(self, sparse_k1_pdf):
         result = INGESTER.ingest(sparse_k1_pdf)
         assert result.partial.document_kind == DocumentKind.SCHEDULE_K1_1065
+
+
+# ---------------------------------------------------------------------------
+# Real IRS K-1 PDF template tests (wave 6)
+# ---------------------------------------------------------------------------
+
+
+_REAL_K1_1065_PDF: Path = (
+    Path(__file__).resolve().parents[1]
+    / "reference"
+    / "irs_forms"
+    / "f1065sk1_ty2024.pdf"
+)
+
+_REAL_K1_1120S_PDF: Path = (
+    Path(__file__).resolve().parents[1]
+    / "reference"
+    / "irs_forms"
+    / "f1120ssk_ty2024.pdf"
+)
+
+
+@pytest.fixture
+def real_k1_1065(tmp_path: Path) -> Path:
+    import shutil
+
+    dst = tmp_path / "k-1_1065.pdf"
+    shutil.copy(_REAL_K1_1065_PDF, dst)
+    return dst
+
+
+@pytest.fixture
+def real_k1_1120s(tmp_path: Path) -> Path:
+    import shutil
+
+    dst = tmp_path / "k-1_1120s.pdf"
+    shutil.copy(_REAL_K1_1120S_PDF, dst)
+    return dst
+
+
+class TestRealK1AcroForm:
+    """Wave 6: the K-1 ingester must read both real IRS fillable K-1
+    templates (1065 partner and 1120-S shareholder) without crashing and
+    must carry Part I identity widget names in its field map."""
+
+    def test_real_k1_1065_pdf_exists(self) -> None:
+        assert _REAL_K1_1065_PDF.exists()
+
+    def test_real_k1_1120s_pdf_exists(self) -> None:
+        assert _REAL_K1_1120S_PDF.exists()
+
+    def test_real_k1_1065_ingest_succeeds(self, real_k1_1065: Path) -> None:
+        assert INGESTER.can_handle(real_k1_1065) is True
+        result = INGESTER.ingest(real_k1_1065)
+        assert result.success, result.error
+        # 1065 K-1 content probe -> partnership
+        assert result.partial.document_kind == DocumentKind.SCHEDULE_K1_1065
+
+    def test_real_k1_1120s_ingest_succeeds(self, real_k1_1120s: Path) -> None:
+        assert INGESTER.can_handle(real_k1_1120s) is True
+        result = INGESTER.ingest(real_k1_1120s)
+        assert result.success, result.error
+        # 1120-S K-1 content probe -> s_corp upgrade path
+        assert result.partial.document_kind == DocumentKind.SCHEDULE_K1_1120S
+
+    def test_field_map_has_real_identity_widget_names(self) -> None:
+        """Part I entity-identity widgets for both K-1 flavors must be in
+        the merged field map (and must resolve to real widgets on at
+        least one of the two archived PDFs)."""
+        reader_1065 = pypdf.PdfReader(str(_REAL_K1_1065_PDF))
+        reader_1120s = pypdf.PdfReader(str(_REAL_K1_1120S_PDF))
+        actual = set(reader_1065.get_fields().keys()) | set(
+            reader_1120s.get_fields().keys()
+        )
+        real_keys = [
+            k for k in SCHEDULE_K1_FIELD_MAP if k.startswith("topmostSubform")
+        ]
+        assert real_keys, "SCHEDULE_K1_FIELD_MAP missing real IRS widget keys"
+        missing = [k for k in real_keys if k not in actual]
+        assert not missing, missing[:5]

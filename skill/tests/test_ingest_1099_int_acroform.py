@@ -218,3 +218,53 @@ class TestIngestSparseForm:
     def test_sparse_document_kind(self, sparse_1099_int_pdf):
         result = INGESTER.ingest(sparse_1099_int_pdf)
         assert result.partial.document_kind == DocumentKind.FORM_1099_INT
+
+
+# ---------------------------------------------------------------------------
+# Real IRS f1099int.pdf template tests (wave 6)
+# ---------------------------------------------------------------------------
+
+
+_REAL_1099_INT_PDF: Path = (
+    Path(__file__).resolve().parents[1]
+    / "reference"
+    / "irs_forms"
+    / "f1099int_ty2024.pdf"
+)
+
+
+@pytest.fixture
+def real_1099_int(tmp_path: Path) -> Path:
+    import shutil
+
+    dst = tmp_path / "1099-int.pdf"
+    shutil.copy(_REAL_1099_INT_PDF, dst)
+    return dst
+
+
+class TestReal1099INTAcroForm:
+    """Wave 6: the ingester must read the real IRS f1099int.pdf template
+    without crashing and must have real IRS widget names in its field map."""
+
+    def test_real_pdf_exists(self) -> None:
+        assert _REAL_1099_INT_PDF.exists()
+
+    def test_real_pdf_is_acroform(self, real_1099_int: Path) -> None:
+        assert INGESTER.can_handle(real_1099_int) is True
+
+    def test_real_pdf_ingest_succeeds(self, real_1099_int: Path) -> None:
+        result = INGESTER.ingest(real_1099_int)
+        assert result.success, result.error
+        assert result.partial.document_kind == DocumentKind.FORM_1099_INT
+
+    def test_field_map_has_real_widget_names(self) -> None:
+        reader = pypdf.PdfReader(str(_REAL_1099_INT_PDF))
+        actual = set(reader.get_fields().keys())
+        real_keys = [
+            k for k in FORM_1099_INT_FIELD_MAP if k.startswith("topmostSubform")
+        ]
+        assert real_keys, "FORM_1099_INT_FIELD_MAP missing real IRS widget keys"
+        missing = [k for k in real_keys if k not in actual]
+        assert not missing, (
+            f"real 1099-INT widget keys not on f1099int.pdf: {missing[:5]}"
+        )

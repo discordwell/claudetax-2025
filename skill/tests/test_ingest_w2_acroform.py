@@ -239,3 +239,69 @@ class TestW2AcroFormIngesterFallback:
         by_path = {f.path: f.value for f in result.partial.fields}
         assert by_path["_acroform_raw.mystery_field_a"] == "alpha"
         assert by_path["_acroform_raw.mystery_field_b"] == "beta"
+
+
+# ---------------------------------------------------------------------------
+# Real IRS fw2.pdf template tests (wave 6)
+# ---------------------------------------------------------------------------
+
+
+_REAL_FW2_PDF: Path = (
+    Path(__file__).resolve().parents[1]
+    / "reference"
+    / "irs_forms"
+    / "fw2_ty2024.pdf"
+)
+
+
+@pytest.fixture
+def real_fw2(tmp_path: Path) -> Path:
+    """Copy the archived IRS fw2.pdf to a tmp path named ``w2.pdf``.
+
+    The IRS ships the file as ``fw2.pdf`` which the stock classifier's
+    ``w-?2`` filename pattern doesn't match (the leading ``f`` eats the
+    word boundary). Real users would rename or receive a file named
+    ``w2.pdf`` / ``w-2.pdf`` from a portal, so the test copies under a
+    classifier-friendly name.
+    """
+    import shutil
+
+    dst = tmp_path / "w2.pdf"
+    shutil.copy(_REAL_FW2_PDF, dst)
+    return dst
+
+
+class TestW2RealIRSAcroForm:
+    """The ingester must read the real IRS ``fw2.pdf`` template without
+    crashing and must extract every populated canonical path via the real
+    widget names (not the synthetic fixture keys)."""
+
+    def test_real_fw2_exists(self) -> None:
+        assert _REAL_FW2_PDF.exists(), (
+            f"archived real IRS W-2 missing at {_REAL_FW2_PDF}"
+        )
+
+    def test_real_fw2_is_acroform(self, real_fw2: Path) -> None:
+        assert INGESTER.can_handle(real_fw2) is True
+
+    def test_real_fw2_ingest_succeeds(self, real_fw2: Path) -> None:
+        result = INGESTER.ingest(real_fw2)
+        assert result.success, result.error
+        # The real blank template has no values set, so the ingester
+        # returns success with zero extracted canonical-path fields.
+        # It MUST NOT crash.
+        assert result.partial.document_kind == DocumentKind.FORM_W2
+
+    def test_real_fw2_field_map_has_real_widget_names(self) -> None:
+        """Every mapped widget name starting with ``topmostSubform`` must
+        be an actual widget on the archived PDF."""
+        reader = pypdf.PdfReader(str(_REAL_FW2_PDF))
+        actual_widgets = set(reader.get_fields().keys())
+        real_keys = [
+            k for k in W2_FIELD_MAP if k.startswith("topmostSubform")
+        ]
+        assert real_keys, "W2_FIELD_MAP is missing real IRS widget keys"
+        missing = [k for k in real_keys if k not in actual_widgets]
+        assert not missing, (
+            f"real W-2 widget keys not present in fw2.pdf: {missing[:5]}"
+        )

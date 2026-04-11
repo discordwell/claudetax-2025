@@ -4,13 +4,34 @@ Wires a field-name map into the shared PyPdfAcroFormIngester base so that
 AcroForm widget values from a 1099-B PDF land on the canonical
 ``forms_1099_b[0].*`` paths on CanonicalReturn.
 
-SYNTHETIC FIELD NAMES
----------------------
-The keys in FORM_1099_B_FIELD_MAP below are SYNTHETIC placeholder names that
-match the fixture produced by the test suite's ``_make_acroform_pdf`` helper.
-The real IRS fillable 1099-B uses opaque internal field identifiers like
-``topmostSubform[0].CopyB[0].f_1[0]`` — those need to be captured from an
-actual IRS form PDF and swapped in. See the TODO in the module footer.
+Real-IRS widget compatibility (wave 6)
+---------------------------------------
+The IRS does NOT publish a fillable Form 1099-B. Probed URLs (all
+returned HTTP 404 on the IRS PDF CDN as of 2026-04-11):
+
+- ``https://www.irs.gov/pub/irs-pdf/f1099b.pdf`` -- 404
+- ``https://www.irs.gov/pub/irs-pdf/f1099b-dft.pdf`` -- 404
+
+The IRS form the payer/broker issues is a paper-scannable / flattened
+PDF template, not an interactive AcroForm. Brokers who file 1099-B
+electronically submit via the IRS FIRE / IRIS channels using XML,
+not PDF AcroForms. Recipient copies brokers send to taxpayers are
+rendered as consolidated broker statements (typically flattened PDF
+with a multi-row 8949-style table) or on paper, not fillable AcroForms.
+
+Upgrade path: the 1099-B Azure Document Intelligence ingester
+(``_azure_doc_intelligence.py``) already handles real-world broker
+summary statements via the Unified US Tax prebuilt model -- it reads
+the tabular layout natively and produces populated
+``Form1099BTransaction`` entries. Use it for real 1099-B statements;
+this AcroForm ingester remains synthetic-only for unit testing the
+cascade plumbing.
+
+This ingester is therefore useful only for:
+
+- verifying the plumbing (classifier -> base ingester -> path rewrite)
+- providing a realistic single-sale fixture for downstream engine tests
+- documenting which 1099-B boxes the skill currently cares about
 
 SINGLE-TRANSACTION LIMITATION (important!)
 ------------------------------------------

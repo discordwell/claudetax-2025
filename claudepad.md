@@ -39,17 +39,26 @@ Session memory for this project. Top section = most recent session summaries (ne
 
 Full suite: **503 passed + 1 skipped** in 1.07s. Registry now has 12 entries (8 no-tax + CA/NY/WA/DC).
 
-**Deferred to fan-out wave 2:**
-- Wire CTC/NIIT/EITC patches into engine.py (needs earned_income/investment_income computation, golden-fixture updates to reflect credits)
-- Real per-state nonresident apportionment (CA 540NR, NY IT-203 source ratio, WA RCW 82.87.100 sourcing)
-- OBBBA senior deduction (§63(f)(3)), Form 4547 Trump Account calc, Schedule 1-A tips/overtime calc
-- Remaining ~30 taxing states (AL, AR, CO, CT, DE, GA, HI, ID, IL, IN, IA, KS, KY, LA, ME, MD, MN, MS, MO, MT, NE, NM, ND, OK, OR, RI, SC, UT, VT, WI, WV)
-- Remaining ingesters: 1099-DIV/B/NEC/K/R/G pypdf, SSA-1099, K-1, plus Azure DI variants
+**FAN-OUT wave 2 complete** (commits 0cf981c → a0a544a, octopus merge + registry wiring): 12 parallel sub-agents in manual git worktrees. Landed:
+- **Engine wiring** (fanout/engwire +15): `compute()` now calls CTC/NIIT/EITC patches after tenforty, folds results into Credits/Payments/OtherTaxes. Lazy import breaks niit→engine cycle. Verified as bit-for-bit no-op on all 3 pre-existing golden fixtures (simple_w2_standard, w2_investments_itemized, se_home_office) — none have dependents or MAGI above NIIT/EITC thresholds, so no patches fire.
+- **States wave 2 (6)**: AZ (+34, 2.5% flat), MA (+34, STATE_GROSS Part A/B/C), MI (+41, 4.25% flat, 6 partners, flagged potential tenforty exemption gap), NJ (+37, PA-only reciprocity, fixed 404'd e-file URL via WebFetch), PA (+42, PA_COMPENSATION_BASE flat 3.07% verified $1,995.50 on $65k), VA (+38, 5 partners incl. DC). All wired into registry.
+- **Ingesters (3)**: 1099-DIV (+15), 1099-NEC (+15), 1099-B (+17 with explicit single-transaction-only limitation locked). All use synthetic field names — real IRS widget research pending.
+- **OBBBA patches (2)**: Senior deduction §63(f)(3)-enhanced (+22, $6k/filer age 65+, 6% phase-out rate verified against 3 independent sources), Schedule 1-A tips/overtime (+30, caps $25k/$12.5k/$25k confirmed from IRS newsroom, phase-out rate $100/$1,000 assumed and loudly locked in tests as UNVERIFIED pending final IRS Schedule 1-A instructions).
+
+Full suite: **844 passed + 1 skipped** in 1.72s. Registry: 18 plugins (8 no-tax + CA/NY/WA/DC + AZ/MA/MI/NJ/PA/VA).
+
+**Deferred to wave 3:**
+- Real per-state nonresident apportionment (CA 540NR, NY IT-203 source ratio, PA Sch NRH, MI Sch NR, WA RCW 82.87.100 sourcing, MA 1-NR/PY)
+- Wire OBBBA senior deduction + Schedule 1-A into engine.compute() (add to patch layer)
+- Remaining ~27 taxing states (AL, AR, CO, CT, DE, GA, HI, ID, IL, IN, IA, KS, KY, LA, ME, MD, MN, MS, MO, MT, NE, NM, NC, ND, OH, OK, OR, RI, SC, TN, UT, VT, WI, WV) — NC, OH, OR are tenforty-supported so those are easy
+- 1099-R/G/SSA/K1 ingesters (models exist as stubs, ingesters pending)
 - PDF output renderers per IRS form (1040, Sch A/B/C/D/E/SE, 8949, 8829, 6251, etc.)
-- FFFF entry map and paper bundle output
-- Real IRS W-2 and 1099-INT AcroForm field name research
+- FFFF entry map + FFFF limits checker + paper-file bundle
+- Azure Document Intelligence variants for 1098/1099 (beyond W-2)
+- Real IRS W-2 / 1099-INT / 1099-DIV / 1099-NEC / 1099-B AcroForm field name research (replace synthetic field maps with widget identifiers from IRS fillable PDFs)
+- Form 4547 Trump Account patch
 - SKILL.md interview flow
-- Distribution packaging
+- Distribution packaging + wet test
 
 ---
 

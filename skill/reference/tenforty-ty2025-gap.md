@@ -64,7 +64,7 @@ backend="graph", state="ST", ...)`.
 | MO    | FAIL    | OK    | $2,200.52                     |       |
 | MS    | FAIL    | OK    | $2,054.80                     |       |
 | MT    | FAIL    | OK    | $2,652.55                     |       |
-| ND    | FAIL    | OK    | **$15.11**                    | ⚠️ suspect — verify against ND DOR Form ND-1 (ND has a very low flat rate but $15 on $65k looks like a stub) |
+| ND    | FAIL    | OK    | **$15.11**                    | ✅ wave-5 A6 verified: mathematically correct (ND zero-bracket cap Single $48,475 → TI $49,250 has $775 in 1.95% middle bracket → $15.1125). My CP8-B "stubbed" suspicion was wrong. Hand-rolled anyway per A6 mandate with a gatekeeper test pinning both the graph value AND the DOR formula. |
 | NE    | FAIL    | OK    | $2,454.83                     |       |
 | NM    | FAIL    | OK    | $1,905.75                     |       |
 | OK    | FAIL    | OK    | $2,597.38                     |       |
@@ -104,7 +104,7 @@ per-state gaps in which state-specific exemptions/credits are applied:
 | **KS** | $2,827.71  | $3,338.44 | **+$510** | Graph does NOT apply KS $9,160 exemption           |
 | **CT** | $2,875.00  | $2,825.00 | **−$50**  | Graph missing line 5 phase-out recapture add-back  |
 | **MD** | $2,723.88¹ | $2,875.88 | **+$152** | Graph missing something (verify)                   |
-| **ND** | n/a        | $15.11    | **stub?** | $15 on $65k is implausible — likely broken graph   |
+| **ND** | $15.11     | $15.11    | match     | **CP8-B "stub" claim RETRACTED**: wave 5 A6 verified mathematically. ND zero-bracket cap for Single is $48,475 so $65k TI = $49,250 leaves only $775 in the 1.95% middle bracket → $15.1125. Not a bug. |
 
 ¹ MD hand-rolled state-only (local tax is separate).
 
@@ -132,12 +132,18 @@ Wave 5's 21 remaining-state plugins should follow this decision tree:
      something wrong for this state — do NOT trust it.
 
 The five wave-4 hand-rolled plugins (CT/KS/KY/MN/MD) are all correct as
-written — do NOT convert them to graph wrappers. ND's $15.11 on $65k
-specifically means the ND graph definition is broken or stubbed; wave
-5's ND agent must hand-roll from ND DOR Form ND-EZ / ND-1 rather than
-trust the graph output. Wave 4's pattern of 5-out-of-6 hand-rolled
-recoveries from an enum that silently over-claims coverage was
-well-calibrated.
+written — do NOT convert them to graph wrappers.
+
+**ND update**: CP8-B flagged ND's $15.11 probe result as "broken or
+stubbed" but wave 5 A6 verified it is mathematically correct (see the
+per-state tables above). The number is not wrong — it's just
+unintuitively low because ND's zero-bracket cap for Single filers is
+$48,475, which absorbs most of a $65k taxpayer's taxable income. Wave
+5 hand-rolled ND anyway (safe call, per CP8-B mandate) with a
+gatekeeper test that pins BOTH the graph value AND the DOR formula for
+belt-and-suspenders coverage. The probe-first rubric remains correct —
+this is just one less "broken graph" entry than CP8-B originally
+claimed.
 
 #### Implication for wave 5
 
@@ -146,8 +152,9 @@ wrapper pattern established by `wi.py`**, NOT the hand-rolled path used
 by CT/KS/KY/MD/MN in wave 4. Hand-rolling should be reserved for:
 - States where the graph-backend tax number diverges materially from
   DOR primary-source verification (wave 5 agents must verify).
-- States where the graph backend produces a suspicious number (e.g. ND
-  at $15.11 on $65k — flagged above).
+- States where the graph backend produces a number that diverges from
+  DOR primary source by more than ±$5 (the wave-5 observed gaps were
+  usually missing personal-exemption credits in the $30-$608 range).
 - Cases where local taxes / county-level piggyback are required (MD
   was hand-rolled in wave 4 specifically because of the 22-county
   local tax table — not because the state tax itself was missing).

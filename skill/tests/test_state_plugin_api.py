@@ -255,14 +255,19 @@ class TestStateRegistry:
         assert codes == sorted(codes)
 
     def test_registry_len(self):
-        """8 no-tax + 4 wave-1 + 6 wave-2 + 6 wave-3 + 6 wave-4 taxing states
-        = 30 registered plugins.
+        """8 no-tax + 4 wave-1 + 6 wave-2 + 6 wave-3 + 6 wave-4 + 21 wave-5
+        = 51 registered plugins.
 
-        Wave 4 added CT, KS, KY, MD, MN, WI — all hand-rolled from DOR
-        primary sources except WI, which wraps tenforty's graph backend
-        (see skill/reference/tenforty-ty2025-gap.md for the enum gap).
+        Wave 5 completed coverage of all 50 states + DC. Split: 10 graph-
+        backend wraps (AR/HI/IA/ID/LA/MS/MT/NM/SC/VT) where tenforty's
+        graph backend reconciled to DOR primary sources, and 11 hand-
+        rolled plugins (AL/DE/IN/ME/MO/ND/NE/OK/RI/UT/WV) where the
+        graph backend systematically omitted state-specific personal
+        exemptions or credits. See skill/reference/tenforty-ty2025-gap.md
+        for the per-state probe table and the probe-then-verify-then-
+        decide decision rubric.
         """
-        assert len(registry) == 30
+        assert len(registry) == 51
 
 
 # ---------------------------------------------------------------------------

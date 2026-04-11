@@ -1,28 +1,28 @@
-"""Form 1040 output renderer — two-layer scaffold.
+"""Form 1040 output renderer — two layers.
 
-SCAFFOLD NOTICE
-===============
-This module is the FIRST entry in ``skill/scripts/output/`` and only a
-SCAFFOLD for Form 1040 PDF generation. It is intentionally minimal:
+* **Layer 1** (``compute_form_1040_fields``) maps a computed
+  ``CanonicalReturn`` onto a dataclass whose field names mirror the
+  Form 1040 (TY2024 layout, semantically stable for TY2025) line
+  numbers. It does NOT recompute any tax figures — every line comes
+  from values already populated by ``skill.scripts.calc.engine.compute``.
 
-* Layer 1 (``compute_form_1040_fields``) maps a computed CanonicalReturn
-  onto a dataclass whose field names mirror the Form 1040 (TY2024 layout,
-  assumed stable for TY2025) line numbers. It DOES NOT recompute any tax
-  figures — every line comes from values already populated by
-  ``skill.scripts.calc.engine.compute``.
-
-* Layer 2 (``render_form_1040_pdf``) writes a very simple tabular PDF
-  using ``reportlab``. The table lists every line_name/value pair so a
-  human can eyeball the return; this is NOT a filled IRS Form 1040 — real
-  AcroForm overlay on the IRS fillable PDF is a follow-up task that will
-  need a researched widget map (see ``skill/reference/`` for future work).
+* **Layer 2** (``render_form_1040_pdf``) overlays the dataclass values
+  onto the IRS fillable ``f1040.pdf`` via the wave-4 AcroForm widget
+  map (``skill/reference/form-1040-acroform-map.json``). The IRS PDF
+  is bundled at ``skill/reference/irs_forms/f1040.pdf`` and verified by
+  SHA-256 at fill time; if the bundled copy is missing or corrupt the
+  renderer downloads a fresh copy from the IRS-hosted URL pinned in
+  the map JSON. If the download or SHA-256 verification fails the
+  renderer raises ``RuntimeError`` — there is **no silent fallback** to
+  the old reportlab scaffold.
 
 Design goals
 ------------
 * No tax re-computation. Trust ``ComputedTotals``.
 * No modification of the engine, models, or registry.
-* Minimal surface area so downstream waves can replace Layer 2 with a real
-  AcroForm renderer without touching Layer 1 or its tests.
+* Layer 2 is a thin wrapper around
+  :mod:`skill.scripts.output._acroform_overlay`, which is shared with
+  the Schedule A/B/C/SE renderers in the next wave.
 
 Simplifications documented here (tracked for later waves):
 * All 1099-R distributions are assumed to land on line 4a/4b (IRA). True
@@ -35,10 +35,14 @@ Simplifications documented here (tracked for later waves):
 * Line 17 (Schedule 2 Part I) is 0 — AMT/excess APTC is not yet modeled.
 * Line 20 / line 31 (Schedule 3) are 0 — nonrefundable credits beyond CTC
   and refundable credits beyond EITC/ACTC/AOTC are not yet modeled.
+* TY2025 PDF renumbers line 12 → 12e and line 13 → 13a (with new 13b
+  for Schedule 1-A additional deductions). The widget map records the
+  renumbering so the Layer 1 ``line_12_*`` / ``line_13_*`` values land
+  in the correct widgets.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field, fields as dc_fields
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
@@ -48,6 +52,13 @@ from skill.scripts.calc.engine import (
     schedule_e_total_net,
 )
 from skill.scripts.models import CanonicalReturn
+from skill.scripts.output._acroform_overlay import (
+    WidgetMap,
+    fetch_and_verify_source_pdf,
+    fill_acroform_pdf,
+    format_money,
+    load_widget_map,
+)
 
 
 _ZERO = Decimal("0")
@@ -318,108 +329,114 @@ def compute_form_1040_fields(return_: CanonicalReturn) -> Form1040Fields:
 
 
 # ---------------------------------------------------------------------------
-# Layer 2: reportlab PDF rendering (SCAFFOLD)
+# Layer 2: pypdf AcroForm overlay onto the IRS fillable f1040.pdf
 # ---------------------------------------------------------------------------
 
 
-def _format_decimal(value: Decimal) -> str:
-    """Format a Decimal as a US currency-ish string ``65,000.00``."""
-    q = value.quantize(Decimal("0.01"))
-    # Use python string formatting for thousands separators.
-    return f"{q:,.2f}"
+# Bundled artifact paths. The widget map is checked in by wave 4; the
+# source PDF is fetched on first run and cached at the same location.
+_REFERENCE_DIR = Path(__file__).resolve().parents[2] / "reference"
+_WIDGET_MAP_JSON = _REFERENCE_DIR / "form-1040-acroform-map.json"
+_SOURCE_PDF_PATH = _REFERENCE_DIR / "irs_forms" / "f1040.pdf"
+
+
+# Layer 1 dataclass field names that are NOT money values.
+_HEADER_STRING_FIELDS = {"filing_status", "taxpayer_name", "spouse_name"}
+
+# Map Layer 1 ``filing_status`` values to the IRS five-checkbox label.
+_FILING_STATUS_TO_CHECKBOX_LABEL = {
+    "single": "SINGLE",
+    "mfj": "MFJ",
+    "mfs": "MFS",
+    "hoh": "HOH",
+    "qss": "QSS",
+}
+
+
+def _build_widget_values_for_form1040(
+    fields: Form1040Fields, widget_map: WidgetMap
+) -> dict[str, str | bool]:
+    """Translate a :class:`Form1040Fields` instance into a widget-name dict.
+
+    The output is keyed by fully-qualified widget name and ready to
+    pass to :func:`fill_acroform_pdf`. Money fields are formatted via
+    :func:`format_money` (zero collapses to empty string), the
+    taxpayer/spouse name strings land in their text widgets, and the
+    filing-status string toggles exactly one of the five
+    filing-status checkboxes.
+    """
+    out: dict[str, str | bool] = {}
+
+    # Numeric line fields → text widgets, including computed-copy mirrors.
+    for sem_name, value in vars(fields).items():
+        if sem_name in _HEADER_STRING_FIELDS:
+            continue
+        if not isinstance(value, Decimal):
+            continue
+        widget_names = widget_map.widget_names_for(sem_name)
+        if not widget_names:
+            continue
+        text = format_money(value)
+        for wn in widget_names:
+            out[wn] = text
+
+    # Header strings → text widgets (skip if widget map has no entry).
+    if fields.taxpayer_name:
+        for wn in widget_map.widget_names_for("taxpayer_name"):
+            out[wn] = fields.taxpayer_name
+    if fields.spouse_name:
+        for wn in widget_map.widget_names_for("spouse_name"):
+            out[wn] = fields.spouse_name
+
+    # Filing status → exactly one of the five checkboxes.
+    if fields.filing_status:
+        label = _FILING_STATUS_TO_CHECKBOX_LABEL.get(
+            fields.filing_status.lower()
+        )
+        if label is not None:
+            for fs_label, widget_name in widget_map.filing_status_checkboxes.items():
+                out[widget_name] = (fs_label == label)
+
+    return out
 
 
 def render_form_1040_pdf(fields: Form1040Fields, out_path: Path) -> Path:
-    """Render a Form 1040 SCAFFOLD PDF using reportlab.
+    """Render a filled IRS Form 1040 PDF.
 
-    This writes a tabular PDF listing every line name and its value. It is
-    NOT a filled IRS Form 1040 — real AcroForm overlay on the IRS fillable
-    PDF is a follow-up task.
+    Loads the wave-4 widget map, ensures the IRS source PDF is present
+    and SHA-256 verified, builds the per-widget value dict from
+    ``fields``, and writes the filled copy to ``out_path``.
 
-    Returns the out_path for convenience.
+    Parameters
+    ----------
+    fields
+        A :class:`Form1040Fields` instance, typically the output of
+        :func:`compute_form_1040_fields`.
+    out_path
+        Where to write the filled PDF. Parent directories are created.
+
+    Returns
+    -------
+    Path
+        ``out_path`` for caller convenience.
+
+    Raises
+    ------
+    RuntimeError
+        If the source PDF cannot be downloaded or its SHA-256 does not
+        match the digest pinned in the widget map JSON. There is no
+        silent fallback to a reportlab scaffold — callers should treat
+        a missing source PDF as a hard failure and place a verified
+        copy at ``skill/reference/irs_forms/f1040.pdf`` manually.
     """
-    # Lazy import so that users who never render PDFs don't pay the import
-    # cost (and test runners without reportlab can still exercise Layer 1).
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import letter
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.platypus import (
-        Paragraph,
-        SimpleDocTemplate,
-        Spacer,
-        Table,
-        TableStyle,
-    )
-
     out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    doc = SimpleDocTemplate(
-        str(out_path),
-        pagesize=letter,
-        title="Form 1040 (TY2025 SCAFFOLD)",
+    widget_map = load_widget_map(_WIDGET_MAP_JSON)
+    fetch_and_verify_source_pdf(
+        _SOURCE_PDF_PATH,
+        widget_map.source_pdf_url,
+        widget_map.source_pdf_sha256,
     )
-    styles = getSampleStyleSheet()
 
-    story: list = []
-    story.append(Paragraph("Form 1040 (TY2025 - SCAFFOLD)", styles["Title"]))
-    story.append(
-        Paragraph(
-            "This is a scaffold rendering, not a filed IRS form.",
-            styles["Italic"],
-        )
-    )
-    story.append(Spacer(1, 12))
-
-    # Header block
-    header_rows = [
-        ["Filing status", fields.filing_status],
-        ["Taxpayer", fields.taxpayer_name],
-        ["Spouse", fields.spouse_name or ""],
-    ]
-    header_table = Table(header_rows, colWidths=[140, 360])
-    header_table.setStyle(
-        TableStyle(
-            [
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                ("BACKGROUND", (0, 0), (0, -1), colors.lightgrey),
-                ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ]
-        )
-    )
-    story.append(header_table)
-    story.append(Spacer(1, 12))
-
-    # Line-item table
-    line_rows: list[list] = [["Line", "Description", "Amount"]]
-    for f in dc_fields(fields):
-        if f.name in ("filing_status", "taxpayer_name", "spouse_name"):
-            continue
-        value = getattr(fields, f.name)
-        if not isinstance(value, Decimal):
-            continue
-        # Parse "line_25d_total_withholding" -> ("25d", "total withholding")
-        parts = f.name.split("_")
-        # parts == ["line", "25d", "total", "withholding"]
-        line_number = parts[1] if len(parts) >= 2 else ""
-        desc = " ".join(parts[2:]).replace("_", " ")
-        line_rows.append([line_number, desc, _format_decimal(value)])
-
-    line_table = Table(line_rows, colWidths=[50, 350, 100])
-    line_table.setStyle(
-        TableStyle(
-            [
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
-                ("ALIGN", (2, 1), (2, -1), "RIGHT"),
-            ]
-        )
-    )
-    story.append(line_table)
-
-    doc.build(story)
-    return out_path
+    widget_values = _build_widget_values_for_form1040(fields, widget_map)
+    return fill_acroform_pdf(_SOURCE_PDF_PATH, widget_values, out_path)

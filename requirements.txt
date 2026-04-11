@@ -1,0 +1,25 @@
+# Tax Prep Skill — Python dependencies
+#
+# Pinned to stable versions as of 2026-04-10. Update cautiously; any calc-affecting
+# change must be re-validated against golden fixtures before merging.
+
+# PDF manipulation
+pypdf>=5.1,<6                  # Primary PDF form fill + AcroForm extraction
+pdfplumber>=0.11,<0.12         # Coordinate-aware text extraction (non-AcroForm)
+pdfrw>=0.4,<0.5                # Secondary for edge-case IRS PDFs (pdfrw + reportlab overlay)
+reportlab>=4.2,<5              # Text overlay for flattened / widgetless forms
+
+# Schema + data modeling
+pydantic>=2.9,<3               # Canonical return models with validation
+jsonschema>=4.23,<5            # Schema validation for JSON-only consumers
+python-dateutil>=2.9,<3        # Robust date parsing from varied input formats
+
+# Calculation engine candidate (pending CP4 verification)
+tenforty>=0.2                  # Python wrapper of OpenTaxSolver, TY2018–TY2025
+
+# OCR for tax documents (first-class, not optional)
+azure-ai-documentintelligence>=1.0,<2  # "Unified US Tax" prebuilt model for W-2/1098/1099/1040
+
+# Testing
+pytest>=8.3,<9
+pytest-cov>=5.0,<6

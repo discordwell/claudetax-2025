@@ -1,0 +1,27 @@
+{
+  "description": "Single filer, one W-2 for $65,000 with $7,500 federal withheld, standard deduction, no dependents. Hand-computed from TY2025 OBBBA-adjusted constants.",
+  "authority": [
+    "skill/reference/ty2025-constants.json for standard deduction $15,750 (OBBBA)",
+    "IRS tax tables used for taxable income < $100k; bracket formula used as cross-check",
+    "CP4 tenforty verification locked Federal income tax at 5755 for this scenario"
+  ],
+  "expected_computed_totals": {
+    "total_income": "65000.00",
+    "adjusted_gross_income": "65000.00",
+    "deduction_taken": "15750.00",
+    "taxable_income": "49250.00",
+    "tentative_tax": "5755.00",
+    "total_tax": "5755.00",
+    "total_payments": "7500.00",
+    "refund": "1745.00",
+    "amount_owed": null,
+    "marginal_rate": 22.0
+  },
+  "hand_check": {
+    "standard_deduction_single_ty2025_obbba": 15750,
+    "taxable_income_calc": "65000 - 15750 = 49250",
+    "bracket_formula_tax": "10% * 11925 + 12% * (48475 - 11925) + 22% * (49250 - 48475) = 1192.50 + 4386.00 + 170.50 = 5749.00",
+    "tax_tables_delta": "IRS tax tables use $50 midpoints, so $49,250 lands in the bracket centered at $49,275. 10% * 11925 + 12% * 36550 + 22% * 800 = 1192.50 + 4386.00 + 176.00 = 5754.50, rounds to 5755",
+    "refund_calc": "7500 withheld - 5755 total tax = 1745 refund"
+  }
+}

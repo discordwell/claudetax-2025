@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tax-prep-skill"
+version = "0.0.1"
+description = "Claude Code skill that prepares US individual income tax returns (federal + all states) for TY2025+"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "TBD"}
+authors = [{name = "discordwell"}]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Accounting",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["skill*"]
+
+[tool.pytest.ini_options]
+testpaths = ["skill/tests"]
+pythonpath = ["."]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+]
+markers = [
+    "golden: golden-fixture tests comparing full return output to hand-computed answers",
+    "slow: tests that take >1s",
+]

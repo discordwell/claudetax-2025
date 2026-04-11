@@ -1,0 +1,583 @@
+"""Canonical return Pydantic models — the data contract for the entire skill.
+
+Every module (calc, ingest, output, states) reads from and writes to CanonicalReturn.
+Fields are aligned to 1040-series line numbers where possible. Where a calc module
+needs a field that isn't here yet, ADD IT — do not work around the model.
+
+Design notes:
+- Strict on the top-level shape and on common fields (W-2, Schedule C, standard
+  deduction, CTC).
+- Loose (arbitrary dict) on infrequently-used fields so modules can land in fan-out
+  without blocking on schema completeness. Tighten up over time.
+- SSN/EIN fields are plain strings with format validation; the canonical return
+  lives in the user's own directory outside this repo.
+- Schema version tracked at the root so future migrations are detectable.
+"""
+from __future__ import annotations
+
+import datetime as dt
+import re
+from decimal import Decimal
+from enum import Enum
+from typing import Annotated, Any, Literal
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
+
+SCHEMA_VERSION = "0.1.0"
+
+
+# ---------------------------------------------------------------------------
+# Base config and reused types
+# ---------------------------------------------------------------------------
+
+
+class _StrictModel(BaseModel):
+    """Base for every canonical-return model. Strict mode, immutable."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=False,  # allow in-place updates during interview
+        str_strip_whitespace=True,
+    )
+
+
+Money = Annotated[Decimal, Field(description="US dollar amount, 2 decimal places")]
+"""A USD amount. Use Decimal so rounding is deterministic across calc → output."""
+
+SSN = Annotated[
+    str,
+    StringConstraints(pattern=r"^\d{3}-?\d{2}-?\d{4}$"),
+    Field(description="Social Security Number, ddd-dd-dddd or ddddddddd"),
+]
+
+EIN = Annotated[
+    str,
+    StringConstraints(pattern=r"^\d{2}-?\d{7}$"),
+    Field(description="Employer Identification Number, dd-ddddddd"),
+]
+
+StateCode = Annotated[
+    str,
+    StringConstraints(pattern=r"^[A-Z]{2}$", min_length=2, max_length=2),
+    Field(description="Two-letter USPS state code"),
+]
+
+ZipCode = Annotated[
+    str,
+    StringConstraints(pattern=r"^\d{5}(-\d{4})?$"),
+    Field(description="US ZIP, ddddd or ddddd-dddd"),
+]
+
+
+# ---------------------------------------------------------------------------
+# Enums
+# ---------------------------------------------------------------------------
+
+
+class FilingStatus(str, Enum):
+    SINGLE = "single"
+    MFJ = "mfj"  # married filing jointly
+    MFS = "mfs"  # married filing separately
+    HOH = "hoh"  # head of household
+    QSS = "qss"  # qualifying surviving spouse
+
+
+class ResidencyStatus(str, Enum):
+    RESIDENT = "resident"
+    NONRESIDENT = "nonresident"
+    PART_YEAR = "part_year"
+
+
+class DependentRelationship(str, Enum):
+    SON = "son"
+    DAUGHTER = "daughter"
+    STEPCHILD = "stepchild"
+    FOSTER_CHILD = "foster_child"
+    SIBLING = "sibling"
+    PARENT = "parent"
+    GRANDPARENT = "grandparent"
+    GRANDCHILD = "grandchild"
+    NIECE_NEPHEW = "niece_nephew"
+    OTHER = "other"
+
+
+class CoverageType(str, Enum):
+    SELF = "self"
+    FAMILY = "family"
+
+
+# ---------------------------------------------------------------------------
+# People
+# ---------------------------------------------------------------------------
+
+
+class Address(_StrictModel):
+    street1: str
+    street2: str | None = None
+    city: str
+    state: StateCode
+    zip: ZipCode
+    country: str = "US"
+
+
+class Person(_StrictModel):
+    first_name: str
+    middle_initial: str | None = None
+    last_name: str
+    ssn: SSN
+    date_of_birth: dt.date
+    is_blind: bool = False
+    is_age_65_or_older: bool | None = None
+    """If not set, caller should derive from date_of_birth and the tax year."""
+    occupation: str | None = None
+
+
+class Dependent(_StrictModel):
+    person: Person
+    relationship: DependentRelationship
+    months_lived_with_taxpayer: int = Field(ge=0, le=12)
+    is_qualifying_child: bool
+    is_qualifying_relative: bool
+    is_student: bool = False
+    is_disabled: bool = False
+    claimed_by_other: bool = False
+
+    @model_validator(mode="after")
+    def _exactly_one_qualifying_kind(self) -> "Dependent":
+        if self.is_qualifying_child and self.is_qualifying_relative:
+            raise ValueError("dependent cannot be both qualifying child and qualifying relative")
+        if not self.is_qualifying_child and not self.is_qualifying_relative:
+            raise ValueError("dependent must be either qualifying child or qualifying relative")
+        return self
+
+
+# ---------------------------------------------------------------------------
+# Income documents
+# ---------------------------------------------------------------------------
+
+
+class W2Box12Entry(_StrictModel):
+    code: Annotated[str, StringConstraints(pattern=r"^[A-Z]{1,3}$")]
+    amount: Money
+
+
+class W2(_StrictModel):
+    """Form W-2, Wage and Tax Statement."""
+
+    employer_name: str
+    employer_ein: EIN | None = None
+    employee_is_taxpayer: bool = True
+    """True if attached to primary taxpayer, False if spouse."""
+
+    box1_wages: Money
+    box2_federal_income_tax_withheld: Money = Decimal("0")
+    box3_social_security_wages: Money = Decimal("0")
+    box4_social_security_tax_withheld: Money = Decimal("0")
+    box5_medicare_wages: Money = Decimal("0")
+    box6_medicare_tax_withheld: Money = Decimal("0")
+    box7_social_security_tips: Money = Decimal("0")
+    box8_allocated_tips: Money = Decimal("0")
+    box10_dependent_care_benefits: Money = Decimal("0")
+    box11_nonqualified_plans: Money = Decimal("0")
+    box12_entries: list[W2Box12Entry] = Field(default_factory=list)
+    box13_statutory_employee: bool = False
+    box13_retirement_plan: bool = False
+    box13_third_party_sick_pay: bool = False
+    box14_other: list[str] = Field(default_factory=list)
+    box15_state: StateCode | None = None
+    box16_state_wages: Money = Decimal("0")
+    box17_state_tax_withheld: Money = Decimal("0")
+    box18_local_wages: Money = Decimal("0")
+    box19_local_tax_withheld: Money = Decimal("0")
+    box20_locality: str | None = None
+
+
+class Form1099INT(_StrictModel):
+    """Form 1099-INT, Interest Income."""
+
+    payer_name: str
+    payer_tin: str | None = None
+    recipient_is_taxpayer: bool = True
+    box1_interest_income: Money = Decimal("0")
+    box2_early_withdrawal_penalty: Money = Decimal("0")
+    box3_us_savings_bond_and_treasury_interest: Money = Decimal("0")
+    box4_federal_income_tax_withheld: Money = Decimal("0")
+    box5_investment_expenses: Money = Decimal("0")
+    box6_foreign_tax_paid: Money = Decimal("0")
+    box8_tax_exempt_interest: Money = Decimal("0")
+    box9_specified_private_activity_bond_interest: Money = Decimal("0")
+    box13_bond_premium_on_tax_exempt_bonds: Money = Decimal("0")
+
+
+class Form1099DIV(_StrictModel):
+    """Form 1099-DIV, Dividends and Distributions."""
+
+    payer_name: str
+    payer_tin: str | None = None
+    recipient_is_taxpayer: bool = True
+    box1a_ordinary_dividends: Money = Decimal("0")
+    box1b_qualified_dividends: Money = Decimal("0")
+    box2a_total_capital_gain_distributions: Money = Decimal("0")
+    box2b_unrecaptured_sec_1250_gain: Money = Decimal("0")
+    box2c_section_1202_gain: Money = Decimal("0")
+    box2d_collectibles_28pct_gain: Money = Decimal("0")
+    box3_nondividend_distributions: Money = Decimal("0")
+    box4_federal_income_tax_withheld: Money = Decimal("0")
+    box5_section_199a_dividends: Money = Decimal("0")
+    box6_investment_expenses: Money = Decimal("0")
+    box7_foreign_tax_paid: Money = Decimal("0")
+    box11_exempt_interest_dividends: Money = Decimal("0")
+    box12_specified_private_activity_bond_interest_dividends: Money = Decimal("0")
+
+
+class Form1099BTransaction(_StrictModel):
+    """A single line on Form 8949 / Schedule D, imported from a 1099-B broker statement."""
+
+    description: str
+    date_acquired: dt.date | Literal["various"] | None = None
+    date_sold: dt.date
+    proceeds: Money
+    cost_basis: Money
+    wash_sale_loss_disallowed: Money = Decimal("0")
+    accrued_market_discount: Money = Decimal("0")
+    is_long_term: bool
+    basis_reported_to_irs: bool = True
+    adjustment_codes: list[str] = Field(default_factory=list)
+    adjustment_amount: Money = Decimal("0")
+
+
+class Form1099B(_StrictModel):
+    """Form 1099-B, Proceeds From Broker and Barter Exchange Transactions."""
+
+    broker_name: str
+    recipient_is_taxpayer: bool = True
+    transactions: list[Form1099BTransaction] = Field(default_factory=list)
+    box4_federal_income_tax_withheld: Money = Decimal("0")
+
+
+class Form1099NEC(_StrictModel):
+    """Form 1099-NEC, Nonemployee Compensation. Flows into Schedule C."""
+
+    payer_name: str
+    payer_tin: str | None = None
+    recipient_is_taxpayer: bool = True
+    box1_nonemployee_compensation: Money
+    box4_federal_income_tax_withheld: Money = Decimal("0")
+    linked_schedule_c: str | None = None
+    """Name of the Schedule C business this 1099 flows into."""
+
+
+class ScheduleCExpenses(_StrictModel):
+    """Schedule C Part II expense categories. Aligns to line numbers 8–27."""
+
+    line8_advertising: Money = Decimal("0")
+    line9_car_and_truck: Money = Decimal("0")
+    line10_commissions_and_fees: Money = Decimal("0")
+    line11_contract_labor: Money = Decimal("0")
+    line12_depletion: Money = Decimal("0")
+    line13_depreciation: Money = Decimal("0")
+    line14_employee_benefit_programs: Money = Decimal("0")
+    line15_insurance_not_health: Money = Decimal("0")
+    line16a_mortgage_interest: Money = Decimal("0")
+    line16b_other_interest: Money = Decimal("0")
+    line17_legal_and_professional: Money = Decimal("0")
+    line18_office_expense: Money = Decimal("0")
+    line19_pension_and_profit_sharing: Money = Decimal("0")
+    line20a_rent_vehicles_machinery_equipment: Money = Decimal("0")
+    line20b_rent_other_business_property: Money = Decimal("0")
+    line21_repairs_and_maintenance: Money = Decimal("0")
+    line22_supplies: Money = Decimal("0")
+    line23_taxes_and_licenses: Money = Decimal("0")
+    line24a_travel: Money = Decimal("0")
+    line24b_meals_50pct_deductible: Money = Decimal("0")
+    line25_utilities: Money = Decimal("0")
+    line26_wages: Money = Decimal("0")
+    line27a_other_expenses: Money = Decimal("0")
+    other_expense_detail: dict[str, Money] = Field(default_factory=dict)
+
+
+class ScheduleC(_StrictModel):
+    """Form 1040 Schedule C — Profit or Loss From Business (Sole Proprietorship)."""
+
+    proprietor_is_taxpayer: bool = True
+    business_name: str
+    principal_business_or_profession: str
+    principal_business_code: str | None = None  # NAICS-style code, Part I line B
+    ein: EIN | None = None
+    business_address: Address | None = None
+    accounting_method: Literal["cash", "accrual", "other"] = "cash"
+    material_participation: bool = True
+    started_or_acquired_this_year: bool = False
+    made_1099_payments: bool | None = None
+    filed_required_1099s: bool | None = None
+
+    line1_gross_receipts: Money = Decimal("0")
+    line2_returns_and_allowances: Money = Decimal("0")
+    line4_cost_of_goods_sold: Money = Decimal("0")
+    line6_other_income: Money = Decimal("0")
+    expenses: ScheduleCExpenses = Field(default_factory=ScheduleCExpenses)
+    line30_home_office_expense: Money = Decimal("0")
+    """From Form 8829."""
+    line32_at_risk_box: Literal["all_at_risk", "some_not_at_risk"] = "all_at_risk"
+
+
+class ScheduleEProperty(_StrictModel):
+    """A single rental real estate property on Schedule E Part I."""
+
+    address: Address
+    property_type: Literal[
+        "single_family",
+        "multi_family",
+        "vacation_short_term",
+        "commercial",
+        "land",
+        "self_rental",
+        "other",
+    ] = "single_family"
+    fair_rental_days: int = Field(default=0, ge=0, le=366)
+    personal_use_days: int = Field(default=0, ge=0, le=366)
+    qbi_qualified: bool = False
+
+    rents_received: Money = Decimal("0")
+    royalties_received: Money = Decimal("0")
+    advertising: Money = Decimal("0")
+    auto_and_travel: Money = Decimal("0")
+    cleaning_and_maintenance: Money = Decimal("0")
+    commissions: Money = Decimal("0")
+    insurance: Money = Decimal("0")
+    legal_and_professional: Money = Decimal("0")
+    management_fees: Money = Decimal("0")
+    mortgage_interest_to_banks: Money = Decimal("0")
+    other_interest: Money = Decimal("0")
+    repairs: Money = Decimal("0")
+    supplies: Money = Decimal("0")
+    taxes: Money = Decimal("0")
+    utilities: Money = Decimal("0")
+    depreciation: Money = Decimal("0")
+    """Computed via Form 4562 by the depreciation module (MACRS)."""
+    other_expenses: dict[str, Money] = Field(default_factory=dict)
+
+
+class ScheduleE(_StrictModel):
+    """Form 1040 Schedule E — Supplemental Income and Loss."""
+
+    properties: list[ScheduleEProperty] = Field(default_factory=list)
+    part_ii_partnership_s_corp: list[dict[str, Any]] = Field(default_factory=list)
+    """Stub: Part II K-1 passthroughs. Tighten in fan-out."""
+    part_iii_estates_trusts: list[dict[str, Any]] = Field(default_factory=list)
+    """Stub: Part III K-1 estate/trust. Tighten in fan-out."""
+
+
+# ---------------------------------------------------------------------------
+# Adjustments, deductions, credits
+# ---------------------------------------------------------------------------
+
+
+class AdjustmentsToIncome(_StrictModel):
+    """Schedule 1 Part II — above-the-line adjustments."""
+
+    educator_expenses: Money = Decimal("0")
+    hsa_deduction: Money = Decimal("0")
+    deductible_se_tax: Money = Decimal("0")  # computed from Sch SE
+    se_health_insurance: Money = Decimal("0")
+    se_retirement_plans: Money = Decimal("0")  # SEP, SIMPLE, Solo 401k
+    alimony_paid: Money = Decimal("0")  # pre-2019 divorces only
+    alimony_recipient_ssn: SSN | None = None
+    alimony_divorce_date: dt.date | None = None
+    ira_deduction: Money = Decimal("0")
+    student_loan_interest: Money = Decimal("0")
+    archer_msa_deduction: Money = Decimal("0")
+    other_adjustments: dict[str, Money] = Field(default_factory=dict)
+
+
+class ItemizedDeductions(_StrictModel):
+    """Schedule A — Itemized Deductions."""
+
+    medical_and_dental_total: Money = Decimal("0")
+    state_and_local_income_tax: Money = Decimal("0")
+    state_and_local_sales_tax: Money = Decimal("0")
+    real_estate_tax: Money = Decimal("0")
+    personal_property_tax: Money = Decimal("0")
+    home_mortgage_interest: Money = Decimal("0")
+    mortgage_points: Money = Decimal("0")
+    mortgage_insurance_premiums: Money = Decimal("0")
+    investment_interest: Money = Decimal("0")
+    gifts_to_charity_cash: Money = Decimal("0")
+    gifts_to_charity_other_than_cash: Money = Decimal("0")
+    gifts_to_charity_carryover: Money = Decimal("0")
+    casualty_and_theft_losses_federal_disaster: Money = Decimal("0")
+    other_itemized: dict[str, Money] = Field(default_factory=dict)
+
+
+class Credits(_StrictModel):
+    child_tax_credit: Money = Decimal("0")  # computed
+    additional_child_tax_credit_refundable: Money = Decimal("0")  # computed
+    credit_for_other_dependents: Money = Decimal("0")
+    dependent_care_credit: Money = Decimal("0")
+    education_credits_nonrefundable: Money = Decimal("0")  # AOTC + LLC non-refundable
+    education_credits_refundable: Money = Decimal("0")  # AOTC refundable portion
+    retirement_savings_credit: Money = Decimal("0")  # Form 8880
+    foreign_tax_credit: Money = Decimal("0")
+    residential_energy_credits: Money = Decimal("0")
+    earned_income_tax_credit: Money = Decimal("0")  # computed
+    premium_tax_credit_net: Money = Decimal("0")
+    other_credits: dict[str, Money] = Field(default_factory=dict)
+
+
+class OtherTaxes(_StrictModel):
+    self_employment_tax: Money = Decimal("0")  # from Schedule SE
+    additional_medicare_tax: Money = Decimal("0")  # from Form 8959
+    net_investment_income_tax: Money = Decimal("0")  # from Form 8960
+    alternative_minimum_tax: Money = Decimal("0")  # from Form 6251
+    early_distribution_penalty: Money = Decimal("0")  # from Form 5329
+    other: dict[str, Money] = Field(default_factory=dict)
+
+
+class Payments(_StrictModel):
+    """Form 1040 lines 25 and 31 — payments / credits against tax."""
+
+    federal_income_tax_withheld_from_w2: Money = Decimal("0")  # summed from W-2s
+    federal_income_tax_withheld_from_1099: Money = Decimal("0")
+    federal_income_tax_withheld_other: Money = Decimal("0")  # SSA, RRB
+    estimated_tax_payments_2025: Money = Decimal("0")
+    prior_year_overpayment_applied: Money = Decimal("0")
+    amount_paid_with_4868_extension: Money = Decimal("0")
+    excess_social_security_tax_withheld: Money = Decimal("0")
+
+
+# ---------------------------------------------------------------------------
+# State returns
+# ---------------------------------------------------------------------------
+
+
+class StateReturn(_StrictModel):
+    state: StateCode
+    residency: ResidencyStatus
+    days_in_state: int = Field(ge=0, le=366)
+    state_specific: dict[str, Any] = Field(default_factory=dict)
+    """State plugins populate this with their own shape. Tighten per-state in fan-out."""
+
+
+# ---------------------------------------------------------------------------
+# Carryforwards
+# ---------------------------------------------------------------------------
+
+
+class PriorYearCarryforwards(_StrictModel):
+    nol_carryforward: Money = Decimal("0")
+    short_term_capital_loss_carryover: Money = Decimal("0")
+    long_term_capital_loss_carryover: Money = Decimal("0")
+    charitable_contribution_carryover: Money = Decimal("0")
+    amt_credit_carryforward: Money = Decimal("0")
+    passive_activity_loss_carryover: Money = Decimal("0")
+    foreign_tax_credit_carryover: Money = Decimal("0")
+    section_179_disallowed_carryover: Money = Decimal("0")
+    other: dict[str, Money] = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# Computed totals (populated by calc engine)
+# ---------------------------------------------------------------------------
+
+
+class ComputedTotals(_StrictModel):
+    """Fields populated by the calc engine. Absent on a fresh interview; filled after compute."""
+
+    total_income: Money | None = None
+    adjustments_total: Money | None = None
+    adjusted_gross_income: Money | None = None
+    deduction_taken: Money | None = None  # max(standard, itemized) + senior + OBBBA extras
+    qbi_deduction: Money | None = None
+    taxable_income: Money | None = None
+    tentative_tax: Money | None = None
+    total_credits_nonrefundable: Money | None = None
+    other_taxes_total: Money | None = None
+    total_tax: Money | None = None
+    total_payments: Money | None = None
+    refund: Money | None = None
+    amount_owed: Money | None = None
+    effective_rate: float | None = None
+    marginal_rate: float | None = None
+
+
+# ---------------------------------------------------------------------------
+# Root
+# ---------------------------------------------------------------------------
+
+
+class CanonicalReturn(_StrictModel):
+    """Root of the canonical tax return JSON."""
+
+    schema_version: Literal["0.1.0"] = SCHEMA_VERSION
+    tax_year: int = Field(ge=2024, le=2030)
+
+    filing_status: FilingStatus
+    taxpayer: Person
+    spouse: Person | None = None
+    address: Address
+    phone: str | None = None
+    email: str | None = None
+
+    dependents: list[Dependent] = Field(default_factory=list)
+
+    # Income
+    w2s: list[W2] = Field(default_factory=list)
+    forms_1099_int: list[Form1099INT] = Field(default_factory=list)
+    forms_1099_div: list[Form1099DIV] = Field(default_factory=list)
+    forms_1099_b: list[Form1099B] = Field(default_factory=list)
+    forms_1099_nec: list[Form1099NEC] = Field(default_factory=list)
+    schedules_c: list[ScheduleC] = Field(default_factory=list)
+    schedules_e: list[ScheduleE] = Field(default_factory=list)
+
+    # Other income (stubs — tighten in fan-out)
+    other_income: dict[str, Any] = Field(default_factory=dict)
+    """1099-R, 1099-G, 1099-SSA, K-1, etc. Tighten per-form in fan-out."""
+
+    # Adjustments / deductions / credits / taxes / payments
+    adjustments: AdjustmentsToIncome = Field(default_factory=AdjustmentsToIncome)
+    itemize_deductions: bool = False
+    itemized: ItemizedDeductions | None = None
+    credits: Credits = Field(default_factory=Credits)
+    other_taxes: OtherTaxes = Field(default_factory=OtherTaxes)
+    payments: Payments = Field(default_factory=Payments)
+
+    # States
+    state_returns: list[StateReturn] = Field(default_factory=list)
+
+    # Carryforwards
+    carryforwards: PriorYearCarryforwards = Field(default_factory=PriorYearCarryforwards)
+
+    # Computed (populated by calc engine)
+    computed: ComputedTotals = Field(default_factory=ComputedTotals)
+
+    # Free-form notes (not tax data, just reminders for the human)
+    notes: list[str] = Field(default_factory=list)
+
+    @field_validator("tax_year")
+    @classmethod
+    def _tax_year_current(cls, v: int) -> int:
+        if v < 2024:
+            raise ValueError("tax_year must be >= 2024 (skill targets TY2025 and forward)")
+        return v
+
+    @model_validator(mode="after")
+    def _spouse_required_iff_joint(self) -> "CanonicalReturn":
+        needs_spouse = self.filing_status in (FilingStatus.MFJ, FilingStatus.MFS)
+        if needs_spouse and self.spouse is None:
+            raise ValueError(f"filing_status={self.filing_status.value} requires spouse")
+        if not needs_spouse and self.spouse is not None and self.filing_status != FilingStatus.QSS:
+            raise ValueError(f"filing_status={self.filing_status.value} should not have spouse")
+        return self
+
+    @model_validator(mode="after")
+    def _itemized_iff_itemize(self) -> "CanonicalReturn":
+        if self.itemize_deductions and self.itemized is None:
+            raise ValueError("itemize_deductions=True requires itemized block")
+        return self

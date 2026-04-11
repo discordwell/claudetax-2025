@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+
+# Virtualenv
+.venv/
+venv/
+env/
+ENV/
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Taxpayer data — NEVER commit
+# User convention: data lives at ~/TaxData/, never inside this repo.
+# These patterns are defense-in-depth in case someone copies data into the tree by mistake.
+*.tax
+*.T[0-9][0-9]
+TaxData/
+tax-data/
+user-data/
+**/return.json
+!skill/schemas/return.schema.json
+!skill/fixtures/**/return.json
+
+# Secrets
+.env
+.env.*
+!.env.example
+credentials*
+secrets*
+*.key
+*.pem
+
+# Build artifacts
+*.pdf
+!skill/reference/**/*.pdf
+!skill/fixtures/**/*.pdf
+!skill/tests/**/*.pdf

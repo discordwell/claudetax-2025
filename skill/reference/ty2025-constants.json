@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "meta": {
+    "tax_year": 2025,
+    "compiled": "2026-04-10",
+    "obbba_adjusted": true,
+    "notes": "Inflation-adjusted figures start from IRS Rev. Proc. 2024-40, then overlaid with the One Big Beautiful Bill Act (OBBBA, P.L. 119-21, signed 2025-07-04). Use these OBBBA-adjusted values, not Rev. Proc. 2024-40 alone.",
+    "primary_sources": {
+      "obbba_provisions": "https://www.irs.gov/newsroom/one-big-beautiful-bill-provisions",
+      "obbba_deductions": "https://www.irs.gov/newsroom/one-big-beautiful-bill-act-tax-deductions-for-working-americans-and-seniors",
+      "rev_proc_2024_40": "https://www.irs.gov/pub/irs-drop/rp-24-40.pdf",
+      "irs_inflation_2025": "https://www.irs.gov/newsroom/irs-releases-tax-inflation-adjustments-for-tax-year-2025",
+      "irs_cola": "https://www.irs.gov/retirement-plans/cola-increases-for-dollar-limitations-on-benefits-and-contributions",
+      "rev_proc_2024_25_hsa": "https://www.irs.gov/pub/irs-drop/rp-24-25.pdf",
+      "ssa_wage_base": "https://www.ssa.gov/oact/cola/cbb.html",
+      "i1040gi_2025": "https://www.irs.gov/pub/irs-pdf/i1040gi.pdf",
+      "form_8995_instructions": "https://www.irs.gov/instructions/i8995",
+      "form_8995a_instructions": "https://www.irs.gov/pub/irs-pdf/i8995a.pdf",
+      "irs_1099k_obbba_faq": "https://www.irs.gov/newsroom/irs-issues-faqs-on-form-1099-k-threshold-under-the-one-big-beautiful-bill-dollar-limit-reverts-to-20000",
+      "irs_ctc": "https://www.irs.gov/credits-deductions/individuals/child-tax-credit",
+      "irs_eitc_tables": "https://www.irs.gov/credits-deductions/individuals/earned-income-tax-credit/earned-income-and-earned-income-tax-credit-eitc-tables",
+      "landscape_doc": "skill/reference/ty2025-landscape.md"
+    }
+  },
+
+  "filing_statuses": ["single", "mfj", "mfs", "hoh", "qss"],
+
+  "standard_deduction": {
+    "single": 15750,
+    "mfs": 15750,
+    "mfj": 31500,
+    "qss": 31500,
+    "hoh": 23625,
+    "additional_65_or_blind_mfj_mfs_qss": 1600,
+    "additional_65_or_blind_single_hoh": 2000,
+    "senior_deduction_obbba": {
+      "amount": 6000,
+      "phase_out_start_single_hoh_mfs": 75000,
+      "phase_out_start_mfj_qss": 150000,
+      "years_applicable": [2025, 2026, 2027, 2028],
+      "note": "New under OBBBA. Stacks on top of the regular age-65 additional standard deduction."
+    },
+    "_sources": ["obbba_provisions", "obbba_deductions"]
+  },
+
+  "ordinary_brackets": {
+    "single": [
+      {"rate": 0.10, "upper": 11925},
+      {"rate": 0.12, "upper": 48475},
+      {"rate": 0.22, "upper": 103350},
+      {"rate": 0.24, "upper": 197300},
+      {"rate": 0.32, "upper": 250525},
+      {"rate": 0.35, "upper": 626350},
+      {"rate": 0.37, "upper": null}
+    ],
+    "mfj": [
+      {"rate": 0.10, "upper": 23850},
+      {"rate": 0.12, "upper": 96950},
+      {"rate": 0.22, "upper": 206700},
+      {"rate": 0.24, "upper": 394600},
+      {"rate": 0.32, "upper": 501050},
+      {"rate": 0.35, "upper": 751600},
+      {"rate": 0.37, "upper": null}
+    ],
+    "qss": [
+      {"rate": 0.10, "upper": 23850},
+      {"rate": 0.12, "upper": 96950},
+      {"rate": 0.22, "upper": 206700},
+      {"rate": 0.24, "upper": 394600},
+      {"rate": 0.32, "upper": 501050},
+      {"rate": 0.35, "upper": 751600},
+      {"rate": 0.37, "upper": null}
+    ],
+    "mfs": [
+      {"rate": 0.10, "upper": 11925},
+      {"rate": 0.12, "upper": 48475},
+      {"rate": 0.22, "upper": 103350},
+      {"rate": 0.24, "upper": 197300},
+      {"rate": 0.32, "upper": 250525},
+      {"rate": 0.35, "upper": 375800},
+      {"rate": 0.37, "upper": null}
+    ],
+    "hoh": [
+      {"rate": 0.10, "upper": 17000},
+      {"rate": 0.12, "upper": 64850},
+      {"rate": 0.22, "upper": 103350},
+      {"rate": 0.24, "upper": 197300},
+      {"rate": 0.32, "upper": 250500},
+      {"rate": 0.35, "upper": 626350},
+      {"rate": 0.37, "upper": null}
+    ],
+    "_sources": ["rev_proc_2024_40", "irs_inflation_2025"]
+  },
+
+  "capital_gains_brackets": {
+    "note": "Long-term capital gains and qualified dividends. Each status has 0%, 15%, and 20% thresholds.",
+    "single": {"zero_rate_upper": 48350, "fifteen_rate_upper": 533400},
+    "mfj": {"zero_rate_upper": 96700, "fifteen_rate_upper": 600050},
+    "qss": {"zero_rate_upper": 96700, "fifteen_rate_upper": 600050},
+    "mfs": {"zero_rate_upper": 48350, "fifteen_rate_upper": 300000},
+    "hoh": {"zero_rate_upper": 64750, "fifteen_rate_upper": 566700},
+    "_sources": ["rev_proc_2024_40", "irs_inflation_2025"]
+  },
+
+  "payroll_taxes": {
+    "social_security_wage_base": 176100,
+    "social_security_rate_employee": 0.062,
+    "social_security_rate_self_employment": 0.124,
+    "medicare_rate_employee": 0.0145,
+    "medicare_rate_self_employment": 0.029,
+    "additional_medicare_tax": {
+      "rate": 0.009,
+      "threshold_single": 200000,
+      "threshold_hoh": 200000,
+      "threshold_mfj": 250000,
+      "threshold_qss": 250000,
+      "threshold_mfs": 125000,
+      "note": "Not indexed for inflation. Thresholds are fixed by statute."
+    },
+    "niit": {
+      "rate": 0.038,
+      "threshold_single": 200000,
+      "threshold_hoh": 200000,
+      "threshold_mfj": 250000,
+      "threshold_qss": 250000,
+      "threshold_mfs": 125000,
+      "note": "Net Investment Income Tax. Not indexed. 3.8% on lesser of NII or MAGI - threshold."
+    },
+    "_sources": ["ssa_wage_base", "i1040gi_2025"]
+  },
+
+  "schedule_se": {
+    "combined_rate": 0.153,
+    "social_security_portion_rate": 0.124,
+    "medicare_portion_rate": 0.029,
+    "filing_floor_net_se_earnings": 400,
+    "deduction_fraction_of_se_tax": 0.5,
+    "note_ss_wage_base_applies": "SS portion only applies to net SE earnings up to the SS wage base ($176,100 for TY2025). Medicare portion has no cap.",
+    "_sources": ["i1040gi_2025"]
+  },
+
+  "qbi_deduction": {
+    "note": "Section 199A. Made permanent by OBBBA (was scheduled to sunset 12/31/2025).",
+    "rate": 0.20,
+    "phase_in_threshold_single_hoh_mfs_qss": 197300,
+    "phase_in_threshold_mfj": 394600,
+    "phase_in_width_single_hoh_mfs_qss": 50000,
+    "phase_in_width_mfj": 100000,
+    "full_phase_in_complete_single_hoh_mfs_qss": 247300,
+    "full_phase_in_complete_mfj": 494600,
+    "form_8995_simplified_when_taxable_income_le_threshold": true,
+    "form_8995a_when_above_threshold": true,
+    "_sources": ["form_8995_instructions", "form_8995a_instructions", "obbba_provisions"]
+  },
+
+  "child_tax_credit": {
+    "note": "Raised to $2,200 by OBBBA, now indexed. Phase-out thresholds unchanged and not indexed.",
+    "amount_per_qualifying_child": 2200,
+    "refundable_portion_max_actc": 1700,
+    "phase_out_start_single_hoh_mfs": 200000,
+    "phase_out_start_mfj_qss": 400000,
+    "phase_out_reduction_per_1000_over_threshold": 50,
+    "_sources": ["obbba_provisions", "irs_ctc"]
+  },
+
+  "eitc": {
+    "note": "Earned Income Tax Credit. Source: Rev. Proc. 2024-40 and IRS EITC tables.",
+    "max_credit_by_qualifying_children": {
+      "0": 649,
+      "1": 4328,
+      "2": 7152,
+      "3_or_more": 8046
+    },
+    "agi_limit_single_hoh_qss_by_qualifying_children": {
+      "0": 19104,
+      "1": 50434,
+      "2": 57310,
+      "3_or_more": 61555
+    },
+    "agi_limit_mfj_by_qualifying_children": {
+      "0": 26214,
+      "1": 57554,
+      "2": 64430,
+      "3_or_more": 68675
+    },
+    "investment_income_disqualifier": 11950,
+    "_sources": ["irs_eitc_tables", "rev_proc_2024_40"]
+  },
+
+  "retirement_contribution_limits": {
+    "elective_deferral_401k_403b_457_tsp": 23500,
+    "catch_up_age_50_plus_401k_403b_457_tsp": 7500,
+    "super_catch_up_ages_60_63_401k_403b_457_tsp": {
+      "amount": 11250,
+      "note": "SECURE 2.0 §109, effective 2025. Applies to ages 60-63 in place of the regular age-50 catch-up."
+    },
+    "ira_traditional_or_roth_combined": 7000,
+    "ira_catch_up_age_50_plus": 1000,
+    "sep_ira": {
+      "max_dollar": 70000,
+      "max_rate_of_compensation": 0.25,
+      "effective_se_rate": 0.20,
+      "note": "Lesser of 25% of compensation (effective 20% for self-employed due to SE tax deduction) or $70,000."
+    },
+    "solo_401k_total_annual_additions": 70000,
+    "simple_ira_elective_deferral": 16500,
+    "simple_ira_catch_up_age_50_plus": 3500,
+    "simple_ira_super_catch_up_ages_60_63": 5250,
+    "defined_benefit_415_limit": 280000,
+    "_sources": ["irs_cola"]
+  },
+
+  "hsa": {
+    "contribution_limit_self_only": 4300,
+    "contribution_limit_family": 8550,
+    "catch_up_age_55_plus": 1000,
+    "catch_up_note": "Each spouse with their own HSA gets the catch-up separately.",
+    "hdhp_min_annual_deductible_self_only": 1650,
+    "hdhp_min_annual_deductible_family": 3300,
+    "hdhp_max_oop_self_only": 8300,
+    "hdhp_max_oop_family": 16600,
+    "_sources": ["rev_proc_2024_25_hsa", "irs_cola"]
+  },
+
+  "information_returns": {
+    "form_1099k_threshold_obbba_reverted": {
+      "dollar_threshold": 20000,
+      "transaction_count_threshold": 200,
+      "note": "Both thresholds must be exceeded (AND). OBBBA retroactively reverted the 1099-K threshold from the previously-announced $2,500 transitional figure back to the pre-ARPA $20,000 / 200 transactions rule for TY2025 and forward. State-level thresholds may be lower: MA/MD/VA $600, NJ $1,000, IL/VT vary."
+    },
+    "schedule_se_filing_floor": 400,
+    "_sources": ["irs_1099k_obbba_faq"]
+  },
+
+  "new_obbba_forms": {
+    "form_4547": {
+      "name": "Trump Account Election",
+      "note": "New under OBBBA for TY2025. Filed with the 2025 return, NOT attached to 1040-X."
+    },
+    "schedule_1a": {
+      "name": "Tips and Overtime Deductions",
+      "note": "New schedule for OBBBA temporary deductions on qualified tips and qualified overtime compensation, TY2025-2028."
+    },
+    "_sources": ["obbba_provisions", "obbba_deductions"]
+  },
+
+  "_todo": {
+    "note": "Items not yet researched — do NOT make up numbers. When a calc module needs one of these, block on a targeted research sub-agent.",
+    "pending": [
+      "AMT exemption amount and phase-out thresholds (needed for Form 6251)",
+      "Foreign Earned Income Exclusion (FEIE) amount for TY2025",
+      "Student loan interest deduction phase-out thresholds",
+      "Savers Credit income brackets",
+      "IRA deduction phase-out when covered by workplace plan",
+      "Roth IRA contribution phase-out thresholds",
+      "Education credit phase-outs (AOTC, LLC)",
+      "Dependent care credit limits",
+      "Adoption credit amounts and phase-out",
+      "Premium Tax Credit ACA parameters",
+      "Long-term capital gains rate applied inside trusts/estates (not relevant for 1040)",
+      "Qualified tips / qualified overtime deduction caps (OBBBA, Schedule 1-A)",
+      "Trump Account (Form 4547) contribution limits and eligibility"
+    ]
+  }
+}

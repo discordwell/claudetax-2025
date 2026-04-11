@@ -1,0 +1,47 @@
+{
+  "schema_version": "0.1.0",
+  "tax_year": 2025,
+  "filing_status": "single",
+  "taxpayer": {
+    "first_name": "Alex",
+    "last_name": "Doe",
+    "ssn": "111-22-3333",
+    "date_of_birth": "1990-01-15",
+    "is_blind": false,
+    "is_age_65_or_older": false
+  },
+  "address": {
+    "street1": "1 Test Lane",
+    "city": "Springfield",
+    "state": "IL",
+    "zip": "62701",
+    "country": "US"
+  },
+  "w2s": [
+    {
+      "employer_name": "Acme Corp",
+      "employer_ein": "12-3456789",
+      "employee_is_taxpayer": true,
+      "box1_wages": "65000.00",
+      "box2_federal_income_tax_withheld": "7500.00",
+      "box3_social_security_wages": "65000.00",
+      "box4_social_security_tax_withheld": "4030.00",
+      "box5_medicare_wages": "65000.00",
+      "box6_medicare_tax_withheld": "942.50",
+      "box7_social_security_tips": "0",
+      "box8_allocated_tips": "0",
+      "box10_dependent_care_benefits": "0",
+      "box11_nonqualified_plans": "0",
+      "box12_entries": [],
+      "box13_statutory_employee": false,
+      "box13_retirement_plan": false,
+      "box13_third_party_sick_pay": false,
+      "box14_other": [],
+      "box16_state_wages": "0",
+      "box17_state_tax_withheld": "0",
+      "box18_local_wages": "0",
+      "box19_local_tax_withheld": "0"
+    }
+  ],
+  "itemize_deductions": false
+}

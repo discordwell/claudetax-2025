@@ -1,0 +1,71 @@
+{
+  "meta": {
+    "verified": "2026-04-10",
+    "primary_source": "https://taxfoundation.org/research/all/state/state-reciprocity-agreements/",
+    "secondary_sources": [
+      "https://support.taxslayer.com/hc/en-us/articles/360015899831-Which-states-have-tax-reciprocity-agreements",
+      "https://www.nifc.gov/sites/default/files/programs_documents/CPC/publications/StateTaxReciprocalAgreements.pdf"
+    ],
+    "note": "Reciprocity means: a resident of state A working in state B pays income tax only to state A. The employee files an exemption certificate with their employer to stop state B withholding. Agreements are bilateral between the listed pairs. DC has an additional unilateral policy of not taxing any nonresident employees — represented by dc_nonresident_exemption below."
+  },
+
+  "agreements": [
+    {"states": ["IL", "IA"]},
+    {"states": ["IL", "KY"]},
+    {"states": ["IL", "MI"]},
+    {"states": ["IL", "WI"]},
+    {"states": ["IN", "KY"]},
+    {"states": ["IN", "MI"]},
+    {"states": ["IN", "OH"]},
+    {"states": ["IN", "PA"]},
+    {"states": ["IN", "WI"]},
+    {"states": ["KY", "MI"]},
+    {"states": ["KY", "OH"]},
+    {"states": ["KY", "VA"]},
+    {"states": ["KY", "WI"]},
+    {"states": ["KY", "WV"]},
+    {"states": ["MD", "DC"]},
+    {"states": ["MD", "PA"]},
+    {"states": ["MD", "VA"]},
+    {"states": ["MD", "WV"]},
+    {"states": ["MI", "MN"]},
+    {"states": ["MI", "OH"]},
+    {"states": ["MI", "WI"]},
+    {"states": ["MN", "ND"]},
+    {"states": ["MT", "ND"]},
+    {"states": ["NJ", "PA"]},
+    {"states": ["OH", "PA"]},
+    {"states": ["OH", "WV"]},
+    {"states": ["PA", "VA"]},
+    {"states": ["PA", "WV"]},
+    {"states": ["VA", "DC"]},
+    {"states": ["VA", "WV"]}
+  ],
+
+  "dc_nonresident_exemption": {
+    "applies": true,
+    "description": "DC does not tax nonresident employees regardless of origin state. A nonresident working in DC files state tax only with their home state. Stacks on top of the bilateral MD-DC and VA-DC agreements above."
+  },
+
+  "no_income_tax_states": [
+    {"code": "AK", "name": "Alaska"},
+    {"code": "FL", "name": "Florida"},
+    {"code": "NV", "name": "Nevada"},
+    {"code": "NH", "name": "New Hampshire", "note": "Previously taxed interest and dividends only; fully phased out after TY2024."},
+    {"code": "SD", "name": "South Dakota"},
+    {"code": "TN", "name": "Tennessee"},
+    {"code": "TX", "name": "Texas"},
+    {"code": "WY", "name": "Wyoming"}
+  ],
+
+  "capital_gains_only_states": [
+    {"code": "WA", "name": "Washington", "note": "No broad income tax, but Washington taxes long-term capital gains above a threshold (created 2022, upheld 2023). Partial-income-tax state."}
+  ],
+
+  "notable_non_reciprocity_borders": [
+    {"between": ["NY", "NJ"], "note": "No reciprocity. Cross-border commuters file nonresident in work state and claim resident credit in home state."},
+    {"between": ["NY", "CT"], "note": "No reciprocity."},
+    {"between": ["CA", "any"], "note": "CA has no reciprocity with any state."},
+    {"between": ["MA", "any"], "note": "MA has no reciprocity with any state."}
+  ]
+}

@@ -447,16 +447,21 @@ def test_build_paper_bundle_form_1040_before_schedules(
     bundle_path = tmp_path / "bundle_itemized.pdf"
     build_paper_bundle(canonical, [sa_path, f1040], bundle_path)
 
-    # Find the page index of "Form 1040" header text and a Schedule A header.
+    # Find the page index of Form 1040 vs Schedule A. The filled IRS
+    # Schedule A header is "SCHEDULE A (Form 1040)" in all caps, so a
+    # case-insensitive filter is required (the pre-wave-5 reportlab
+    # scaffold was title-case).
     pages = _per_page_text(bundle_path)
-    form_1040_pages = [
-        i for i, t in enumerate(pages) if "Form 1040" in t and "Schedule" not in t.split("Form 1040")[0]
+    form_1040_only_pages = [
+        i
+        for i, t in enumerate(pages)
+        if "Form 1040" in t and "SCHEDULE A" not in t.upper()
     ]
-    schedule_a_pages = [i for i, t in enumerate(pages) if "Schedule A" in t]
+    schedule_a_pages = [i for i, t in enumerate(pages) if "SCHEDULE A" in t.upper()]
 
-    assert form_1040_pages, "Form 1040 page not found in bundle"
+    assert form_1040_only_pages, "Form 1040 page not found in bundle"
     assert schedule_a_pages, "Schedule A page not found in bundle"
-    assert min(form_1040_pages) < min(schedule_a_pages)
+    assert min(form_1040_only_pages) < min(schedule_a_pages)
 
 
 def test_build_paper_bundle_includes_signature_and_mailing_pages(

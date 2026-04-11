@@ -62,6 +62,7 @@ from skill.scripts.states.al import (
     AL_TY2025_STD_DED_SINGLE_MIN,
     AL_V1_LIMITATIONS,
     AlabamaPlugin,
+    LOCK_VALUE,
     PLUGIN,
     al_dependent_exemption,
     al_personal_exemption,
@@ -466,8 +467,6 @@ class TestAlabamaTaxLockSingle65k:
     AGI with no deductions). Hand-rolling closes the $487.75 gap.
     """
 
-    LOCK_VALUE = Decimal("2722.25")
-
     def test_resident_single_65k_tax_lock(
         self, single_65k_return, federal_single_65k
     ):
@@ -477,10 +476,10 @@ class TestAlabamaTaxLockSingle65k:
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert result.state_specific["state_total_tax"] == self.LOCK_VALUE
+        assert result.state_specific["state_total_tax"] == LOCK_VALUE
         assert (
             result.state_specific["state_total_tax_resident_basis"]
-            == self.LOCK_VALUE
+            == LOCK_VALUE
         )
 
     def test_lock_value_breakdown(

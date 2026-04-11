@@ -1,5 +1,9 @@
 """Iowa (IA) state plugin — TY2025.
 
+See skill/reference/tenforty-ty2025-gap.md for the TY2025 probe rubric
+and the graph-backend output-field gap list (state_taxable_income
+echo, state_tax_bracket=0, state_effective_tax_rate=0).
+
 Decision: WRAP (graph backend)
 ------------------------------
 Per the wave-5 probe-then-verify-then-decide rubric (CP8-B), we re-probed

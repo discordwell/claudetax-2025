@@ -83,6 +83,7 @@ from skill.scripts.states._plugin_api import (
     SubmissionChannel,
 )
 from skill.scripts.states.ne import (
+    LOCK_VALUE,
     NE_TY2025_BRACKETS,
     NE_TY2025_PEC_PER_EXEMPTION_APPLIED,
     NE_TY2025_STANDARD_DEDUCTION,
@@ -440,7 +441,7 @@ class TestNebraskaPluginComputeResident:
         assert result.residency == ResidencyStatus.RESIDENT
         assert result.days_in_state == 365
 
-    def test_resident_65k_single_lock(
+    def test_resident_single_65k_tax_lock(
         self, single_65k_return, federal_single_65k
     ):
         """HAND-ROLL CORRECTNESS LOCK: Single / $65k W-2 / Standard
@@ -462,7 +463,7 @@ class TestNebraskaPluginComputeResident:
         )
         state_tax = result.state_specific["state_total_tax"]
         assert isinstance(state_tax, Decimal)
-        assert state_tax == Decimal("2454.83")
+        assert state_tax == LOCK_VALUE
 
     def test_state_taxable_income_correct(
         self, single_65k_return, federal_single_65k

@@ -1,5 +1,9 @@
 """Oklahoma (OK) state plugin — TY2025.
 
+See skill/reference/tenforty-ty2025-gap.md for the TY2025 probe rubric
+and why OK is hand-rolled instead of graph-wrapped (graph backend
+omits the OK $1,000 personal exemption — material mismatch > $5).
+
 Hand-rolled Form 511 calculation. Tenforty's default OTS backend does
 NOT register OK_511 (``ValueError: OTS does not support 2025/OK_511``),
 and tenforty's *graph* backend has a real correctness gap for OK at
@@ -190,7 +194,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from skill.scripts.models import (
     CanonicalReturn,
@@ -213,6 +217,11 @@ from skill.scripts.states._plugin_api import (
     StateStartingPoint,
     SubmissionChannel,
 )
+
+
+# Canonical wave-5 $65k Single gatekeeper lock. Hand-traced from OK
+# Form 511 — see module docstring. Referenced from test_state_ok.py.
+LOCK_VALUE: Final[Decimal] = Decimal("2549.88")
 
 
 # ---------------------------------------------------------------------------

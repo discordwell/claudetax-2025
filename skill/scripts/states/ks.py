@@ -1,5 +1,9 @@
 """Kansas (KS) state plugin — TY2025.
 
+See skill/reference/tenforty-ty2025-gap.md for the TY2025 probe rubric
+and why KS is hand-rolled instead of graph-wrapped (OTS_FORM_CONFIG
+has no KS_K40 entries for any year).
+
 Kansas is NOT actually supported by tenforty/OpenTaxSolver at time of
 writing: ``tenforty.evaluate_return(year=2025, state='KS', ...)`` raises
 ``ValueError: OTS does not support 2025/KS_K40``. The task spec says
@@ -142,7 +146,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from skill.scripts.models import (
     CanonicalReturn,
@@ -158,6 +162,12 @@ from skill.scripts.states._plugin_api import (
     StateStartingPoint,
     SubmissionChannel,
 )
+
+
+# Canonical wave-4 $65k Single gatekeeper lock. Hand-traced from KS
+# IP25 Tax Computation Worksheet — see module docstring. Referenced
+# from test_state_ks.py.
+LOCK_VALUE: Final[Decimal] = Decimal("2827.71")
 
 
 # ---------------------------------------------------------------------------

@@ -72,6 +72,7 @@ from skill.scripts.states.ct import (
     CT_V1_LIMITATIONS,
     ConnecticutPlugin,
     CTTaxCalcResult,
+    LOCK_VALUE,
     PLUGIN,
     compute_ct_tax,
 )
@@ -552,7 +553,7 @@ class TestConnecticutPluginResident:
         assert result.residency == ResidencyStatus.RESIDENT
         assert result.days_in_state == 365
 
-    def test_resident_single_65k_ct_tax_is_2875(
+    def test_resident_single_65k_tax_lock(
         self, single_65k_return, federal_single_65k
     ):
         """CORE WRAP-CORRECTNESS LOCK: Single $65k W-2 CT resident.
@@ -583,7 +584,7 @@ class TestConnecticutPluginResident:
         )
         state_tax = result.state_specific["state_total_tax"]
         assert isinstance(state_tax, Decimal)
-        assert state_tax == Decimal("2875.00")
+        assert state_tax == LOCK_VALUE
 
     def test_resident_single_65k_all_tcs_lines(
         self, single_65k_return, federal_single_65k

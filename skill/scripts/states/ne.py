@@ -1,5 +1,10 @@
 """Nebraska (NE) state plugin — TY2025.
 
+See skill/reference/tenforty-ty2025-gap.md for the TY2025 probe rubric
+and why NE is hand-rolled rather than graph-wrapped (the graph backend
+crashes on any return with ``num_dependents>=1`` and also omits the NE
+personal exemption credit).
+
 Decision: HAND-ROLL
 -------------------
 Per the wave-5 probe-then-verify-then-decide rubric (CP8-B), we re-
@@ -237,7 +242,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from skill.scripts.models import (
     CanonicalReturn,
@@ -260,6 +265,12 @@ from skill.scripts.states._plugin_api import (
     StateStartingPoint,
     SubmissionChannel,
 )
+
+
+# Canonical wave-5 $65k Single gatekeeper lock. Hand-traced from NE
+# Form 1040N bracket schedule — see module docstring. Referenced from
+# test_state_ne.py.
+LOCK_VALUE: Final[Decimal] = Decimal("2454.83")
 
 
 # ---------------------------------------------------------------------------

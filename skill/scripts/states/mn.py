@@ -1,5 +1,9 @@
 """Minnesota (MN) state plugin - TY2025.
 
+See skill/reference/tenforty-ty2025-gap.md for the TY2025 probe rubric
+and why MN is hand-rolled instead of graph-wrapped (OTS_FORM_CONFIG
+has no MN_M1 entries for any year).
+
 *** TENFORTY MN SUPPORT STATUS: NOT AVAILABLE ***
 
 The fan-out spec for this agent stated that tenforty / OpenTaxSolver supports
@@ -185,7 +189,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from skill.scripts.models import (
     CanonicalReturn,
@@ -201,6 +205,12 @@ from skill.scripts.states._plugin_api import (
     StateStartingPoint,
     SubmissionChannel,
 )
+
+
+# Canonical wave-4 $65k Single gatekeeper lock. Hand-traced from MN
+# Form M1 bracket schedule — see module docstring. Referenced from
+# test_state_mn.py.
+LOCK_VALUE: Final[Decimal] = Decimal("2931.14")
 
 
 # ---------------------------------------------------------------------------

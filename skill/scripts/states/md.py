@@ -1,5 +1,10 @@
 """Maryland (MD) state plugin — TY2025.
 
+See skill/reference/tenforty-ty2025-gap.md for the TY2025 probe rubric
+and why MD is hand-rolled instead of graph-wrapped (OTS_FORM_CONFIG
+has no MD_502 entries for any year, and MD has a county-level local
+piggyback that would not fit a single-state graph wrap regardless).
+
 Maryland is NOT supported by tenforty/OpenTaxSolver. Calling
 ``tenforty.evaluate_return(..., state='MD')`` raises
 ``ValueError: OTS does not support 2025/MD_502`` for every tax year currently
@@ -164,7 +169,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from skill.scripts.models import (
     CanonicalReturn,
@@ -188,6 +193,12 @@ _CENTS = Decimal("0.01")
 def _cents(v: Decimal) -> Decimal:
     """Quantize a Decimal to cents with half-up rounding."""
     return v.quantize(_CENTS, rounding=ROUND_HALF_UP)
+
+
+# Canonical wave-4 $65k Single gatekeeper lock — MD Form 502 state
+# tax plus the 2.25% default local tax. Hand-traced from MD Form 502
+# — see module docstring. Referenced from test_state_md.py.
+LOCK_VALUE: Final[Decimal] = Decimal("4039.01")
 
 
 # ---------------------------------------------------------------------------

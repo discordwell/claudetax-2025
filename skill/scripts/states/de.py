@@ -123,7 +123,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from skill.scripts.models import (
     CanonicalReturn,
@@ -146,6 +146,11 @@ from skill.scripts.states._plugin_api import (
     StateStartingPoint,
     SubmissionChannel,
 )
+
+
+# Canonical wave-5 $65k Single gatekeeper lock. Hand-traced from DE
+# Form 200-01 — see module docstring. Referenced from test_state_de.py.
+LOCK_VALUE: Final[Decimal] = Decimal("2949.00")
 
 
 # ---------------------------------------------------------------------------

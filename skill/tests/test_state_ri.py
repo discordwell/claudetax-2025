@@ -53,6 +53,7 @@ from skill.scripts.states._plugin_api import (
     SubmissionChannel,
 )
 from skill.scripts.states.ri import (
+    LOCK_VALUE,
     PLUGIN,
     RI_TY2025_BRACKETS,
     RI_TY2025_BRACKETS_BY_STATUS,
@@ -416,7 +417,7 @@ class TestRhodeIslandPluginComputeResident:
         )
         assert result.residency == ResidencyStatus.RESIDENT
 
-    def test_resident_65k_single_lock(
+    def test_resident_single_65k_tax_lock(
         self, single_65k_return, federal_single_65k
     ):
         """**$65k Single RI resident WRAP-CORRECTNESS LOCK.**
@@ -439,7 +440,7 @@ class TestRhodeIslandPluginComputeResident:
         )
         state_tax = result.state_specific["state_total_tax"]
         assert isinstance(state_tax, Decimal)
-        assert state_tax == Decimal("1833.75")
+        assert state_tax == LOCK_VALUE
 
     def test_state_taxable_income_65k(
         self, single_65k_return, federal_single_65k

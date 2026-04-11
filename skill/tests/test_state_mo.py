@@ -42,6 +42,7 @@ from skill.scripts.states._plugin_api import (
     SubmissionChannel,
 )
 from skill.scripts.states.mo import (
+    LOCK_VALUE,
     MO_TY2025_BRACKETS,
     MO_TY2025_FED_TAX_DEDUCTION_CAP_MFJ,
     MO_TY2025_FED_TAX_DEDUCTION_CAP_OTHER,
@@ -368,7 +369,7 @@ class TestMissouriPluginComputeResident:
         assert result.state == "MO"
         assert result.residency == ResidencyStatus.RESIDENT
 
-    def test_resident_single_65k_lock(
+    def test_resident_single_65k_tax_lock(
         self, single_65k_return, federal_single_65k
     ):
         """**SPEC-MANDATED $65k Single LOCK**: $2,098.00 (whole-dollar
@@ -382,10 +383,11 @@ class TestMissouriPluginComputeResident:
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert result.state_specific["state_total_tax"] == Decimal("2098.00")
-        assert result.state_specific[
-            "state_total_tax_resident_basis"
-        ] == Decimal("2098.00")
+        assert result.state_specific["state_total_tax"] == LOCK_VALUE
+        assert (
+            result.state_specific["state_total_tax_resident_basis"]
+            == LOCK_VALUE
+        )
 
     def test_resident_single_65k_line_breakdown(
         self, single_65k_return, federal_single_65k

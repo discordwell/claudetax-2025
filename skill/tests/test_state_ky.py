@@ -61,6 +61,7 @@ from skill.scripts.states.ky import (
     KY_FAMILY_SIZE_THRESHOLDS_TY2025,
     KY_FLAT_RATE,
     KY_STANDARD_DEDUCTION_TY2025,
+    LOCK_VALUE,
     PLUGIN,
     KentuckyPlugin,
 )
@@ -318,7 +319,7 @@ class TestKentuckyPluginComputeResident:
         assert result.residency == ResidencyStatus.RESIDENT
         assert result.days_in_state == 365
 
-    def test_wrap_correctness_lock_single_65k(
+    def test_resident_single_65k_tax_lock(
         self, single_65k_return, federal_single_65k
     ):
         """WRAP-CORRECTNESS LOCK — the task brief's $65k single-filer KY
@@ -351,7 +352,7 @@ class TestKentuckyPluginComputeResident:
         assert ss["state_standard_deduction"] == Decimal("3270.00")
         assert ss["state_taxable_income"] == Decimal("61730.00")
         # THE LOCK.
-        assert ss["state_total_tax"] == Decimal("2469.20")
+        assert ss["state_total_tax"] == LOCK_VALUE
         assert ss["flat_rate"] == Decimal("0.04")
 
     def test_resident_apportionment_is_one(

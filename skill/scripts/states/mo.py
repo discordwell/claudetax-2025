@@ -1,5 +1,10 @@
 """Missouri (MO) state plugin — TY2025.
 
+See skill/reference/tenforty-ty2025-gap.md for the TY2025 probe rubric
+and why MO is hand-rolled instead of graph-wrapped (graph backend
+output diverges from DOR primary source by ~$102 at $65k Single —
+material mismatch > $5).
+
 Hand-rolled MO Form MO-1040 calc. Tenforty does NOT support MO via the
 default OTS backend (``ValueError: OTS does not support 2025/MO_1040``)
 and the **graph backend's MO output diverges materially from the DOR
@@ -139,7 +144,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from skill.scripts.models import (
     CanonicalReturn,
@@ -162,6 +167,11 @@ from skill.scripts.states._plugin_api import (
     StateStartingPoint,
     SubmissionChannel,
 )
+
+
+# Canonical wave-5 $65k Single gatekeeper lock. Hand-traced from MO
+# Form MO-1040 — see module docstring. Referenced from test_state_mo.py.
+LOCK_VALUE: Final[Decimal] = Decimal("2098.00")
 
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,9 @@
 """Hawaii state plugin — TY2025.
 
+See skill/reference/tenforty-ty2025-gap.md for the TY2025 probe rubric
+and the graph-backend output-field gap list (state_taxable_income
+echo, state_tax_bracket=0, state_effective_tax_rate=0).
+
 Wraps tenforty's graph backend for Hawaii Form N-11 (resident return).
 Mirrors the WI / wave-5 graph-backend wrapper pattern: probe, verify
 against DOR primary source, then wrap.

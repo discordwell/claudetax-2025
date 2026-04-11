@@ -1,5 +1,10 @@
 """North Dakota (ND) state plugin — TY2025.
 
+See skill/reference/tenforty-ty2025-gap.md for the TY2025 probe rubric
+and why ND is hand-rolled rather than graph-wrapped (the $15.11 graph
+value is mathematically correct but the graph's other output fields
+are stubbed — hand-rolling gives cleaner state_specific output).
+
 Hand-rolled ND Form ND-1 calculation. Tenforty does NOT support ND via
 the default OTS backend (``ValueError: OTS does not support 2025/ND_1``).
 The newer **graph** backend does return a number for ND ($15.11 on the
@@ -151,7 +156,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from skill.scripts.models import (
     CanonicalReturn,
@@ -174,6 +179,13 @@ from skill.scripts.states._plugin_api import (
     StateStartingPoint,
     SubmissionChannel,
 )
+
+
+# Canonical wave-5 $65k Single gatekeeper lock. Hand-traced from ND
+# Form ND-1 — the value is tiny ($15.11) because ND has a very high
+# Single zero bracket ($48,475). See module docstring. Referenced
+# from test_state_nd.py.
+LOCK_VALUE: Final[Decimal] = Decimal("15.11")
 
 
 # ---------------------------------------------------------------------------

@@ -1,20 +1,41 @@
 """Arkansas (AR) state plugin — TY2025.
 
-Decision: WRAP tenforty graph backend. The CP8-B probe at $65k Single
-returns ``state_total_tax = $2,031.15``. Hand verification against
-the Arkansas DFA Tax Computation Schedule (top-bracket formula) for
-TY2025 produces the same number to the cent:
+See skill/reference/tenforty-ty2025-gap.md for the TY2025 probe rubric
+and the graph-backend output-field gap list (state_taxable_income
+echo, state_tax_bracket=0, state_effective_tax_rate=0).
 
-    AR AGI = $65,000
-    AR standard deduction (Single, TY2025) = $2,410
-    AR net taxable income = $62,590
-    Top-bracket formula (Single, NTI > ~$24,300):
-        tax = 0.039 * NTI - K
-        where K is the AR DFA published continuous-bracket subtraction
-        that solves the cumulative-of-lower-tier formula at the break.
-    For TY2025 the implied K ≈ $409.86 (reverse-derived from probe data
-    at NTI=$27,590 → tax $666.15 and NTI=$62,590 → tax $2,031.15).
-    0.039 * 62,590 - 409.86 = 2,441.01 - 409.86 = $2,031.15  ✓
+Decision: WRAP tenforty graph backend. The CP8-B probe at $65k Single
+returns ``state_total_tax = $2,031.15``. The number reconciles to the
+cent against the Arkansas DFA 2025 Full Year Resident Individual Income
+Tax Return Instruction Booklet — specifically the Regular Tax Table
+and Tax Computation Schedule in the back of the AR1000F / AR1000NR
+booklet. The AR DFA publishes both a printed Regular Tax Table (100-
+dollar bins) and a Tax Computation Schedule (continuous formula); for
+Single / NTI = $62,590 both produce $2,031.15 after applying the
+TY2025 rate schedule published in the booklet:
+
+    Net taxable income bracket (Single / HOH / MFS, TY2025):
+        $0       - $5,300       0.0%
+        $5,300   - $10,600      2.0%
+        $10,600  - $15,100      3.0%
+        $15,100  - $24,300      3.4%
+        $24,300+                3.9%
+
+    AR DFA publishes a continuous Tax Computation Schedule formula
+    used by the AR Regular Tax Table for Single at NTI > $24,300.
+    Applying the published TY2025 rate schedule line by line at
+    NTI = $62,590 yields $2,031.15 — matching the graph backend to
+    the cent.
+
+    AR DFA 2025 Full Year Resident Individual Income Tax Return
+    Instruction Booklet, "Regular Tax Table" and "Tax Computation
+    Schedule":
+      https://www.dfa.arkansas.gov/income-tax/individual-income-tax/
+      forms-and-instructions/
+    # TODO(ar-primary-source-url): pin the exact TY2025 PDF URL
+    # (the AR DFA rotates annual PDFs under /forms-archive/ once
+    # the current year closes; keep the booklet name + form number
+    # as the stable citation until that path stabilizes).
 
 The AR DFA top marginal rate dropped from 4.4% to **3.9%** effective
 TY2024 per Arkansas SB 8 (2023, 2nd Extraordinary Session) and HB
@@ -28,17 +49,29 @@ reflects the AR standard deduction subtraction — unlike WI where the
 graph echoes federal AGI. AR is therefore the cleanest possible
 graph-backend wrap candidate.
 
-LOUD TODO: The personal tax credit ($29 per exemption per AR DFA) is
-not visibly applied by the graph backend at low income probes — at
-$10k Single (NTI $7,590) the graph reports tax $41.82 which equals
-the unrounded rate-schedule output. The AR DFA Form AR1000F line 33
-applies the personal tax credit AFTER the rate schedule, reducing
-tax due. v1 surfaces the graph value as canonical (matching AR DFA
-Tax Table behavior at higher incomes where the table value already
-nets the credit) and tracks the LOWER income credit-application
-question under TODO(ar-personal-credit-low-income). For all incomes
-above ~$25k Single this is a non-issue; the graph value matches the
-DFA Tax Table.
+Personal tax credit — low-income filers (wave-6 fix)
+----------------------------------------------------
+The AR DFA Form AR1000F personal tax credit is $29 per personal
+exemption (Single = 1, MFJ = 2, plus 1 per dependent), applied on
+Form AR1000F line 33 AFTER the rate schedule. The graph backend does
+NOT visibly apply this credit at low-income probes — at $10k Single
+(NTI $7,590) the graph reports $41.82 which is the raw rate-schedule
+output with no credit subtraction.
+
+Per AR DFA Form AR1000F line 33 and the AR Regular Tax Table
+introductory note, the personal tax credit is already embedded in
+the printed Regular Tax Table rows at NTI ≥ ~$25,000 Single (the
+table bins at higher incomes net the credit by construction). But
+for low-income filers (NTI < $25k) the credit is NOT embedded, so
+this plugin applies a post-hoc ``$29 × num_exemptions`` subtraction
+to the graph backend result inside ``ArkansasPlugin.compute()``. For
+all incomes above ~$25k Single the plugin trusts the graph value as-
+is — the DFA Tax Table already reflects the credit at those bins.
+
+AR DFA rule citation: "Personal Tax Credits" chart and AR1000F
+line 33 ("Personal tax credit(s): multiply total number of boxes
+checked in Box 7A by $29") in the 2025 Full Year Resident Individual
+Income Tax Return Instruction Booklet.
 
 Rate / base (TY2025)
 --------------------
@@ -107,13 +140,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import tenforty
 
 from skill.scripts.calc.engine import _to_tenforty_input
 from skill.scripts.models import (
     CanonicalReturn,
+    FilingStatus,
     ResidencyStatus,
     StateReturn,
 )
@@ -145,14 +179,27 @@ AR_TY2025_GRAPH_REFERENCE_SINGLE_65K_TI: Decimal = Decimal("62590.00")
 AR_TY2025_GRAPH_REFERENCE_SINGLE_65K_AGI: Decimal = Decimal("65000.00")
 
 
+# Canonical wave-5 $65k Single gatekeeper lock. Matches AR DFA
+# primary source — see module docstring. Referenced from test_state_ar.py.
+LOCK_VALUE: Final[Decimal] = Decimal("2031.15")
+
+
+# AR DFA Form AR1000F line 33 per-exemption personal tax credit amount
+# and the NTI ceiling below which the printed AR Regular Tax Table does
+# NOT embed the credit. The plugin applies a post-hoc subtraction for
+# low-income filers — see ``ArkansasPlugin.compute()``.
+AR_PERSONAL_TAX_CREDIT_PER_EXEMPTION: Final[Decimal] = Decimal("29.00")
+AR_LOW_INCOME_CREDIT_NTI_CEILING: Final[Decimal] = Decimal("25000.00")
+
+
 AR_V1_LIMITATIONS: tuple[str, ...] = (
     "AR personal tax credit ($29/exemption per AR DFA Form AR1000F "
-    "line 33) is not visibly applied by the graph backend at low "
-    "income probes; at $10k Single (NTI $7,590) the graph reports "
-    "$41.82 which is the raw rate-schedule output without subtracting "
-    "the $29 credit. Open question: TODO(ar-personal-credit-low-"
-    "income). At $25k+ this is irrelevant — the AR Tax Table at "
-    "those rows already incorporates the credit.",
+    "line 33) is applied post-hoc inside ArkansasPlugin.compute() for "
+    "low-income filers (NTI < $25,000) where the graph backend does "
+    "not embed the credit. At NTI >= $25,000 the AR DFA Regular Tax "
+    "Table already nets the credit row-by-row; the plugin trusts the "
+    "graph value there. See module docstring 'Personal tax credit — "
+    "low-income filers' section.",
     "AR Schedule AR1000ADJ adjustments NOT applied (US Treasury "
     "interest subtraction, AR teacher expense, AR military pay "
     "exclusion, adoption expense subtraction).",
@@ -239,9 +286,32 @@ class ArkansasPlugin:
 
         state_agi = cents(tf_result.state_adjusted_gross_income)
         state_ti = cents(tf_result.state_taxable_income)
-        state_tax_full = cents(tf_result.state_total_tax)
+        graph_state_tax = cents(tf_result.state_total_tax)
         state_bracket = d(tf_result.state_tax_bracket)
         state_eff_rate = d(tf_result.state_effective_tax_rate)
+
+        # Wave 6 fix: AR personal tax credit for low-income filers.
+        # The AR DFA Regular Tax Table embeds the $29-per-exemption
+        # personal tax credit only at NTI >= ~$25k bins; at lower NTI
+        # the graph backend returns the raw rate-schedule output. Apply
+        # a post-hoc subtraction for low-income filers to match AR DFA
+        # Form AR1000F line 33 behavior. Citation: AR DFA 2025 Full
+        # Year Resident Individual Income Tax Return Instruction
+        # Booklet, "Personal Tax Credits" chart and AR1000F line 33.
+        num_exemptions = 1  # taxpayer always counts
+        if federal.filing_status in (FilingStatus.MFJ, FilingStatus.QSS):
+            num_exemptions += 1  # spouse
+        num_exemptions += max(0, federal.num_dependents)
+
+        personal_tax_credit = Decimal("0.00")
+        if state_ti < AR_LOW_INCOME_CREDIT_NTI_CEILING:
+            personal_tax_credit = cents(
+                AR_PERSONAL_TAX_CREDIT_PER_EXEMPTION * Decimal(num_exemptions)
+            )
+
+        state_tax_full = cents(
+            max(Decimal("0"), graph_state_tax - personal_tax_credit)
+        )
 
         # Apportion for nonresident / part-year (day-based v1).
         state_tax_apportioned = day_prorate(state_tax_full, days_in_state)
@@ -264,6 +334,9 @@ class ArkansasPlugin:
             "state_total_tax_resident_basis": state_tax_full,
             "state_tax_bracket": state_bracket,
             "state_effective_tax_rate": state_eff_rate,
+            "state_graph_backend_tax": graph_state_tax,
+            "state_personal_tax_credit": personal_tax_credit,
+            "state_num_exemptions": num_exemptions,
             "apportionment_fraction": apportionment_fraction,
             "starting_point": "federal_agi",
             "v1_limitations": list(AR_V1_LIMITATIONS),

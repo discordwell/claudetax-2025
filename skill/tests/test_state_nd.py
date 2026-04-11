@@ -46,6 +46,7 @@ from skill.scripts.states._plugin_api import (
     SubmissionChannel,
 )
 from skill.scripts.states.nd import (
+    LOCK_VALUE,
     ND_TY2025_BRACKETS_HOH,
     ND_TY2025_BRACKETS_MFJ,
     ND_TY2025_BRACKETS_MFS,
@@ -310,7 +311,7 @@ class TestNorthDakotaPluginComputeResident:
         assert isinstance(result, StateReturn)
         assert result.state == "ND"
 
-    def test_resident_single_65k_lock(
+    def test_resident_single_65k_tax_lock(
         self, single_65k_return, federal_single_65k
     ):
         """**SPEC-MANDATED $65k Single LOCK**: $15.11 (yes, really).
@@ -326,10 +327,11 @@ class TestNorthDakotaPluginComputeResident:
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert result.state_specific["state_total_tax"] == Decimal("15.11")
-        assert result.state_specific[
-            "state_total_tax_resident_basis"
-        ] == Decimal("15.11")
+        assert result.state_specific["state_total_tax"] == LOCK_VALUE
+        assert (
+            result.state_specific["state_total_tax_resident_basis"]
+            == LOCK_VALUE
+        )
 
     def test_resident_uses_federal_taxable_income_not_agi(
         self, single_65k_return, federal_single_65k

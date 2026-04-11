@@ -1,5 +1,9 @@
 """Kentucky state plugin — HAND-ROLLED (not tenforty-backed).
 
+See skill/reference/tenforty-ty2025-gap.md for the TY2025 probe rubric
+and why KY is hand-rolled instead of graph-wrapped (OTS_FORM_CONFIG
+has no KY_740 entries for any year).
+
 IMPORTANT: Despite tenforty listing KY in ``tenforty.core.OTSState``,
 OpenTaxSolver does NOT ship a 2025 KY_740 module — a live call
 
@@ -173,7 +177,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from skill.scripts.models import (
     CanonicalReturn,
@@ -192,6 +196,12 @@ from skill.scripts.states._plugin_api import (
 
 
 _CENTS = Decimal("0.01")
+
+# Canonical wave-4 $65k Single gatekeeper lock. Hand-traced from KY
+# Form 740 Line 12 — see module docstring. Referenced from
+# test_state_ky.py.
+LOCK_VALUE: Final[Decimal] = Decimal("2469.20")
+
 
 # TY2025 Form 740 constants — see module docstring for citations.
 KY_FLAT_RATE: Decimal = Decimal("0.04")

@@ -1,5 +1,9 @@
 """Connecticut (CT) state plugin — TY2025.
 
+See skill/reference/tenforty-ty2025-gap.md for the TY2025 probe rubric
+and why CT is hand-rolled instead of graph-wrapped (the OTSState enum
+lists CT but OTS_FORM_CONFIG has zero CT entries for any year).
+
 Connecticut is listed in tenforty's ``OTSState`` enum (``OTSState.CT ->
 CT_1``) but it is **NOT** actually wired into OpenTaxSolver's form catalog
 for any year — calling ``tenforty.evaluate_return(..., state='CT')`` raises
@@ -103,7 +107,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from skill.scripts.models import (
     CanonicalReturn,
@@ -127,6 +131,12 @@ _CENTS = Decimal("0.01")
 def _cents(v: Decimal) -> Decimal:
     """Quantize a Decimal to cents with half-up rounding."""
     return v.quantize(_CENTS, rounding=ROUND_HALF_UP)
+
+
+# Canonical wave-4 $65k Single gatekeeper lock. Hand-traced from CT
+# Form CT-1040 TCS — see module docstring. Referenced from
+# test_state_ct.py.
+LOCK_VALUE: Final[Decimal] = Decimal("2875.00")
 
 
 # ---------------------------------------------------------------------------

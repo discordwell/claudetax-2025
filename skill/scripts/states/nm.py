@@ -1,5 +1,9 @@
 """New Mexico (NM) state plugin — TY2025.
 
+See skill/reference/tenforty-ty2025-gap.md for the TY2025 probe rubric
+and the graph-backend output-field gap list (state_taxable_income
+echo, state_tax_bracket=0, state_effective_tax_rate=0).
+
 Wraps tenforty / OpenTaxSolver for the New Mexico Form PIT-1 resident
 calc, in the same shape as the WI plugin (graph backend wrapper). NM is
 NOT supported by the default OTS backend in tenforty

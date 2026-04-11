@@ -42,11 +42,14 @@ from skill.scripts.states._plugin_api import (
     SubmissionChannel,
 )
 from skill.scripts.states.ar import (
+    AR_LOW_INCOME_CREDIT_NTI_CEILING,
+    AR_PERSONAL_TAX_CREDIT_PER_EXEMPTION,
     AR_TY2025_GRAPH_REFERENCE_SINGLE_65K_AGI,
     AR_TY2025_GRAPH_REFERENCE_SINGLE_65K_TAX,
     AR_TY2025_GRAPH_REFERENCE_SINGLE_65K_TI,
     AR_V1_LIMITATIONS,
     ArkansasPlugin,
+    LOCK_VALUE,
     PLUGIN,
 )
 
@@ -135,6 +138,51 @@ def federal_single_50k() -> FederalTotals:
         taxable_income=Decimal("34250"),
         total_federal_tax=Decimal("3905"),
         federal_income_tax=Decimal("3905"),
+        federal_standard_deduction=Decimal("15750"),
+        federal_itemized_deductions_total=Decimal("0"),
+        deduction_taken=Decimal("15750"),
+        federal_withholding_from_w2s=Decimal("0"),
+    )
+
+
+@pytest.fixture
+def single_18k_return() -> CanonicalReturn:
+    """A Single $18k W-2 AR resident — low-income filer used to
+    exercise the wave-6 AR personal tax credit fix."""
+    return CanonicalReturn(
+        tax_year=2025,
+        filing_status=FilingStatus.SINGLE,
+        taxpayer=Person(
+            first_name="Low",
+            last_name="Income",
+            ssn="333-44-5555",
+            date_of_birth=dt.date(1995, 3, 14),
+        ),
+        address=Address(
+            street1="1 River Mkt",
+            city="Little Rock",
+            state="AR",
+            zip="72201",
+        ),
+        w2s=[
+            W2(
+                employer_name="River Valley LLC",
+                box1_wages=Decimal("18000"),
+                box2_federal_income_tax_withheld=Decimal("0"),
+            ),
+        ],
+    )
+
+
+@pytest.fixture
+def federal_single_18k() -> FederalTotals:
+    return FederalTotals(
+        filing_status=FilingStatus.SINGLE,
+        num_dependents=0,
+        adjusted_gross_income=Decimal("18000"),
+        taxable_income=Decimal("2250"),
+        total_federal_tax=Decimal("225"),
+        federal_income_tax=Decimal("225"),
         federal_standard_deduction=Decimal("15750"),
         federal_itemized_deductions_total=Decimal("0"),
         deduction_taken=Decimal("15750"),
@@ -257,8 +305,6 @@ class TestArkansasTaxLockSingle65k:
     Matches the AR DFA Tax Table value to the cent.
     """
 
-    LOCK_VALUE = Decimal("2031.15")
-
     def test_resident_single_65k_tax_lock(
         self, single_65k_return, federal_single_65k
     ):
@@ -268,10 +314,10 @@ class TestArkansasTaxLockSingle65k:
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert result.state_specific["state_total_tax"] == self.LOCK_VALUE
+        assert result.state_specific["state_total_tax"] == LOCK_VALUE
         assert (
             result.state_specific["state_total_tax_resident_basis"]
-            == self.LOCK_VALUE
+            == LOCK_VALUE
         )
 
     def test_lock_value_breakdown(
@@ -290,9 +336,7 @@ class TestArkansasTaxLockSingle65k:
 
     def test_lock_value_constant_matches(self):
         """Module-level reference constant matches the lock value."""
-        assert (
-            AR_TY2025_GRAPH_REFERENCE_SINGLE_65K_TAX == self.LOCK_VALUE
-        )
+        assert AR_TY2025_GRAPH_REFERENCE_SINGLE_65K_TAX == LOCK_VALUE
         assert (
             AR_TY2025_GRAPH_REFERENCE_SINGLE_65K_TI
             == Decimal("62590.00")
@@ -301,6 +345,66 @@ class TestArkansasTaxLockSingle65k:
             AR_TY2025_GRAPH_REFERENCE_SINGLE_65K_AGI
             == Decimal("65000.00")
         )
+
+
+class TestArkansasPersonalTaxCreditLowIncome:
+    """**WAVE 6 FIX**: AR personal tax credit for low-income filers.
+
+    The AR DFA Form AR1000F personal tax credit ($29 per exemption,
+    line 33) is already baked into the AR Regular Tax Table at
+    NTI >= ~$25k bins but is NOT applied by the graph backend at
+    lower incomes. ``ArkansasPlugin.compute()`` subtracts
+    ``$29 * num_exemptions`` from the graph backend result whenever
+    AR NTI (``state_taxable_income``) is under the $25k ceiling.
+
+    Citation: AR DFA 2025 Full Year Resident Individual Income Tax
+    Return Instruction Booklet, "Personal Tax Credits" chart and
+    AR1000F line 33.
+    """
+
+    def test_low_income_single_18k_applies_credit(
+        self, single_18k_return, federal_single_18k
+    ):
+        """$18k Single Little Rock resident — NTI $15,590 is below
+        the $25k ceiling, so the $29 credit applies. Graph backend
+        probe (verified 2026-04-11) returns $248.73 at this scenario;
+        the corrected value is $248.73 - $29.00 = $219.73."""
+        result = PLUGIN.compute(
+            single_18k_return,
+            federal_single_18k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        ss = result.state_specific
+        assert ss["state_taxable_income"] == Decimal("15590.00")
+        assert ss["state_graph_backend_tax"] == Decimal("248.73")
+        assert ss["state_num_exemptions"] == 1
+        assert ss["state_personal_tax_credit"] == Decimal("29.00")
+        # THE LOCK: graph backend tax minus $29 personal credit.
+        assert ss["state_total_tax"] == Decimal("219.73")
+        assert ss["state_total_tax_resident_basis"] == Decimal("219.73")
+
+    def test_credit_not_applied_at_65k_single(
+        self, single_65k_return, federal_single_65k
+    ):
+        """At NTI = $62,590 (>= $25k ceiling), the printed AR Regular
+        Tax Table already embeds the credit, so the plugin MUST NOT
+        subtract it again — otherwise it would double-net the credit.
+        """
+        result = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        ss = result.state_specific
+        assert ss["state_personal_tax_credit"] == Decimal("0.00")
+        assert ss["state_total_tax"] == LOCK_VALUE
+
+    def test_ceiling_and_per_exemption_constants(self):
+        """Module-level constants match the AR DFA citation."""
+        assert AR_PERSONAL_TAX_CREDIT_PER_EXEMPTION == Decimal("29.00")
+        assert AR_LOW_INCOME_CREDIT_NTI_CEILING == Decimal("25000.00")
 
 
 class TestArkansasPluginComputeOtherResidents:

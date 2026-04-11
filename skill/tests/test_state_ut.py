@@ -56,6 +56,7 @@ from skill.scripts.states._plugin_api import (
     SubmissionChannel,
 )
 from skill.scripts.states.ut import (
+    LOCK_VALUE,
     UT_TY2025_BASE_PHASE_OUT_HOH,
     UT_TY2025_BASE_PHASE_OUT_MFJ,
     UT_TY2025_BASE_PHASE_OUT_SINGLE,
@@ -320,7 +321,7 @@ class TestUtahPluginComputeResident:
         assert isinstance(result, StateReturn)
         assert result.state == "UT"
 
-    def test_resident_single_65k_lock(
+    def test_resident_single_65k_tax_lock(
         self, single_65k_return, federal_single_65k
     ):
         """**SPEC-MANDATED $65k Single LOCK**: $2,588.23.
@@ -334,10 +335,11 @@ class TestUtahPluginComputeResident:
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert result.state_specific["state_total_tax"] == Decimal("2588.23")
-        assert result.state_specific[
-            "state_total_tax_resident_basis"
-        ] == Decimal("2588.23")
+        assert result.state_specific["state_total_tax"] == LOCK_VALUE
+        assert (
+            result.state_specific["state_total_tax_resident_basis"]
+            == LOCK_VALUE
+        )
 
     def test_resident_single_65k_line_breakdown(
         self, single_65k_return, federal_single_65k

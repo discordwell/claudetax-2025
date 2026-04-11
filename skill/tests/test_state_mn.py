@@ -58,6 +58,7 @@ from skill.scripts.states._plugin_api import (
     SubmissionChannel,
 )
 from skill.scripts.states.mn import (
+    LOCK_VALUE,
     MN_TY2025_BRACKETS,
     MN_TY2025_DEPENDENT_EXEMPTION,
     MN_TY2025_STANDARD_DEDUCTION,
@@ -551,7 +552,7 @@ class TestMinnesotaPluginComputeResident:
         )
         assert result.days_in_state == 365
 
-    def test_resident_65k_single_wrap_lock(
+    def test_resident_single_65k_tax_lock(
         self, single_65k_return, federal_single_65k
     ):
         """**$65k Single MN resident WRAP-CORRECTNESS LOCK.**
@@ -575,7 +576,7 @@ class TestMinnesotaPluginComputeResident:
         )
         state_tax = result.state_specific["state_total_tax"]
         assert isinstance(state_tax, Decimal)
-        assert state_tax == Decimal("2931.14")
+        assert state_tax == LOCK_VALUE
 
     def test_state_taxable_income_65k(
         self, single_65k_return, federal_single_65k

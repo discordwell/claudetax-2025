@@ -65,6 +65,7 @@ from skill.scripts.states._plugin_api import (
     SubmissionChannel,
 )
 from skill.scripts.states.ok import (
+    LOCK_VALUE,
     OK_TY2025_BRACKETS_MFJ,
     OK_TY2025_BRACKETS_SINGLE,
     OK_TY2025_PERSONAL_EXEMPTION,
@@ -521,9 +522,9 @@ class TestOklahomaPluginComputeResident:
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert result.state_specific["state_total_tax"] == Decimal("2549.88")
-        assert result.state_specific["state_total_tax_resident_basis"] == Decimal(
-            "2549.88"
+        assert result.state_specific["state_total_tax"] == LOCK_VALUE
+        assert (
+            result.state_specific["state_total_tax_resident_basis"] == LOCK_VALUE
         )
 
     def test_resident_single_65k_line_breakdown(

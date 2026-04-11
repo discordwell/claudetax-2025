@@ -61,6 +61,7 @@ from skill.scripts.states._plugin_api import (
     SubmissionChannel,
 )
 from skill.scripts.states.wv import (
+    LOCK_VALUE,
     PLUGIN,
     WV_RECIPROCITY_PARTNERS,
     WV_TY2025_BRACKETS,
@@ -498,7 +499,7 @@ class TestWestVirginiaPluginComputeResident:
         )
         assert result.residency == ResidencyStatus.RESIDENT
 
-    def test_resident_65k_single_lock(
+    def test_resident_single_65k_tax_lock(
         self, single_65k_return, federal_single_65k
     ):
         """**$65k Single WV resident WRAP-CORRECTNESS LOCK.**
@@ -520,7 +521,7 @@ class TestWestVirginiaPluginComputeResident:
         )
         state_tax = result.state_specific["state_total_tax"]
         assert isinstance(state_tax, Decimal)
-        assert state_tax == Decimal("2198.10")
+        assert state_tax == LOCK_VALUE
 
     def test_state_taxable_income_63k(
         self, single_65k_return, federal_single_65k

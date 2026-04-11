@@ -69,6 +69,7 @@ from skill.scripts.states._plugin_api import (
     SubmissionChannel,
 )
 from skill.scripts.states.md import (
+    LOCK_VALUE,
     MD_TY2025_ANNE_ARUNDEL_BRACKETS_SCHEDULE_I,
     MD_TY2025_ANNE_ARUNDEL_BRACKETS_SCHEDULE_II,
     MD_TY2025_BRACKETS_SCHEDULE_I,
@@ -385,7 +386,7 @@ class TestMarylandComputeSingle65kResident:
         )
         assert result.state_specific["local_tax"] == Decimal("1315.13")
 
-    def test_locked_default_state_total_tax_4039_01(
+    def test_resident_single_65k_tax_lock(
         self, single_65k_return, federal_single_65k
     ):
         """LOCK: state_total_tax = $2,723.88 + $1,315.13 = $4,039.01.
@@ -399,7 +400,7 @@ class TestMarylandComputeSingle65kResident:
             ResidencyStatus.RESIDENT,
             365,
         )
-        assert result.state_specific["state_total_tax"] == Decimal("4039.01")
+        assert result.state_specific["state_total_tax"] == LOCK_VALUE
 
     def test_default_local_tax_note_flags_default(
         self, single_65k_return, federal_single_65k

@@ -83,6 +83,7 @@ from skill.scripts.states.ks import (
     KS_TY2025_UPPER_RATE,
     KS_V1_LIMITATIONS,
     KansasPlugin,
+    LOCK_VALUE,
     PLUGIN,
     ks_exemption_allowance,
     ks_standard_deduction,
@@ -754,12 +755,12 @@ class TestKansasPluginComputeResident:
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert result.state_specific["state_total_tax"] == Decimal("2827.71")
-        assert result.state_specific["state_total_tax_resident_basis"] == Decimal(
-            "2827.71"
+        assert result.state_specific["state_total_tax"] == LOCK_VALUE
+        assert (
+            result.state_specific["state_total_tax_resident_basis"] == LOCK_VALUE
         )
-        assert result.state_specific["state_total_tax_worksheet_basis"] == Decimal(
-            "2827.71"
+        assert (
+            result.state_specific["state_total_tax_worksheet_basis"] == LOCK_VALUE
         )
 
     def test_resident_single_65k_line_breakdown(

@@ -52,6 +52,7 @@ from skill.scripts.states.de import (
     DE_TY2025_STD_DED_SINGLE,
     DE_V1_LIMITATIONS,
     DelawarePlugin,
+    LOCK_VALUE,
     PLUGIN,
     de_personal_credit,
     de_personal_credit_count,
@@ -414,8 +415,6 @@ class TestDelawareTaxLockSingle65k:
     credit). Hand-rolling closes the $110 gap.
     """
 
-    LOCK_VALUE = Decimal("2949.00")
-
     def test_resident_single_65k_tax_lock(
         self, single_65k_return, federal_single_65k
     ):
@@ -425,10 +424,10 @@ class TestDelawareTaxLockSingle65k:
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert result.state_specific["state_total_tax"] == self.LOCK_VALUE
+        assert result.state_specific["state_total_tax"] == LOCK_VALUE
         assert (
             result.state_specific["state_total_tax_resident_basis"]
-            == self.LOCK_VALUE
+            == LOCK_VALUE
         )
 
     def test_lock_value_breakdown(

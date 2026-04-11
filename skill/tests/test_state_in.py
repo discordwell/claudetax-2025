@@ -74,6 +74,7 @@ from skill.scripts.states.in_ import (
     IN_TY2025_QUALIFYING_CHILD_EXTRA_EXEMPTION,
     IN_V1_LIMITATIONS,
     IndianaPlugin,
+    LOCK_VALUE,
     PLUGIN,
     in_personal_exemption,
     in_state_tax,
@@ -354,7 +355,7 @@ class TestIndianaPluginComputeResident:
         assert result.residency == ResidencyStatus.RESIDENT
         assert result.days_in_state == 365
 
-    def test_resident_65k_single_lock(
+    def test_resident_single_65k_tax_lock(
         self, single_65k_return, federal_single_65k
     ):
         """HAND-ROLL CORRECTNESS LOCK: Single / $65k W-2 / Standard
@@ -377,7 +378,7 @@ class TestIndianaPluginComputeResident:
         )
         state_tax = result.state_specific["state_total_tax"]
         assert isinstance(state_tax, Decimal)
-        assert state_tax == Decimal("1920.00")
+        assert state_tax == LOCK_VALUE
 
     def test_indiana_taxable_income_correct(
         self, single_65k_return, federal_single_65k

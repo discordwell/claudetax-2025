@@ -1,5 +1,9 @@
 """Utah (UT) state plugin — TY2025.
 
+See skill/reference/tenforty-ty2025-gap.md for the TY2025 probe rubric
+and why UT is hand-rolled instead of graph-wrapped (graph backend
+omits the Taxpayer Tax Credit phase-out — material mismatch > $5).
+
 Hand-rolled UT Form TC-40 calculation. Tenforty does NOT support UT
 via the default OTS backend (``ValueError: OTS does not support
 2025/UT_TC40``). The newer graph backend returns a number ($1,980 on
@@ -127,7 +131,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from skill.scripts.models import (
     CanonicalReturn,
@@ -148,6 +152,11 @@ from skill.scripts.states._plugin_api import (
     StateStartingPoint,
     SubmissionChannel,
 )
+
+
+# Canonical wave-5 $65k Single gatekeeper lock. Hand-traced from UT
+# Form TC-40 — see module docstring. Referenced from test_state_ut.py.
+LOCK_VALUE: Final[Decimal] = Decimal("2588.23")
 
 
 # ---------------------------------------------------------------------------

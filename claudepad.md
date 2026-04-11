@@ -6,7 +6,40 @@ Session memory for this project. Top section = most recent session summaries (ne
 
 ## Session Summaries
 
-### 2026-04-11 14:00 UTC — Wave 5 dispatch plan (pending, written during CP8)
+### 2026-04-11 18:00 UTC — Wave 5 complete: 51-state coverage + real AcroForm overlays
+
+**Wave 5 dispatched and landed** in one 12-agent fan-out. Every one of the 21 remaining taxing states now has a plugin; real IRS AcroForm overlays replace the reportlab scaffolds for Form 1040 + Schedule A/B/C/SE; Schedule K-1 ingester lands; paper-file bundle generator + SKILL.md interview scaffold ship; multi-state PA→IL golden fixture locks the state plugin dispatch chain end-to-end.
+
+**Final registry state**: **51 jurisdictions** (50 states + DC) — complete coverage for the first time in the project's history. Split across the four fan-out waves: wave 1 (CA/NY/WA/DC + 8 no-tax states), wave 2 (AZ/MA/MI/NJ/PA/VA), wave 3 (NC/OH/OR + IL/CO/GA hand-rolled, wave-4 remediated), wave 4 (CT/KS/KY/MD/MN hand-rolled + WI graph), wave 5 (21 states via probe-then-verify-then-decide: 10 wraps + 11 hand-rolls).
+
+**Wave 5 state decisions** (probe table in `skill/reference/tenforty-ty2025-gap.md`):
+- **Graph-backend wraps (10)**: AR, HI, IA, ID, LA, MS, MT, NM, SC, VT. Each matched DOR primary source within ±$5. Each wraps `backend="graph"` and pins the graph value in a gatekeeper test.
+- **Hand-rolled (11)**: AL, DE, IN, ME, MO, ND, NE, OK, RI, UT, WV. Each recovers a state-specific personal exemption or credit that the graph backend omits. Gap magnitudes: $30 (IN), $47.50 (OK), $96.40 (WV), $110 (DE), $141 (IL — wave 3), $152 (MD — wave 4), $195 (RI), $347.63 (ME), $488 (AL), $510 (KS — wave 4), $608 (UT). AL and MO both miss the federal-tax-deduction that those states allow. NE has an additional functional bug: graph raises `NotImplementedError` on `num_dependents > 0`.
+- **ND correction**: my CP8-B "$15.11 is broken/stubbed" finding was WRONG. A6 verified it is mathematically correct — ND's zero-bracket cap for Single is $48,475, so $49,250 TI leaves only $775 in the 1.95% middle bracket → $15.11. Hand-rolled anyway (safe call) with a gatekeeper pinning BOTH the graph value AND the DOR formula for belt-and-suspenders. `tenforty-ty2025-gap.md` updated with the retraction.
+- **UT rate correction**: TY2025 is 4.5% per HB 106 2025, not the 4.55% I had in the brief. Agent caught it and locked the real number ($2,588.23, not the $1,980 graph-backend reports).
+
+**Real AcroForm overlays** (B1 + B2):
+- **B1 — Form 1040**: new shared `skill/scripts/output/_acroform_overlay.py` with `fill_acroform_pdf`, `load_widget_map`, `fetch_and_verify_source_pdf`, `build_widget_values`, `format_money`, `WidgetMap` dataclass. IRS `f1040.pdf` bundled at `skill/reference/irs_forms/` (SHA256 pinned, auto-fetch fallback, fail-loud on mismatch). Form 1040 renderer Layer 2 replaced: 8 canonical line widgets round-tripped (wages, AGI page-1 + page-2 mirror, line 16 tax, line 24 total tax, line 25a W-2 withholding, line 34 overpayment, line 37 amount owed). Zero silent fallbacks to reportlab.
+- **B2 — Schedules A/B/C/SE**: 4 new widget maps + 4 bundled TY2025 source PDFs (all verified to be TY2025 at canonical IRS URLs). Per-schedule mapped/unmapped counts: Sch A 27/33, Sch B 67/72, Sch C 86/105, Sch SE 22/27. **Schedule C TY2025 delta**: line 27 split into 27a/27b (27b is the new §179D Energy efficient commercial buildings deduction) — flagged in unmapped since Layer 1 doesn't model it yet.
+- **B1/B2 merge fixup**: B2 wrote a local stub of `_acroform_overlay.py` expecting dict-access semantics; B1 shipped a frozen `WidgetMap` dataclass. Resolved by (a) adding `load_widget_map_as_dict(path) -> dict` helper to B1's canonical version, (b) adding `verify_pdf_sha256(path, expected_sha) -> None` compatibility shim (raises RuntimeError with "missing" or "SHA-256 mismatch" substrings that B2's tests match on), (c) updating B2's 4 schedule renderers to call the dict variant. Also: paper-bundle test used title-case "Schedule A" detection but the real IRS header is "SCHEDULE A" all-caps → fixed with `.upper()`.
+
+**Other deliverables**:
+- **C1 — Schedule K-1 ingester**: Tier-1 pypdf, all 19 ScheduleK1 model fields mapped (both 1065 partnership and 1120-S S-corp flavors), content-layer probe distinguishes them. `DocumentKind.SCHEDULE_K1_1065` and `SCHEDULE_K1_1120S` already existed. Wired into `pipeline.build_default_cascade()` (now 9 Tier-1 ingesters).
+- **D1 — SKILL.md**: 561-line Claude-facing interview prompt + 5 worked example transcripts (19KB). 9 interview phases, CP8-A medical-floor warning explicitly wired into the Schedule A walk, CP8-D county collection in the address phase for MD residents, OBBBA senior/tips/overtime/Form 4547 covered, FFFF compatibility checklist. 46 structural tests.
+- **D2 — Paper bundle generator**: `build_paper_bundle(canonical_return, rendered_pdf_paths, out_path)`. Cover sheet (name, SSN, summary table, IRS service-center address, FFFF status), IRS form-order reconciliation via `_FORM_ORDER` tuple, signature page (handles MFJ/MFS/QSS dual-name), mailing instructions with service-center lookup. New `skill/reference/irs-mailing-addresses.json` with 52 entries (50 states + DC + INTL) × with-payment/without-payment routing. 26 tests.
+- **E1 — Multi-state golden fixture**: PA→IL part-year single filer ($30k Philly + $35k Chicago). Agent caught that my idealized hand-check (real per-state income sourcing) doesn't match the existing plugins — they day-prorate the full federal $65k. Locked the actual day-prorated v1 numbers (PA $989.55 / IL $1,550.86) with a loud TODO explaining that when real sourcing lands the test will need re-blessing to PA $921 / IL $1,591.43. First fixture that exercises state plugin dispatch end-to-end. 38 tests.
+
+**Suite**: 1920 → **3310 passed + 3 skipped** (+1390 net new tests, zero regressions).
+
+**Key patterns confirmed or discovered**:
+- CP8-B probe + hand-rolled fallback is the right strategy for any state tenforty doesn't natively support. The 10/11 wrap-vs-hand-roll split is now well-calibrated; future waves can trust it.
+- Graph backend's per-state omissions are almost entirely state-specific personal exemptions/credits. Any state that folds its exemption into std ded (VT via Act 65 2023, for example) wraps cleanly.
+- `_hand_rolled_base.py` helpers were heavily used by wave 5 hand-rolled plugins. Keep extending rather than refactoring existing code.
+- TY2025 IRS PDFs are already live at canonical URLs — no TY2024 fallback needed for any IRS form we've checked (1040, Sch A, B, C, SE).
+
+---
+
+### 2026-04-11 14:00 UTC — Wave 5 dispatch plan (archived — see above for completion)
 
 **Goal**: 21 remaining taxing states + real AcroForm overlays + K-1 ingester + SKILL.md scaffold, in a single ~12-agent fan-out.
 

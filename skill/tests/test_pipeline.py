@@ -190,11 +190,12 @@ class TestPathHelpers:
 
 
 class TestBuildDefaultCascade:
-    def test_cascade_registers_eight_tier_1_ingesters(self):
+    def test_cascade_registers_nine_tier_1_ingesters(self):
         cascade = build_default_cascade()
         names = cascade.ingester_names
-        # W-2, 1099-INT, 1099-DIV, 1099-B, 1099-NEC, 1099-R, 1099-G, SSA-1099
-        assert len(names) == 8
+        # W-2, 1099-INT, 1099-DIV, 1099-B, 1099-NEC, 1099-R, 1099-G, SSA-1099,
+        # Schedule K-1 (K-1 added in wave 5 C1)
+        assert len(names) == 9
 
     def test_every_ingester_is_tier_1(self):
         cascade = build_default_cascade()

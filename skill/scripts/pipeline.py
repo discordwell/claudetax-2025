@@ -198,6 +198,7 @@ def build_default_cascade() -> IngestCascade:
     from skill.scripts.ingest._1099_int_acroform import INGESTER as I_1099_INT
     from skill.scripts.ingest._1099_nec_acroform import INGESTER as I_1099_NEC
     from skill.scripts.ingest._1099_r_acroform import INGESTER as I_1099_R
+    from skill.scripts.ingest._schedule_k1_acroform import INGESTER as I_K1
     from skill.scripts.ingest._ssa_1099_acroform import INGESTER as I_SSA_1099
     from skill.scripts.ingest._w2_acroform import INGESTER as I_W2
 
@@ -210,6 +211,7 @@ def build_default_cascade() -> IngestCascade:
         I_1099_R,
         I_1099_G,
         I_SSA_1099,
+        I_K1,
     ]
     return IngestCascade(tier_1)
 

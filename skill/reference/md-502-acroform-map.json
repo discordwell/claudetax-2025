@@ -1,0 +1,53 @@
+{
+  "source_pdf_url": "https://www.marylandcomptroller.gov/content/dam/mdcomp/tax/forms/2025/502.pdf",
+  "source_pdf_sha256": "4f4d604f27cf6995cbab58b7650fd812c0e4ccc9f8d899f04261ded5a04a24cf",
+  "form_year": 2025,
+  "state": "MD",
+  "form": "502",
+  "total_widgets": 179,
+  "mapped_count": 6,
+  "mapping": {
+    "md_adjusted_gross_income": {
+      "widget_name": "Enter 1",
+      "terminal_name": "Enter 1",
+      "type": "text",
+      "page": 1,
+      "note": "Form 502 line 1 — Maryland adjusted gross income (federal AGI)"
+    },
+    "md_standard_deduction": {
+      "widget_name": "Enter 17",
+      "terminal_name": "Enter 17",
+      "type": "text",
+      "page": 1,
+      "note": "Form 502 line 17 — Deduction amount"
+    },
+    "md_taxable_net_income": {
+      "widget_name": "Enter 20",
+      "terminal_name": "Enter 20",
+      "type": "text",
+      "page": 1,
+      "note": "Form 502 line 20 — Maryland taxable net income"
+    },
+    "state_tax_only": {
+      "widget_name": "Text Box 30",
+      "terminal_name": "Text Box 30",
+      "type": "text",
+      "page": 2,
+      "note": "Form 502 line 21 — Maryland state tax"
+    },
+    "local_tax": {
+      "widget_name": "Text Box 34",
+      "terminal_name": "Text Box 34",
+      "type": "text",
+      "page": 2,
+      "note": "Form 502 line 28 — Local tax"
+    },
+    "state_total_tax": {
+      "widget_name": "Text Box 36",
+      "terminal_name": "Text Box 36",
+      "type": "text",
+      "page": 2,
+      "note": "Form 502 line 29 — Total Maryland income tax and local tax"
+    }
+  }
+}

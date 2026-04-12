@@ -615,6 +615,36 @@ def _apportionment_fraction(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Layer 1: MD Form 502 field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MD502Fields:
+    """Frozen snapshot of MD Form 502 line values, ready for rendering."""
+
+    md_adjusted_gross_income: Decimal = Decimal("0")
+    md_standard_deduction: Decimal = Decimal("0")
+    md_taxable_net_income: Decimal = Decimal("0")
+    state_tax_only: Decimal = Decimal("0")
+    local_tax: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+
+
+def _build_502_fields(state_return: StateReturn) -> MD502Fields:
+    """Map StateReturn.state_specific to MD502Fields."""
+    ss = state_return.state_specific
+    return MD502Fields(
+        md_adjusted_gross_income=ss.get("md_adjusted_gross_income", Decimal("0")),
+        md_standard_deduction=ss.get("md_standard_deduction", Decimal("0")),
+        md_taxable_net_income=ss.get("md_taxable_net_income", Decimal("0")),
+        state_tax_only=ss.get("state_tax_only", Decimal("0")),
+        local_tax=ss.get("local_tax", Decimal("0")),
+        state_total_tax=ss.get("state_total_tax", Decimal("0")),
+    )
+
+
 @dataclass(frozen=True)
 class MarylandPlugin:
     """State plugin for Maryland.
@@ -792,10 +822,37 @@ class MarylandPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO: fan-out follow-up — fill MD Form 502 (resident), Form 505
-        # (nonresident), Form 502CR (credits), Form 502SU (subtractions)
-        # using pypdf against the Maryland Comptroller's fillable PDFs.
-        return []
+        from dataclasses import asdict
+
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        _REF = Path(__file__).resolve().parents[2] / "reference"
+        _WIDGET_MAP = _REF / "md-502-acroform-map.json"
+        _SOURCE_PDF = _REF / "state_forms" / "md_502.pdf"
+
+        wmap = load_widget_map(_WIDGET_MAP)
+        fetch_and_verify_source_pdf(
+            _SOURCE_PDF, wmap.source_pdf_url, wmap.source_pdf_sha256
+        )
+
+        fields = _build_502_fields(state_return)
+        widget_values: dict[str, str] = {}
+        for sem_name, value in asdict(fields).items():
+            widget_names = wmap.widget_names_for(sem_name)
+            if not widget_names:
+                continue
+            text = format_money(value) if isinstance(value, Decimal) else str(value) if value else ""
+            for wn in widget_names:
+                widget_values[wn] = text
+
+        out_path = out_dir / "md_502.pdf"
+        fill_acroform_pdf(_SOURCE_PDF, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["MD Form 502"]

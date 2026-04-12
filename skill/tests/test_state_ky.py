@@ -773,26 +773,48 @@ class TestKentuckyPluginFormIds:
     def test_form_ids_returns_ky_form_740(self):
         assert PLUGIN.form_ids() == ["KY Form 740"]
 
-    def test_render_pdfs_returns_empty_list(
+    def test_render_pdfs_produces_pdf(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
-        """Fan-out follow-up — KY Form 740 PDF fill not yet implemented."""
-        state_return = PLUGIN.compute(
-            single_65k_return,
-            federal_single_65k,
-            ResidencyStatus.RESIDENT,
-            days_in_state=365,
-        )
-        assert PLUGIN.render_pdfs(state_return, tmp_path) == []
+        """KY Form 740 AcroForm fill produces a non-empty PDF."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
 
-    def test_render_pdfs_accepts_arbitrary_path(
-        self, single_65k_return, federal_single_65k
-    ):
-        """Even a nonexistent path should not raise on a no-op render."""
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert PLUGIN.render_pdfs(state_return, Path("/tmp/nonexistent")) == []
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        assert len(paths) == 1
+        assert paths[0].exists()
+        assert paths[0].stat().st_size > 0
+        assert paths[0].name == "ky_740.pdf"
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify that rendered KY 740 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # state_total_tax = 2469.20 for $65k Single
+        tax_field = fields.get("740Line12A")
+        assert tax_field is not None
+        assert tax_field.get("/V") == "2469.20"

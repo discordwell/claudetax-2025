@@ -1,0 +1,60 @@
+{
+  "source_pdf_url": "https://www.revenue.state.mn.us/sites/default/files/2026-03/m1-25.pdf",
+  "source_pdf_sha256": "6207b7b0ecbcf5d87effd4ead8f3c6e326b6807997b9b0ffe79bb755d115f268",
+  "form_year": 2025,
+  "state": "MN",
+  "form": "M1",
+  "total_widgets": 81,
+  "mapped_count": 7,
+  "mapping": {
+    "m1_line_1_federal_agi": {
+      "widget_name": "m1line1",
+      "terminal_name": "m1line1",
+      "type": "text",
+      "page": 0,
+      "note": "Form M1 line 1 — Federal adjusted gross income"
+    },
+    "m1_line_3": {
+      "widget_name": "m1line3",
+      "terminal_name": "m1line3",
+      "type": "text",
+      "page": 0,
+      "note": "Form M1 line 3 — Federal AGI + additions"
+    },
+    "m1_line_4_standard_deduction": {
+      "widget_name": "m1line4",
+      "terminal_name": "m1line4",
+      "type": "text",
+      "page": 0,
+      "note": "Form M1 line 4 — Standard deduction"
+    },
+    "m1_line_5_exemptions": {
+      "widget_name": "m1line5",
+      "terminal_name": "m1line5",
+      "type": "text",
+      "page": 0,
+      "note": "Form M1 line 5 — Dependent exemptions"
+    },
+    "m1_line_9_mn_taxable_income": {
+      "widget_name": "m1line9",
+      "terminal_name": "m1line9",
+      "type": "text",
+      "page": 0,
+      "note": "Form M1 line 9 — Minnesota taxable income"
+    },
+    "m1_line_10_tax": {
+      "widget_name": "m1line10",
+      "terminal_name": "m1line10",
+      "type": "text",
+      "page": 0,
+      "note": "Form M1 line 10 — Tax from table or schedule"
+    },
+    "state_total_tax": {
+      "widget_name": "m1line10",
+      "terminal_name": "m1line10",
+      "type": "text",
+      "page": 0,
+      "note": "Form M1 line 10 — Total MN tax (same widget as m1_line_10_tax)"
+    }
+  }
+}

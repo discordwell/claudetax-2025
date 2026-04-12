@@ -387,6 +387,36 @@ def me_taxable_income(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Layer 1: ME Form 1040ME field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ME1040MEFields:
+    """Frozen snapshot of ME Form 1040ME line values, ready for rendering."""
+
+    me_line_14_federal_agi: Decimal = Decimal("0")
+    me_line_16_me_agi: Decimal = Decimal("0")
+    me_line_17_deduction: Decimal = Decimal("0")
+    me_line_19_personal_exemption: Decimal = Decimal("0")
+    me_line_20_taxable_income: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+
+
+def _build_1040me_fields(state_return: StateReturn) -> ME1040MEFields:
+    """Map StateReturn.state_specific to ME1040MEFields."""
+    ss = state_return.state_specific
+    return ME1040MEFields(
+        me_line_14_federal_agi=ss.get("me_line_14_federal_agi", Decimal("0")),
+        me_line_16_me_agi=ss.get("me_line_16_me_agi", Decimal("0")),
+        me_line_17_deduction=ss.get("me_line_17_deduction", Decimal("0")),
+        me_line_19_personal_exemption=ss.get("me_line_19_personal_exemption", Decimal("0")),
+        me_line_20_taxable_income=ss.get("me_line_20_taxable_income", Decimal("0")),
+        state_total_tax=ss.get("state_total_tax", Decimal("0")),
+    )
+
+
 @dataclass(frozen=True)
 class MainePlugin:
     """State plugin for Maine — TY2025.
@@ -554,11 +584,37 @@ class MainePlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(me-pdf): fan-out follow-up — fill Form 1040ME (and
-        # Schedule 1A, Schedule 1S, Schedule NR for nonresidents,
-        # Schedule PTFC for property tax fairness credit) using pypdf
-        # against the Maine RS fillable PDFs.
-        return []
+        from dataclasses import asdict
+
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        _REF = Path(__file__).resolve().parents[2] / "reference"
+        _WIDGET_MAP = _REF / "me-1040me-acroform-map.json"
+        _SOURCE_PDF = _REF / "state_forms" / "me_1040me.pdf"
+
+        wmap = load_widget_map(_WIDGET_MAP)
+        fetch_and_verify_source_pdf(
+            _SOURCE_PDF, wmap.source_pdf_url, wmap.source_pdf_sha256
+        )
+
+        fields = _build_1040me_fields(state_return)
+        widget_values: dict[str, str] = {}
+        for sem_name, value in asdict(fields).items():
+            widget_names = wmap.widget_names_for(sem_name)
+            if not widget_names:
+                continue
+            text = format_money(value) if isinstance(value, Decimal) else str(value) if value else ""
+            for wn in widget_names:
+                widget_values[wn] = text
+
+        out_path = out_dir / "me_1040me.pdf"
+        fill_acroform_pdf(_SOURCE_PDF, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["ME Form 1040ME"]

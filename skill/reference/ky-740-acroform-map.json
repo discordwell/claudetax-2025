@@ -1,0 +1,46 @@
+{
+  "source_pdf_url": "https://revenue.ky.gov/Forms/740%20(2025).pdf",
+  "source_pdf_sha256": "cb68242eb8351dcd909425cd8edc032ef3169f7eaa86f17fa3ac6c1cb4136ca2",
+  "form_year": 2025,
+  "state": "KY",
+  "form": "740",
+  "total_widgets": 107,
+  "mapped_count": 5,
+  "mapping": {
+    "state_adjusted_gross_income": {
+      "widget_name": "740Line5A",
+      "terminal_name": "740Line5A",
+      "type": "text",
+      "page": 0,
+      "note": "Form 740 line 5 Column A — Federal AGI / KY AGI"
+    },
+    "state_standard_deduction": {
+      "widget_name": "740Line10A",
+      "terminal_name": "740Line10A",
+      "type": "text",
+      "page": 0,
+      "note": "Form 740 line 10 Column A — Deductions (standard or itemized)"
+    },
+    "state_taxable_income": {
+      "widget_name": "740Line11A",
+      "terminal_name": "740Line11A",
+      "type": "text",
+      "page": 0,
+      "note": "Form 740 line 11 Column A — KY taxable income"
+    },
+    "state_total_tax": {
+      "widget_name": "740Line12A",
+      "terminal_name": "740Line12A",
+      "type": "text",
+      "page": 0,
+      "note": "Form 740 line 12 Column A — Tax (line 11 * 0.04)"
+    },
+    "state_total_tax_line19": {
+      "widget_name": "740Line19",
+      "terminal_name": "740Line19",
+      "type": "text",
+      "page": 1,
+      "note": "Form 740 line 19 — Subtotal tax"
+    }
+  }
+}

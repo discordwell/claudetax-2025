@@ -467,6 +467,38 @@ def _mn_taxable_income(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Layer 1: MN Form M1 field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MNM1Fields:
+    """Frozen snapshot of MN Form M1 line values, ready for rendering."""
+
+    m1_line_1_federal_agi: Decimal = Decimal("0")
+    m1_line_3: Decimal = Decimal("0")
+    m1_line_4_standard_deduction: Decimal = Decimal("0")
+    m1_line_5_exemptions: Decimal = Decimal("0")
+    m1_line_9_mn_taxable_income: Decimal = Decimal("0")
+    m1_line_10_tax: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+
+
+def _build_m1_fields(state_return: StateReturn) -> MNM1Fields:
+    """Map StateReturn.state_specific to MNM1Fields."""
+    ss = state_return.state_specific
+    return MNM1Fields(
+        m1_line_1_federal_agi=ss.get("m1_line_1_federal_agi", Decimal("0")),
+        m1_line_3=ss.get("m1_line_3", Decimal("0")),
+        m1_line_4_standard_deduction=ss.get("m1_line_4_standard_deduction", Decimal("0")),
+        m1_line_5_exemptions=ss.get("m1_line_5_exemptions", Decimal("0")),
+        m1_line_9_mn_taxable_income=ss.get("m1_line_9_mn_taxable_income", Decimal("0")),
+        m1_line_10_tax=ss.get("m1_line_10_tax", Decimal("0")),
+        state_total_tax=ss.get("state_total_tax", Decimal("0")),
+    )
+
+
 @dataclass(frozen=True)
 class MinnesotaPlugin:
     """State plugin for Minnesota.
@@ -605,12 +637,37 @@ class MinnesotaPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(mn-pdf): fan-out follow-up — fill MN Form M1 (and Schedule
-        # M1M, M1MB, M1SA, M1DQC, M1NR for nonresidents, M1W for withholding)
-        # using pypdf against the MN DOR's fillable PDFs. The output
-        # renderer suite is the right home for this; the plugin returns
-        # structured state_specific data that the renderer will consume.
-        return []
+        from dataclasses import asdict
+
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        _REF = Path(__file__).resolve().parents[2] / "reference"
+        _WIDGET_MAP = _REF / "mn-m1-acroform-map.json"
+        _SOURCE_PDF = _REF / "state_forms" / "mn_m1.pdf"
+
+        wmap = load_widget_map(_WIDGET_MAP)
+        fetch_and_verify_source_pdf(
+            _SOURCE_PDF, wmap.source_pdf_url, wmap.source_pdf_sha256
+        )
+
+        fields = _build_m1_fields(state_return)
+        widget_values: dict[str, str] = {}
+        for sem_name, value in asdict(fields).items():
+            widget_names = wmap.widget_names_for(sem_name)
+            if not widget_names:
+                continue
+            text = format_money(value) if isinstance(value, Decimal) else str(value) if value else ""
+            for wn in widget_names:
+                widget_values[wn] = text
+
+        out_path = out_dir / "mn_m1.pdf"
+        fill_acroform_pdf(_SOURCE_PDF, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["MN Form M1"]

@@ -1224,24 +1224,48 @@ class TestMarylandFormIds:
     def test_form_ids_returns_form_502(self):
         assert PLUGIN.form_ids() == ["MD Form 502"]
 
-    def test_render_pdfs_returns_empty_list(
+    def test_render_pdfs_produces_pdf(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
-        state_return = PLUGIN.compute(
-            single_65k_return,
-            federal_single_65k,
-            ResidencyStatus.RESIDENT,
-            365,
-        )
-        assert PLUGIN.render_pdfs(state_return, tmp_path) == []
+        """MD Form 502 AcroForm fill produces a non-empty PDF."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
 
-    def test_render_pdfs_accepts_path(
-        self, single_65k_return, federal_single_65k
-    ):
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             365,
         )
-        assert PLUGIN.render_pdfs(state_return, Path("/tmp")) == []
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        assert len(paths) == 1
+        assert paths[0].exists()
+        assert paths[0].stat().st_size > 0
+        assert paths[0].name == "md_502.pdf"
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify that rendered MD 502 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            365,
+        )
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # state_total_tax = 4039.01 for $65k Single (with 2.25% default local)
+        tax_field = fields.get("Text Box 36")
+        assert tax_field is not None
+        assert tax_field.get("/V") == "4039.01"

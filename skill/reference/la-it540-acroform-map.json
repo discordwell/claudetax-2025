@@ -1,0 +1,39 @@
+{
+  "source_pdf_url": "https://dam.ldr.la.gov/taxforms/IT540WEB-BC-2025-F.pdf",
+  "source_pdf_sha256": "e6b029c3a113b55f308c4b58fc1d67b5f4eb26079b2247290483fa9673a0cd09",
+  "form_year": 2025,
+  "state": "LA",
+  "form": "IT-540",
+  "total_widgets": 515,
+  "mapped_count": 4,
+  "mapping": {
+    "state_federal_agi": {
+      "widget_name": "FEDAGI",
+      "terminal_name": "FEDAGI",
+      "type": "text",
+      "page": 0,
+      "note": "IT-540 — Federal AGI"
+    },
+    "state_standard_deduction": {
+      "widget_name": "STDDED",
+      "terminal_name": "STDDED",
+      "type": "text",
+      "page": 0,
+      "note": "IT-540 — Standard deduction"
+    },
+    "state_taxable_income": {
+      "widget_name": "LATXBL",
+      "terminal_name": "LATXBL",
+      "type": "text",
+      "page": 0,
+      "note": "IT-540 — Louisiana taxable income"
+    },
+    "state_total_tax": {
+      "widget_name": "LATAX",
+      "terminal_name": "LATAX",
+      "type": "text",
+      "page": 0,
+      "note": "IT-540 — Louisiana income tax"
+    }
+  }
+}

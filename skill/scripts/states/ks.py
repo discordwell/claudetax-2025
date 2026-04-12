@@ -532,6 +532,40 @@ def _apportionment_fraction(
 
 
 # ---------------------------------------------------------------------------
+# Layer 1: KS Form K-40 field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class KSK40Fields:
+    """Frozen snapshot of KS Form K-40 line values, ready for rendering."""
+
+    state_federal_agi: Decimal = Decimal("0")
+    state_adjusted_gross_income: Decimal = Decimal("0")
+    state_standard_deduction: Decimal = Decimal("0")
+    state_exemption_allowance: Decimal = Decimal("0")
+    state_total_deductions: Decimal = Decimal("0")
+    state_taxable_income: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+    state_total_tax_line12: Decimal = Decimal("0")
+
+
+def _build_k40_fields(state_return: StateReturn) -> KSK40Fields:
+    """Map StateReturn.state_specific to KSK40Fields."""
+    ss = state_return.state_specific
+    return KSK40Fields(
+        state_federal_agi=ss.get("state_federal_agi", Decimal("0")),
+        state_adjusted_gross_income=ss.get("state_adjusted_gross_income", Decimal("0")),
+        state_standard_deduction=ss.get("state_standard_deduction", Decimal("0")),
+        state_exemption_allowance=ss.get("state_exemption_allowance", Decimal("0")),
+        state_total_deductions=ss.get("state_total_deductions", Decimal("0")),
+        state_taxable_income=ss.get("state_taxable_income", Decimal("0")),
+        state_total_tax=ss.get("state_total_tax", Decimal("0")),
+        state_total_tax_line12=ss.get("state_total_tax", Decimal("0")),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Plugin
 # ---------------------------------------------------------------------------
 
@@ -723,13 +757,37 @@ class KansasPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(ks-pdf): fan-out follow-up — fill Kansas Form K-40 (and
-        # Schedule S Parts A/B, Schedule K-210 for underpayment, and
-        # Schedule A for itemizers) using pypdf against the KDOR's
-        # fillable PDFs. The output renderer suite is the right home
-        # for this; this plugin returns structured state_specific data
-        # that the renderer will consume.
-        return []
+        from dataclasses import asdict
+
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        _REF = Path(__file__).resolve().parents[2] / "reference"
+        _WIDGET_MAP = _REF / "ks-k40-acroform-map.json"
+        _SOURCE_PDF = _REF / "state_forms" / "ks_k40.pdf"
+
+        wmap = load_widget_map(_WIDGET_MAP)
+        fetch_and_verify_source_pdf(
+            _SOURCE_PDF, wmap.source_pdf_url, wmap.source_pdf_sha256
+        )
+
+        fields = _build_k40_fields(state_return)
+        widget_values: dict[str, str] = {}
+        for sem_name, value in asdict(fields).items():
+            widget_names = wmap.widget_names_for(sem_name)
+            if not widget_names:
+                continue
+            text = format_money(value) if isinstance(value, Decimal) else str(value) if value else ""
+            for wn in widget_names:
+                widget_values[wn] = text
+
+        out_path = out_dir / "ks_k40.pdf"
+        fill_acroform_pdf(_SOURCE_PDF, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["KS Form K-40"]

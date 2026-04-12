@@ -1,0 +1,67 @@
+{
+  "source_pdf_url": "https://www.ksrevenue.gov/pdf/k-4025.pdf",
+  "source_pdf_sha256": "dfff7caae33d2527ae9655f562a3469835556cc6ec6ab40297641caf10379fdb",
+  "form_year": 2025,
+  "state": "KS",
+  "form": "K-40",
+  "total_widgets": 134,
+  "mapped_count": 8,
+  "mapping": {
+    "state_federal_agi": {
+      "widget_name": "1 federal adjusted gross income, as reported on your federal income tax return",
+      "terminal_name": "1 federal adjusted gross income, as reported on your federal income tax return",
+      "type": "text",
+      "page": 0,
+      "note": "K-40 line 1 — Federal AGI"
+    },
+    "state_adjusted_gross_income": {
+      "widget_name": "3 kansas adjusted gross income, line 2 added or subtracted from line 1",
+      "terminal_name": "3 kansas adjusted gross income, line 2 added or subtracted from line 1",
+      "type": "text",
+      "page": 0,
+      "note": "K-40 line 3 — Kansas AGI"
+    },
+    "state_standard_deduction": {
+      "widget_name": "4 standard deduction or itemized deductions",
+      "terminal_name": "4 standard deduction or itemized deductions",
+      "type": "text",
+      "page": 0,
+      "note": "K-40 line 4 — Standard deduction or itemized"
+    },
+    "state_exemption_allowance": {
+      "widget_name": "5 exemption allowance, x number of exemptions claimed",
+      "terminal_name": "5 exemption allowance, x number of exemptions claimed",
+      "type": "text",
+      "page": 0,
+      "note": "K-40 line 5 — Exemption allowance"
+    },
+    "state_total_deductions": {
+      "widget_name": "6 total dudecutions, add lines 4 and 5",
+      "terminal_name": "6 total dudecutions, add lines 4 and 5",
+      "type": "text",
+      "page": 0,
+      "note": "K-40 line 6 — Total deductions"
+    },
+    "state_taxable_income": {
+      "widget_name": "7 taxable income, subtract line6 from line 3; if less than zero enter 0",
+      "terminal_name": "7 taxable income, subtract line6 from line 3; if less than zero enter 0",
+      "type": "text",
+      "page": 0,
+      "note": "K-40 line 7 — Kansas taxable income"
+    },
+    "state_total_tax": {
+      "widget_name": "8 tax, use tax tables ot tax computation schedule",
+      "terminal_name": "8 tax, use tax tables ot tax computation schedule",
+      "type": "text",
+      "page": 0,
+      "note": "K-40 line 8 — Tax from tables or worksheet"
+    },
+    "state_total_tax_line12": {
+      "widget_name": "12 total income tax, residnets add lines 8 and 11; nonresidents enter amount form line 10",
+      "terminal_name": "12 total income tax, residnets add lines 8 and 11; nonresidents enter amount form line 10",
+      "type": "text",
+      "page": 0,
+      "note": "K-40 line 12 — Total income tax"
+    }
+  }
+}

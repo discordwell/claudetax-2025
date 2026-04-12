@@ -252,6 +252,32 @@ def _apportionment_fraction(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Layer 1: LA Form IT-540 field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class LAIT540Fields:
+    """Frozen snapshot of LA Form IT-540 line values, ready for rendering."""
+
+    state_federal_agi: Decimal = Decimal("0")
+    state_standard_deduction: Decimal = Decimal("0")
+    state_taxable_income: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+
+
+def _build_it540_fields(state_return: StateReturn) -> LAIT540Fields:
+    """Map StateReturn.state_specific to LAIT540Fields."""
+    ss = state_return.state_specific
+    return LAIT540Fields(
+        state_federal_agi=ss.get("state_federal_agi", Decimal("0")),
+        state_standard_deduction=Decimal("0"),  # graph backend doesn't expose
+        state_taxable_income=ss.get("state_taxable_income", Decimal("0")),
+        state_total_tax=ss.get("state_total_tax", Decimal("0")),
+    )
+
+
 @dataclass(frozen=True)
 class LouisianaPlugin:
     """State plugin for Louisiana — TY2025.
@@ -399,13 +425,37 @@ class LouisianaPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(la-pdf): fan-out follow-up — fill LA Form IT-540 (and
-        # IT-540B for nonresidents, Schedule E for adjustments,
-        # Schedule G for credits) using pypdf against the LA DOR's
-        # fillable PDFs. The output renderer suite is the right home
-        # for this; this plugin returns structured state_specific data
-        # that the renderer will consume.
-        return []
+        from dataclasses import asdict
+
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        _REF = Path(__file__).resolve().parents[2] / "reference"
+        _WIDGET_MAP = _REF / "la-it540-acroform-map.json"
+        _SOURCE_PDF = _REF / "state_forms" / "la_it540.pdf"
+
+        wmap = load_widget_map(_WIDGET_MAP)
+        fetch_and_verify_source_pdf(
+            _SOURCE_PDF, wmap.source_pdf_url, wmap.source_pdf_sha256
+        )
+
+        fields = _build_it540_fields(state_return)
+        widget_values: dict[str, str] = {}
+        for sem_name, value in asdict(fields).items():
+            widget_names = wmap.widget_names_for(sem_name)
+            if not widget_names:
+                continue
+            text = format_money(value) if isinstance(value, Decimal) else str(value) if value else ""
+            for wn in widget_names:
+                widget_values[wn] = text
+
+        out_path = out_dir / "la_it540.pdf"
+        fill_acroform_pdf(_SOURCE_PDF, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["LA Form IT-540"]

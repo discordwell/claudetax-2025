@@ -1,0 +1,53 @@
+{
+  "source_pdf_url": "https://www.maine.gov/revenue/sites/maine.gov.revenue/files/inline-files/25_1040ME_fillable.pdf",
+  "source_pdf_sha256": "6692450e683dc565a1f6605ce76eebb9244cbee7f02151943f603391593be197",
+  "form_year": 2025,
+  "state": "ME",
+  "form": "1040ME",
+  "total_widgets": 110,
+  "mapped_count": 6,
+  "mapping": {
+    "me_line_14_federal_agi": {
+      "widget_name": "1040ME Federal adjusted gross income",
+      "terminal_name": "1040ME Federal adjusted gross income",
+      "type": "text",
+      "page": 0,
+      "note": "Form 1040ME line 14 — Federal adjusted gross income"
+    },
+    "me_line_16_me_agi": {
+      "widget_name": "1040ME Maine adjusted gross income",
+      "terminal_name": "1040ME Maine adjusted gross income",
+      "type": "text",
+      "page": 0,
+      "note": "Form 1040ME line 16 — Maine adjusted gross income"
+    },
+    "me_line_17_deduction": {
+      "widget_name": "1040ME Deduction",
+      "terminal_name": "1040ME Deduction",
+      "type": "text",
+      "page": 0,
+      "note": "Form 1040ME line 17 — Maine deduction"
+    },
+    "me_line_19_personal_exemption": {
+      "widget_name": "1040ME Exemption",
+      "terminal_name": "1040ME Exemption",
+      "type": "text",
+      "page": 0,
+      "note": "Form 1040ME line 19 — Personal exemption deduction"
+    },
+    "me_line_20_taxable_income": {
+      "widget_name": "1040ME Taxable income",
+      "terminal_name": "1040ME Taxable income",
+      "type": "text",
+      "page": 0,
+      "note": "Form 1040ME line 20 — Maine taxable income"
+    },
+    "state_total_tax": {
+      "widget_name": "1040ME Income tax",
+      "terminal_name": "1040ME Income tax",
+      "type": "text",
+      "page": 0,
+      "note": "Form 1040ME line 21 — Maine income tax"
+    }
+  }
+}

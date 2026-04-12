@@ -220,6 +220,23 @@ def eitc_phase_out_begin(qualifying_children: int, status: FilingStatus) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Child Tax Credit (CTC) / Additional CTC / Other Dependents Credit
+# ---------------------------------------------------------------------------
+
+
+def odc_per_dependent() -> int:
+    return _raw()["child_tax_credit"]["amount_per_other_dependent_odc"]
+
+
+def actc_earned_income_floor() -> int:
+    return _raw()["child_tax_credit"]["actc_earned_income_floor"]
+
+
+def actc_earned_income_rate() -> float:
+    return _raw()["child_tax_credit"]["actc_earned_income_rate"]
+
+
+# ---------------------------------------------------------------------------
 # Retirement
 # ---------------------------------------------------------------------------
 

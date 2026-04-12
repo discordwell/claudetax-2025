@@ -452,6 +452,7 @@ def run_pipeline(
     render_form_2441: bool = True,
     render_form_8606: bool = True,
     render_form_8962: bool = True,
+    render_schedule_2: bool = True,
     render_state_returns: bool = True,
     build_paper_bundle: bool = True,
     emit_ffff_map: bool = True,
@@ -719,6 +720,22 @@ def run_pipeline(
         out_path_8962 = output_dir / "form_8962.pdf"
         render_form_8962_pdf(fields_8962, out_path_8962)
         rendered.append(out_path_8962)
+
+    # Schedule 2 — Additional Taxes. Rendered when any of the source
+    # taxes (AMT, SE, additional Medicare, NIIT, early distribution
+    # penalty) are nonzero.
+    if render_schedule_2:
+        from skill.scripts.output.schedule_2 import (
+            compute_schedule_2_fields,
+            render_schedule_2_pdf,
+            schedule_2_required,
+        )
+
+        if schedule_2_required(canonical):
+            fields_2 = compute_schedule_2_fields(canonical)
+            out_path_2 = output_dir / "schedule_2.pdf"
+            render_schedule_2_pdf(fields_2, out_path_2)
+            rendered.append(out_path_2)
 
     # ------------------------------------------------------------------
     # 5. Emit result.json

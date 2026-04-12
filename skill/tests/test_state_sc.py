@@ -354,6 +354,9 @@ class TestSouthCarolinaFormIds:
     def test_render_pdfs_empty(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
+        """SCDOR SC1040 PDF is flattened (no AcroForm widgets).
+        render_pdfs() correctly returns [] until a scaffold renderer
+        is implemented."""
         sr = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,

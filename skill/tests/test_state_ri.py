@@ -649,6 +649,9 @@ class TestRhodeIslandPluginFormIds:
     def test_render_pdfs_returns_empty_list(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
+        """RI Form RI-1040 PDF is flattened (no AcroForm widgets).
+        render_pdfs() correctly returns [] until a scaffold renderer
+        is implemented."""
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,

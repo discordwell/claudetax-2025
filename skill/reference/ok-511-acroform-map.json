@@ -1,0 +1,60 @@
+{
+  "source_pdf_url": "https://oklahoma.gov/content/dam/ok/en/tax/documents/forms/individuals/current/511-Pkt.pdf",
+  "source_pdf_sha256": "c90cf30381cca6262ec94050acde8db1ee58885360f0af4ec21e045d1cc5a572",
+  "form_year": 2025,
+  "state": "OK",
+  "form": "511",
+  "total_widgets": 295,
+  "mapped_count": 7,
+  "mapping": {
+    "state_federal_agi": {
+      "widget_name": "511 Part 1 1",
+      "terminal_name": "511 Part 1 1",
+      "type": "text",
+      "page": 0,
+      "note": "Federal adjusted gross income (Form 511 line 1)"
+    },
+    "state_adjusted_gross_income": {
+      "widget_name": "511 Part 1 5",
+      "terminal_name": "511 Part 1 5",
+      "type": "text",
+      "page": 0,
+      "note": "Oklahoma adjusted gross income (Form 511 line 5)"
+    },
+    "state_standard_deduction": {
+      "widget_name": "511 Part 2 8",
+      "terminal_name": "511 Part 2 8",
+      "type": "text",
+      "page": 0,
+      "note": "Standard deduction (Form 511 line 8)"
+    },
+    "state_exemption_allowance": {
+      "widget_name": "511 Part 2 9",
+      "terminal_name": "511 Part 2 9",
+      "type": "text",
+      "page": 0,
+      "note": "Exemptions amount (Form 511 line 9)"
+    },
+    "state_taxable_income": {
+      "widget_name": "511 Part 2 11",
+      "terminal_name": "511 Part 2 11",
+      "type": "text",
+      "page": 0,
+      "note": "Oklahoma taxable income (Form 511 line 11)"
+    },
+    "state_total_tax": {
+      "widget_name": "511 Part 2 12",
+      "terminal_name": "511 Part 2 12",
+      "type": "text",
+      "page": 0,
+      "note": "Tax from tax table or rate schedule (Form 511 line 12)"
+    },
+    "state_total_tax_resident_basis": {
+      "widget_name": "511 Part 2 13",
+      "terminal_name": "511 Part 2 13",
+      "type": "text",
+      "page": 0,
+      "note": "Total tax before credits (Form 511 line 13)"
+    }
+  }
+}

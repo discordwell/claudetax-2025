@@ -270,8 +270,10 @@ class SouthCarolinaPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(sc-pdf): fan-out follow-up — fill SC1040 + Schedule NR
-        # against SCDOR fillable PDFs.
+        # SCDOR SC1040 PDF is flattened (no AcroForm widgets —
+        # PdfReader.get_fields() returns None). Cannot fill via
+        # AcroForm overlay. Rendering requires a scaffold-based
+        # approach in a future wave.
         return []
 
     def form_ids(self) -> list[str]:

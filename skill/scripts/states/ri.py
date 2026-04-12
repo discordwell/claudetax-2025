@@ -511,10 +511,10 @@ class RhodeIslandPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(ri-pdf): fan-out follow-up — fill Form RI-1040 (and
-        # Schedule M, Schedule A for itemizers, Form RI-1040NR for
-        # nonresidents, Schedule W for withholding) using pypdf against
-        # the RI Division of Taxation fillable PDFs.
+        # RI Division of Taxation Form RI-1040 PDF is flattened (no
+        # AcroForm widgets — PdfReader.get_fields() returns None).
+        # Cannot fill via AcroForm overlay. Rendering requires a
+        # scaffold-based approach in a future wave.
         return []
 
     def form_ids(self) -> list[str]:

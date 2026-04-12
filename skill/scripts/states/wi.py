@@ -182,6 +182,37 @@ def _apportionment_fraction(
     return frac
 
 
+# ---------------------------------------------------------------------------
+# Layer 1: WI Form 1 field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class WIForm1Fields:
+    """Frozen snapshot of WI Form 1 line values, ready for rendering."""
+
+    state_adjusted_gross_income: Decimal = Decimal("0")
+    wi_wi_agi: Decimal = Decimal("0")
+    state_taxable_income: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+    wi_total_tax_and_credits: Decimal = Decimal("0")
+
+
+def _build_wi_form1_fields(state_return: StateReturn) -> WIForm1Fields:
+    """Map StateReturn.state_specific to WIForm1Fields."""
+    ss = state_return.state_specific
+    state_agi = ss.get("state_adjusted_gross_income", Decimal("0"))
+    state_ti = ss.get("state_taxable_income", Decimal("0"))
+    state_tax = ss.get("state_total_tax", Decimal("0"))
+    return WIForm1Fields(
+        state_adjusted_gross_income=state_agi,
+        wi_wi_agi=state_agi,  # graph backend echoes AGI as WI AGI
+        state_taxable_income=state_ti,
+        state_total_tax=state_tax,
+        wi_total_tax_and_credits=state_tax,
+    )
+
+
 @dataclass(frozen=True)
 class WisconsinPlugin:
     """State plugin for Wisconsin.
@@ -333,13 +364,37 @@ class WisconsinPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(wi-pdf): fan-out follow-up — fill Wisconsin Form 1 (and
-        # Schedule I / Schedule SB, Schedule CR for credits, Form 1NPR for
-        # nonresidents) using pypdf against the Wisconsin DOR's fillable
-        # PDFs. The output renderer suite is the right home for this;
-        # this plugin returns structured state_specific data that the
-        # renderer will consume.
-        return []
+        from dataclasses import asdict
+
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        _REF = Path(__file__).resolve().parents[2] / "reference"
+        _WIDGET_MAP = _REF / "wi-form1-acroform-map.json"
+        _SOURCE_PDF = _REF / "state_forms" / "wi_form1.pdf"
+
+        wmap = load_widget_map(_WIDGET_MAP)
+        fetch_and_verify_source_pdf(
+            _SOURCE_PDF, wmap.source_pdf_url, wmap.source_pdf_sha256
+        )
+
+        fields = _build_wi_form1_fields(state_return)
+        widget_values: dict[str, str] = {}
+        for sem_name, value in asdict(fields).items():
+            widget_names = wmap.widget_names_for(sem_name)
+            if not widget_names:
+                continue
+            text = format_money(value) if isinstance(value, Decimal) else str(value) if value else ""
+            for wn in widget_names:
+                widget_values[wn] = text
+
+        out_path = out_dir / "wi_form1.pdf"
+        fill_acroform_pdf(_SOURCE_PDF, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["WI Form 1"]

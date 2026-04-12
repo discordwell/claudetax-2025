@@ -348,6 +348,38 @@ OK_V1_LIMITATIONS: tuple[str, ...] = (
 
 
 # ---------------------------------------------------------------------------
+# Layer 1: OK Form 511 field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class OK511Fields:
+    """Frozen snapshot of OK Form 511 line values, ready for rendering."""
+
+    state_federal_agi: Decimal = Decimal("0")
+    state_adjusted_gross_income: Decimal = Decimal("0")
+    state_standard_deduction: Decimal = Decimal("0")
+    state_exemption_allowance: Decimal = Decimal("0")
+    state_taxable_income: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+    state_total_tax_resident_basis: Decimal = Decimal("0")
+
+
+def _build_ok511_fields(state_return: StateReturn) -> OK511Fields:
+    """Map StateReturn.state_specific to OK511Fields."""
+    ss = state_return.state_specific
+    return OK511Fields(
+        state_federal_agi=ss.get("state_federal_agi", Decimal("0")),
+        state_adjusted_gross_income=ss.get("state_adjusted_gross_income", Decimal("0")),
+        state_standard_deduction=ss.get("state_standard_deduction", Decimal("0")),
+        state_exemption_allowance=ss.get("state_exemption_allowance", Decimal("0")),
+        state_taxable_income=ss.get("state_taxable_income", Decimal("0")),
+        state_total_tax=ss.get("state_total_tax", Decimal("0")),
+        state_total_tax_resident_basis=ss.get("state_total_tax_resident_basis", Decimal("0")),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -561,10 +593,37 @@ class OklahomaPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(ok-pdf): fan-out follow-up — fill OK Form 511 (and
-        # 511-NR for nonresidents, Schedules 511-A/B/C/D for adds/subs)
-        # using pypdf against the OK Tax Commission's fillable PDFs.
-        return []
+        from dataclasses import asdict
+
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        _REF = Path(__file__).resolve().parents[2] / "reference"
+        _WIDGET_MAP = _REF / "ok-511-acroform-map.json"
+        _SOURCE_PDF = _REF / "state_forms" / "ok_511.pdf"
+
+        wmap = load_widget_map(_WIDGET_MAP)
+        fetch_and_verify_source_pdf(
+            _SOURCE_PDF, wmap.source_pdf_url, wmap.source_pdf_sha256
+        )
+
+        fields = _build_ok511_fields(state_return)
+        widget_values: dict[str, str] = {}
+        for sem_name, value in asdict(fields).items():
+            widget_names = wmap.widget_names_for(sem_name)
+            if not widget_names:
+                continue
+            text = format_money(value) if isinstance(value, Decimal) else str(value) if value else ""
+            for wn in widget_names:
+                widget_values[wn] = text
+
+        out_path = out_dir / "ok_511.pdf"
+        fill_acroform_pdf(_SOURCE_PDF, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["OK Form 511"]

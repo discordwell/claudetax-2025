@@ -1,0 +1,60 @@
+{
+  "source_pdf_url": "https://tax.vermont.gov/sites/tax/files/documents/IN-111-2025.pdf",
+  "source_pdf_sha256": "728c6d2a4f14d9a6c6fd5939e72a954c8c727db42daef4fd74568de6306827fc",
+  "form_year": 2025,
+  "state": "VT",
+  "form": "IN-111",
+  "total_widgets": 90,
+  "mapped_count": 7,
+  "mapping": {
+    "state_adjusted_gross_income": {
+      "widget_name": "Line1",
+      "terminal_name": "Line1",
+      "type": "text",
+      "page": 0,
+      "note": "Federal adjusted gross income (IN-111 line 1)"
+    },
+    "vt_modifications": {
+      "widget_name": "Line2",
+      "terminal_name": "Line2",
+      "type": "text",
+      "page": 0,
+      "note": "Schedule IN-112 modifications (IN-111 line 2)"
+    },
+    "vt_modified_agi": {
+      "widget_name": "Line3",
+      "terminal_name": "Line3",
+      "type": "text",
+      "page": 0,
+      "note": "Vermont adjusted gross income (IN-111 line 3)"
+    },
+    "vt_deduction": {
+      "widget_name": "Line4",
+      "terminal_name": "Line4",
+      "type": "text",
+      "page": 0,
+      "note": "Standard or itemized deduction (IN-111 line 4)"
+    },
+    "state_taxable_income": {
+      "widget_name": "Line6",
+      "terminal_name": "Line6",
+      "type": "text",
+      "page": 0,
+      "note": "Vermont taxable income (IN-111 line 6)"
+    },
+    "state_total_tax": {
+      "widget_name": "Line7",
+      "terminal_name": "Line7",
+      "type": "text",
+      "page": 0,
+      "note": "Vermont income tax (IN-111 line 7)"
+    },
+    "vt_total_income_tax": {
+      "widget_name": "Line8",
+      "terminal_name": "Line8",
+      "type": "text",
+      "page": 0,
+      "note": "Total income tax (IN-111 line 8)"
+    }
+  }
+}

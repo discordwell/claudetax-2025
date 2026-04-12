@@ -1,0 +1,109 @@
+{
+  "source_pdf_url": "https://tax.utah.gov/forms/current/tc-40.pdf",
+  "source_pdf_sha256": "0eac22fb3d1487c465d29a4351d5fe3a29c5a511febd5975e0fc2b6688637cdf",
+  "form_year": 2025,
+  "state": "UT",
+  "form": "TC-40",
+  "total_widgets": 107,
+  "mapped_count": 14,
+  "mapping": {
+    "state_federal_agi": {
+      "widget_name": "40 Line 4",
+      "terminal_name": "40 Line 4",
+      "type": "text",
+      "page": 0,
+      "note": "Federal adjusted gross income (TC-40 line 4)"
+    },
+    "state_additions": {
+      "widget_name": "40 Line 5",
+      "terminal_name": "40 Line 5",
+      "type": "text",
+      "page": 0,
+      "note": "Additions to income (TC-40 line 5)"
+    },
+    "state_total_income": {
+      "widget_name": "40 Line 6",
+      "terminal_name": "40 Line 6",
+      "type": "text",
+      "page": 0,
+      "note": "Total income (TC-40 line 6)"
+    },
+    "state_taxable_income": {
+      "widget_name": "40 Line 9",
+      "terminal_name": "40 Line 9",
+      "type": "text",
+      "page": 0,
+      "note": "Utah taxable income (TC-40 line 9)"
+    },
+    "state_tax_before_credit": {
+      "widget_name": "40 Line 10",
+      "terminal_name": "40 Line 10",
+      "type": "text",
+      "page": 0,
+      "note": "Utah tax calculation (TC-40 line 10 = line 9 * 4.5%)"
+    },
+    "state_personal_exemption": {
+      "widget_name": "40 Line 11",
+      "terminal_name": "40 Line 11",
+      "type": "text",
+      "page": 0,
+      "note": "Utah personal exemption (TC-40 line 11)"
+    },
+    "state_federal_deduction": {
+      "widget_name": "40 Line 12",
+      "terminal_name": "40 Line 12",
+      "type": "text",
+      "page": 0,
+      "note": "Federal standard or itemized deduction (TC-40 line 12)"
+    },
+    "state_initial_taxpayer_tax_credit": {
+      "widget_name": "40 Line 16",
+      "terminal_name": "40 Line 16",
+      "type": "text",
+      "page": 0,
+      "note": "Initial credit before phase-out (TC-40 line 16)"
+    },
+    "state_taxpayer_tax_credit_phase_out": {
+      "widget_name": "40 Line 19",
+      "terminal_name": "40 Line 19",
+      "type": "text",
+      "page": 0,
+      "note": "Phase-out amount (TC-40 line 19)"
+    },
+    "state_taxpayer_tax_credit": {
+      "widget_name": "40 Line 20",
+      "terminal_name": "40 Line 20",
+      "type": "text",
+      "page": 0,
+      "note": "Taxpayer tax credit (TC-40 line 20)"
+    },
+    "state_total_tax": {
+      "widget_name": "40 Line 22",
+      "terminal_name": "40 Line 22",
+      "type": "text",
+      "page": 0,
+      "note": "Utah income tax (TC-40 line 22)"
+    },
+    "state_total_payments": {
+      "widget_name": "40 Line 27",
+      "terminal_name": "40 Line 27",
+      "type": "text",
+      "page": 1,
+      "note": "Total payments and credits (TC-40 line 27)"
+    },
+    "state_amount_owed": {
+      "widget_name": "40 Line 29",
+      "terminal_name": "40 Line 29",
+      "type": "text",
+      "page": 1,
+      "note": "Amount owed (TC-40 line 29)"
+    },
+    "state_overpayment": {
+      "widget_name": "40 Line 30",
+      "terminal_name": "40 Line 30",
+      "type": "text",
+      "page": 1,
+      "note": "Overpayment (TC-40 line 30)"
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "source_pdf_url": "https://www.revenue.wi.gov/TaxForms2025/2025-Form1f.pdf",
+  "source_pdf_sha256": "a9b0d9b75bcb55ec0e20984c28872a893765fea66e0f1edd9a7c47b60ceae14e",
+  "form_year": 2025,
+  "state": "WI",
+  "form": "Form 1",
+  "total_widgets": 197,
+  "mapped_count": 5,
+  "mapping": {
+    "state_adjusted_gross_income": {
+      "widget_name": "line1",
+      "terminal_name": "line1",
+      "type": "text",
+      "page": 0,
+      "note": "Federal adjusted gross income (Form 1 line 1)"
+    },
+    "wi_wi_agi": {
+      "widget_name": "9",
+      "terminal_name": "9",
+      "type": "text",
+      "page": 0,
+      "note": "Wisconsin adjusted gross income (Form 1 line 9)"
+    },
+    "state_taxable_income": {
+      "widget_name": "14",
+      "terminal_name": "14",
+      "type": "text",
+      "page": 0,
+      "note": "Wisconsin taxable income (Form 1 line 14)"
+    },
+    "state_total_tax": {
+      "widget_name": "18",
+      "terminal_name": "18",
+      "type": "text",
+      "page": 0,
+      "note": "Wisconsin income tax (Form 1 line 18)"
+    },
+    "wi_total_tax_and_credits": {
+      "widget_name": "22",
+      "terminal_name": "22",
+      "type": "text",
+      "page": 0,
+      "note": "Net income tax (Form 1 line 22)"
+    }
+  }
+}

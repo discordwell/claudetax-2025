@@ -481,16 +481,53 @@ class TestUtahFormIds:
     def test_form_ids(self):
         assert PLUGIN.form_ids() == ["UT Form TC-40"]
 
-    def test_render_pdfs_empty(
+    def test_render_pdfs_produces_pdf(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
+        """UT Form TC-40 AcroForm fill produces a non-empty PDF."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
         sr = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert PLUGIN.render_pdfs(sr, tmp_path) == []
+        paths = PLUGIN.render_pdfs(sr, tmp_path)
+        assert len(paths) == 1
+        assert paths[0].exists()
+        assert paths[0].stat().st_size > 0
+        assert paths[0].name == "ut_tc40.pdf"
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify that rendered UT TC-40 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        sr = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(sr, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # state_total_tax = $2,588.23 -> widget "40 Line 22"
+        assert fields["40 Line 22"].get("/V") == "2588.23"
+        # state_taxable_income = $65,000 -> widget "40 Line 9"
+        assert fields["40 Line 9"].get("/V") == "65000.00"
+        # state_federal_agi = $65,000 -> widget "40 Line 4"
+        assert fields["40 Line 4"].get("/V") == "65000.00"
 
 
 # ---------------------------------------------------------------------------

@@ -163,6 +163,41 @@ def _apportionment_fraction(
     return frac
 
 
+# ---------------------------------------------------------------------------
+# Layer 1: VT IN-111 field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class IN111Fields:
+    """Frozen snapshot of VT Form IN-111 line values, ready for rendering."""
+
+    state_adjusted_gross_income: Decimal = Decimal("0")
+    vt_modifications: Decimal = Decimal("0")
+    vt_modified_agi: Decimal = Decimal("0")
+    vt_deduction: Decimal = Decimal("0")
+    state_taxable_income: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+    vt_total_income_tax: Decimal = Decimal("0")
+
+
+def _build_in111_fields(state_return: StateReturn) -> IN111Fields:
+    """Map StateReturn.state_specific to IN111Fields."""
+    ss = state_return.state_specific
+    state_agi = ss.get("state_adjusted_gross_income", Decimal("0"))
+    state_ti = ss.get("state_taxable_income", Decimal("0"))
+    state_tax = ss.get("state_total_tax", Decimal("0"))
+    return IN111Fields(
+        state_adjusted_gross_income=state_agi,
+        vt_modifications=Decimal("0"),  # v1: no modifications
+        vt_modified_agi=state_agi,
+        vt_deduction=Decimal("0"),  # graph backend does not expose
+        state_taxable_income=state_ti,
+        state_total_tax=state_tax,
+        vt_total_income_tax=state_tax,
+    )
+
+
 @dataclass(frozen=True)
 class VermontPlugin:
     """State plugin for Vermont — TY2025.
@@ -323,12 +358,37 @@ class VermontPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(vt-pdf): fan-out follow-up — fill Form IN-111 (and
-        # Schedule IN-112 modifications, Schedule IN-113 nonresident
-        # adjustment, Schedule IN-117 credit for taxes paid to other
-        # states) using pypdf against the VT Tax Department fillable
-        # PDFs.
-        return []
+        from dataclasses import asdict
+
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        _REF = Path(__file__).resolve().parents[2] / "reference"
+        _WIDGET_MAP = _REF / "vt-in111-acroform-map.json"
+        _SOURCE_PDF = _REF / "state_forms" / "vt_in111.pdf"
+
+        wmap = load_widget_map(_WIDGET_MAP)
+        fetch_and_verify_source_pdf(
+            _SOURCE_PDF, wmap.source_pdf_url, wmap.source_pdf_sha256
+        )
+
+        fields = _build_in111_fields(state_return)
+        widget_values: dict[str, str] = {}
+        for sem_name, value in asdict(fields).items():
+            widget_names = wmap.widget_names_for(sem_name)
+            if not widget_names:
+                continue
+            text = format_money(value) if isinstance(value, Decimal) else str(value) if value else ""
+            for wn in widget_names:
+                widget_values[wn] = text
+
+        out_path = out_dir / "vt_in111.pdf"
+        fill_acroform_pdf(_SOURCE_PDF, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["VT Form IN-111"]

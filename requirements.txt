@@ -15,7 +15,7 @@ jsonschema>=4.23,<5            # Schema validation for JSON-only consumers
 python-dateutil>=2.9,<3        # Robust date parsing from varied input formats
 
 # Calculation engine candidate (pending CP4 verification)
-tenforty>=0.2                  # Python wrapper of OpenTaxSolver, TY2018–TY2025
+tenforty==2025.8               # Python wrapper of OpenTaxSolver, TY2018–TY2025 — pinned for gatekeeper stability
 
 # OCR for tax documents (first-class, not optional)
 azure-ai-documentintelligence>=1.0,<2  # "Unified US Tax" prebuilt model for W-2/1098/1099/1040

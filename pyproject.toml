@@ -30,7 +30,7 @@ dependencies = [
     "jsonschema>=4.23,<5",
     "python-dateutil>=2.9,<3",
     # Calculation engine (OpenTaxSolver wrapper, TY2018-TY2025)
-    "tenforty>=0.2",
+    "tenforty==2025.8",
     # OCR for tax documents
     "azure-ai-documentintelligence>=1.0,<2",
 ]

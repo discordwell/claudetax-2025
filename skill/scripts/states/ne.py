@@ -766,12 +766,10 @@ class NebraskaPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(ne-pdf): fan-out follow-up — fill Form 1040N (and
-        # Schedules I, II, III, Form 1310N for credit for tax paid
-        # to other state) using pypdf against the NE DOR's fillable
-        # PDFs. The output renderer suite is the right home for
-        # this; this plugin returns structured state_specific data
-        # that the renderer will consume.
+        # NE DOR Form 1040N is a flattened (non-fillable) PDF — no
+        # AcroForm widgets. PdfReader(path).get_fields() returns None.
+        # AcroForm overlay is not possible; return [] per Pattern B
+        # step 1 ("if flattened, document, return []").
         return []
 
     def form_ids(self) -> list[str]:

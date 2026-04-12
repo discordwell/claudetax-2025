@@ -293,6 +293,34 @@ ND_V1_LIMITATIONS: tuple[str, ...] = (
 
 
 # ---------------------------------------------------------------------------
+# Layer 1: ND-1 field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ND1Fields:
+    """Frozen snapshot of ND Form ND-1 line values, ready for rendering."""
+
+    state_federal_taxable_income: Decimal = Decimal("0")
+    state_taxable_income: Decimal = Decimal("0")
+    state_tax_before_credits: Decimal = Decimal("0")
+    state_total_credits: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+
+
+def _build_nd1_fields(state_return: StateReturn) -> ND1Fields:
+    """Map StateReturn.state_specific to ND1Fields."""
+    ss = state_return.state_specific
+    return ND1Fields(
+        state_federal_taxable_income=ss.get("state_federal_taxable_income", Decimal("0")),
+        state_taxable_income=ss.get("state_taxable_income", Decimal("0")),
+        state_tax_before_credits=ss.get("state_tax_before_credits", Decimal("0")),
+        state_total_credits=ss.get("state_total_credits", Decimal("0")),
+        state_total_tax=ss.get("state_total_tax", Decimal("0")),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Plugin
 # ---------------------------------------------------------------------------
 
@@ -474,9 +502,37 @@ class NorthDakotaPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(nd-pdf): fan-out follow-up — fill ND-1 + Schedule ND-1SA
-        # + Schedule ND-1NR against ND DOR fillable PDFs.
-        return []
+        from dataclasses import asdict
+
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        _REF = Path(__file__).resolve().parents[2] / "reference"
+        _WIDGET_MAP = _REF / "nd-1-acroform-map.json"
+        _SOURCE_PDF = _REF / "state_forms" / "nd_1.pdf"
+
+        wmap = load_widget_map(_WIDGET_MAP)
+        fetch_and_verify_source_pdf(
+            _SOURCE_PDF, wmap.source_pdf_url, wmap.source_pdf_sha256
+        )
+
+        fields = _build_nd1_fields(state_return)
+        widget_values: dict[str, str] = {}
+        for sem_name, value in asdict(fields).items():
+            widget_names = wmap.widget_names_for(sem_name)
+            if not widget_names:
+                continue
+            text = format_money(value) if isinstance(value, Decimal) else str(value) if value else ""
+            for wn in widget_names:
+                widget_values[wn] = text
+
+        out_path = out_dir / "nd_1.pdf"
+        fill_acroform_pdf(_SOURCE_PDF, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["ND Form ND-1"]

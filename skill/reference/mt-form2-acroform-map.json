@@ -1,0 +1,46 @@
+{
+  "source_pdf_url": "https://revenue.mt.gov/files/Forms/Montana-Individual-Income-Tax-Return-Form-2/2025_Montana_Individual_Income_Tax_Return_Form_2.pdf",
+  "source_pdf_sha256": "4671aef667749732670c07fd51cbeed6bc824dc6466cfe19597787b3d6ba2b37",
+  "form_year": 2025,
+  "state": "MT",
+  "form": "Form 2",
+  "total_widgets": 314,
+  "mapped_count": 5,
+  "mapping": {
+    "state_federal_agi": {
+      "widget_name": "Page 1 Line 1",
+      "terminal_name": "Page 1 Line 1",
+      "type": "text",
+      "page": 1,
+      "note": "Federal adjusted gross income (Form 2 page 1 line 1)"
+    },
+    "state_federal_deduction": {
+      "widget_name": "Page 1 Line 2",
+      "terminal_name": "Page 1 Line 2",
+      "type": "text",
+      "page": 1,
+      "note": "Federal standard or itemized deduction (Form 2 page 1 line 2)"
+    },
+    "state_taxable_income": {
+      "widget_name": "Page 1 Line 3",
+      "terminal_name": "Page 1 Line 3",
+      "type": "text",
+      "page": 1,
+      "note": "Federal taxable income / MT starting base (Form 2 page 1 line 3)"
+    },
+    "state_tax_line6": {
+      "widget_name": "Page 1 Line 6",
+      "terminal_name": "Page 1 Line 6",
+      "type": "text",
+      "page": 1,
+      "note": "Montana income tax (Form 2 page 1 line 6)"
+    },
+    "state_total_tax": {
+      "widget_name": "Page 1 Line 17",
+      "terminal_name": "Page 1 Line 17",
+      "type": "text",
+      "page": 1,
+      "note": "Total tax (Form 2 page 1 line 17)"
+    }
+  }
+}

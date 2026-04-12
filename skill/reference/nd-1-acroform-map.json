@@ -1,0 +1,46 @@
+{
+  "source_pdf_url": "https://www.tax.nd.gov/sites/www/files/documents/forms/individual/2025-iit/28702-form-nd-1-2025.pdf",
+  "source_pdf_sha256": "e7c35d515b7b1e101bef3ceb04cd8363d5df3e44da19654982b8f26bfeed83da",
+  "form_year": 2025,
+  "state": "ND",
+  "form": "ND-1",
+  "total_widgets": 92,
+  "mapped_count": 5,
+  "mapping": {
+    "state_federal_taxable_income": {
+      "widget_name": "SX 1a",
+      "terminal_name": "SX 1a",
+      "type": "text",
+      "page": 1,
+      "note": "Federal taxable income (ND-1 line 1a)"
+    },
+    "state_taxable_income": {
+      "widget_name": "ND 18",
+      "terminal_name": "ND 18",
+      "type": "text",
+      "page": 1,
+      "note": "North Dakota taxable income (ND-1 line 18)"
+    },
+    "state_tax_before_credits": {
+      "widget_name": "Line 19",
+      "terminal_name": "Line 19",
+      "type": "text",
+      "page": 1,
+      "note": "Tax from table/schedule (ND-1 line 19)"
+    },
+    "state_total_credits": {
+      "widget_name": "Line 24",
+      "terminal_name": "Line 24",
+      "type": "text",
+      "page": 1,
+      "note": "Total credits (ND-1 line 24)"
+    },
+    "state_total_tax": {
+      "widget_name": "Line 36",
+      "terminal_name": "Line 36",
+      "type": "text",
+      "page": 1,
+      "note": "Total tax (ND-1 line 36)"
+    }
+  }
+}

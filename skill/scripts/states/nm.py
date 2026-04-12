@@ -276,8 +276,10 @@ class NewMexicoPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(nm-pdf): fan-out follow-up — fill PIT-1 + PIT-ADJ +
-        # PIT-B against the NM TRD's fillable PDFs.
+        # NM TRD Form PIT-1 is a flattened (non-fillable) PDF — no
+        # AcroForm widgets. PdfReader(path).get_fields() returns None.
+        # AcroForm overlay is not possible; return [] per Pattern B
+        # step 1 ("if flattened, document, return []").
         return []
 
     def form_ids(self) -> list[str]:

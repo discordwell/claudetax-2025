@@ -192,6 +192,46 @@ from skill.scripts.states._plugin_api import (
 _TENFORTY_BACKEND = "graph"
 
 
+# ---------------------------------------------------------------------------
+# Layer 1: MT Form 2 field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MTForm2Fields:
+    """Frozen snapshot of MT Form 2 line values, ready for rendering."""
+
+    state_federal_agi: Decimal = Decimal("0")
+    state_federal_deduction: Decimal = Decimal("0")
+    state_taxable_income: Decimal = Decimal("0")
+    state_tax_line6: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+
+
+def _build_mt_form2_fields(state_return: StateReturn) -> MTForm2Fields:
+    """Map StateReturn.state_specific to MTForm2Fields."""
+    ss = state_return.state_specific
+    # The graph backend surfaces state_adjusted_gross_income as federal
+    # taxable income (= AGI - fed std ded). We need to reconstruct
+    # federal AGI for line 1 and the deduction for line 2.
+    state_ti = ss.get("state_taxable_income", Decimal("0"))
+    state_agi = ss.get("state_adjusted_gross_income", Decimal("0"))
+    state_tax = ss.get("state_total_tax", Decimal("0"))
+    state_tax_full = ss.get("state_total_tax_resident_basis", Decimal("0"))
+    return MTForm2Fields(
+        state_federal_agi=state_agi,  # graph backend reports fed TI as AGI
+        state_federal_deduction=Decimal("0"),  # not separately tracked
+        state_taxable_income=state_ti,
+        state_tax_line6=state_tax_full,
+        state_total_tax=state_tax,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Plugin
+# ---------------------------------------------------------------------------
+
+
 @dataclass(frozen=True)
 class MontanaPlugin:
     """State plugin for Montana — TY2025.
@@ -374,11 +414,37 @@ class MontanaPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(mt-pdf): fan-out follow-up — fill Montana Form 2
-        # (and Schedules I, II, and the Nonresident/Part-Year
-        # Resident Schedule) using pypdf against the MT DOR's
-        # fillable PDFs.
-        return []
+        from dataclasses import asdict
+
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        _REF = Path(__file__).resolve().parents[2] / "reference"
+        _WIDGET_MAP = _REF / "mt-form2-acroform-map.json"
+        _SOURCE_PDF = _REF / "state_forms" / "mt_form2.pdf"
+
+        wmap = load_widget_map(_WIDGET_MAP)
+        fetch_and_verify_source_pdf(
+            _SOURCE_PDF, wmap.source_pdf_url, wmap.source_pdf_sha256
+        )
+
+        fields = _build_mt_form2_fields(state_return)
+        widget_values: dict[str, str] = {}
+        for sem_name, value in asdict(fields).items():
+            widget_names = wmap.widget_names_for(sem_name)
+            if not widget_names:
+                continue
+            text = format_money(value) if isinstance(value, Decimal) else str(value) if value else ""
+            for wn in widget_names:
+                widget_values[wn] = text
+
+        out_path = out_dir / "mt_form2.pdf"
+        fill_acroform_pdf(_SOURCE_PDF, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["MT Form 2"]

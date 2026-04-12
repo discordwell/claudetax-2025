@@ -1,0 +1,81 @@
+{
+  "source_pdf_url": "https://dor.mo.gov/forms/MO-1040%20Print%20Only_2025.pdf",
+  "source_pdf_sha256": "c92027c7f6245b67ecee1b626163b3e51a8fea03562d08d5342aaad4491fa6d6",
+  "form_year": 2025,
+  "state": "MO",
+  "form": "MO-1040",
+  "total_widgets": 192,
+  "mapped_count": 10,
+  "mapping": {
+    "state_federal_agi": {
+      "widget_name": "1Y",
+      "terminal_name": "1Y",
+      "type": "text",
+      "page": 1,
+      "note": "Federal adjusted gross income (line 1 Yourself column)"
+    },
+    "state_adjusted_gross_income": {
+      "widget_name": "6",
+      "terminal_name": "6",
+      "type": "text",
+      "page": 1,
+      "note": "Missouri adjusted gross income (line 6)"
+    },
+    "state_pension_ss_exemption": {
+      "widget_name": "8",
+      "terminal_name": "8",
+      "type": "text",
+      "page": 1,
+      "note": "Pension/SS/SS Disability exemption (line 8)"
+    },
+    "state_federal_tax_input": {
+      "widget_name": "9",
+      "terminal_name": "9",
+      "type": "text",
+      "page": 1,
+      "note": "Federal income tax (line 9)"
+    },
+    "state_federal_tax_deduction": {
+      "widget_name": "13",
+      "terminal_name": "13",
+      "type": "text",
+      "page": 1,
+      "note": "Federal income tax deduction (line 13)"
+    },
+    "state_standard_deduction": {
+      "widget_name": "14",
+      "terminal_name": "14",
+      "type": "text",
+      "page": 1,
+      "note": "Standard or itemized deduction (line 14)"
+    },
+    "state_total_deductions": {
+      "widget_name": "25",
+      "terminal_name": "25",
+      "type": "text",
+      "page": 1,
+      "note": "Total deductions (line 25)"
+    },
+    "state_taxable_income": {
+      "widget_name": "29Y",
+      "terminal_name": "29Y",
+      "type": "text",
+      "page": 1,
+      "note": "Missouri taxable income (line 29 Yourself column)"
+    },
+    "state_total_tax_line30": {
+      "widget_name": "30Y",
+      "terminal_name": "30Y",
+      "type": "text",
+      "page": 1,
+      "note": "Tax from table (line 30 Yourself column)"
+    },
+    "state_total_tax": {
+      "widget_name": "36",
+      "terminal_name": "36",
+      "type": "text",
+      "page": 1,
+      "note": "Total tax (line 36)"
+    }
+  }
+}

@@ -589,16 +589,53 @@ class TestMissouriFormIds:
     def test_form_ids(self):
         assert PLUGIN.form_ids() == ["MO Form MO-1040"]
 
-    def test_render_pdfs_empty(
+    def test_render_pdfs_produces_pdf(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
+        """MO Form MO-1040 AcroForm fill produces a non-empty PDF."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
         sr = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert PLUGIN.render_pdfs(sr, tmp_path) == []
+        paths = PLUGIN.render_pdfs(sr, tmp_path)
+        assert len(paths) == 1
+        assert paths[0].exists()
+        assert paths[0].stat().st_size > 0
+        assert paths[0].name == "mo_1040.pdf"
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify rendered MO-1040 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        sr = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(sr, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # Widget "36" maps to state_total_tax (line 36)
+        assert fields["36"].get("/V") == "2098.00"
+        # Widget "29Y" maps to state_taxable_income (line 29 Yourself)
+        assert fields["29Y"].get("/V") == "48387.00"
+        # Widget "6" maps to state_adjusted_gross_income (line 6)
+        assert fields["6"].get("/V") == "65000.00"
 
 
 # ---------------------------------------------------------------------------

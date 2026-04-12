@@ -527,27 +527,51 @@ class TestMontanaPluginFormIds:
     def test_form_ids(self):
         assert PLUGIN.form_ids() == ["MT Form 2"]
 
-    def test_render_pdfs_returns_empty_list(
+    def test_render_pdfs_produces_pdf(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
-        state_return = PLUGIN.compute(
-            single_65k_return,
-            federal_single_65k,
-            ResidencyStatus.RESIDENT,
-            days_in_state=365,
-        )
-        assert PLUGIN.render_pdfs(state_return, tmp_path) == []
+        """MT Form 2 AcroForm fill produces a non-empty PDF."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
 
-    def test_render_pdfs_accepts_path_object(
-        self, single_65k_return, federal_single_65k
-    ):
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert PLUGIN.render_pdfs(state_return, Path("/tmp")) == []
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        assert len(paths) == 1
+        assert paths[0].exists()
+        assert paths[0].stat().st_size > 0
+        assert paths[0].name == "mt_form2.pdf"
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify rendered MT Form 2 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # Widget "Page 1 Line 17" maps to state_total_tax
+        assert fields["Page 1 Line 17"].get("/V") == "2652.55"
+        # Widget "Page 1 Line 3" maps to state_taxable_income
+        assert fields["Page 1 Line 3"].get("/V") == "49250.00"
 
 
 # ---------------------------------------------------------------------------

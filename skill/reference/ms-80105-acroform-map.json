@@ -1,0 +1,46 @@
+{
+  "source_pdf_url": "https://www.dor.ms.gov/sites/default/files/tax-forms/individual/80105258%201.pdf",
+  "source_pdf_sha256": "57fa91016bf72d1ad734b83528985d8ea0a85501e4a0dbf1f44db83c6827d4fa",
+  "form_year": 2025,
+  "state": "MS",
+  "form": "80-105",
+  "total_widgets": 159,
+  "mapped_count": 5,
+  "mapping": {
+    "state_adjusted_gross_income": {
+      "widget_name": "Line12",
+      "terminal_name": "Line12",
+      "type": "text",
+      "page": 1,
+      "note": "Mississippi adjusted gross income (line 12)"
+    },
+    "state_standard_deduction": {
+      "widget_name": "17",
+      "terminal_name": "17",
+      "type": "text",
+      "page": 1,
+      "note": "Standard deduction (line 17)"
+    },
+    "state_taxable_income": {
+      "widget_name": "20",
+      "terminal_name": "20",
+      "type": "text",
+      "page": 1,
+      "note": "Mississippi taxable income (line 20)"
+    },
+    "state_tax_before_credits": {
+      "widget_name": "21",
+      "terminal_name": "21",
+      "type": "text",
+      "page": 1,
+      "note": "Tax from table (line 21)"
+    },
+    "state_total_tax": {
+      "widget_name": "26",
+      "terminal_name": "26",
+      "type": "text",
+      "page": 1,
+      "note": "Total tax (line 26)"
+    }
+  }
+}

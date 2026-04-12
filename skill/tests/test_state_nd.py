@@ -485,16 +485,53 @@ class TestNorthDakotaFormIds:
     def test_form_ids(self):
         assert PLUGIN.form_ids() == ["ND Form ND-1"]
 
-    def test_render_pdfs_empty(
+    def test_render_pdfs_produces_pdf(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
+        """ND Form ND-1 AcroForm fill produces a non-empty PDF."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
         sr = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert PLUGIN.render_pdfs(sr, tmp_path) == []
+        paths = PLUGIN.render_pdfs(sr, tmp_path)
+        assert len(paths) == 1
+        assert paths[0].exists()
+        assert paths[0].stat().st_size > 0
+        assert paths[0].name == "nd_1.pdf"
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify rendered ND-1 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        sr = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(sr, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # Widget "Line 36" maps to state_total_tax
+        assert fields["Line 36"].get("/V") == "15.11"
+        # Widget "SX 1a" maps to state_federal_taxable_income
+        assert fields["SX 1a"].get("/V") == "49250.00"
+        # Widget "ND 18" maps to state_taxable_income
+        assert fields["ND 18"].get("/V") == "49250.00"
 
 
 # ---------------------------------------------------------------------------

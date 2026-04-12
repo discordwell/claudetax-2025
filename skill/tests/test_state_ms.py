@@ -538,27 +538,51 @@ class TestMississippiPluginFormIds:
     def test_form_ids(self):
         assert "MS Form 80-105" in PLUGIN.form_ids()
 
-    def test_render_pdfs_returns_empty_list(
+    def test_render_pdfs_produces_pdf(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
-        state_return = PLUGIN.compute(
-            single_65k_return,
-            federal_single_65k,
-            ResidencyStatus.RESIDENT,
-            days_in_state=365,
-        )
-        assert PLUGIN.render_pdfs(state_return, tmp_path) == []
+        """MS Form 80-105 AcroForm fill produces a non-empty PDF."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
 
-    def test_render_pdfs_accepts_path(
-        self, single_65k_return, federal_single_65k
-    ):
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert PLUGIN.render_pdfs(state_return, Path("/tmp")) == []
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        assert len(paths) == 1
+        assert paths[0].exists()
+        assert paths[0].stat().st_size > 0
+        assert paths[0].name == "ms_80105.pdf"
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify rendered MS 80-105 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # Widget "26" maps to state_total_tax (line 26)
+        assert fields["26"].get("/V") == "2054.80"
+        # Widget "20" maps to state_taxable_income (line 20)
+        assert fields["20"].get("/V") == "56700.00"
 
 
 # ---------------------------------------------------------------------------

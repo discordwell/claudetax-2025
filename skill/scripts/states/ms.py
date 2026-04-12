@@ -255,6 +255,34 @@ def _apportionment_fraction(
 
 
 # ---------------------------------------------------------------------------
+# Layer 1: MS Form 80-105 field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MS80105Fields:
+    """Frozen snapshot of MS Form 80-105 line values, ready for rendering."""
+
+    state_adjusted_gross_income: Decimal = Decimal("0")
+    state_standard_deduction: Decimal = Decimal("0")
+    state_taxable_income: Decimal = Decimal("0")
+    state_tax_before_credits: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+
+
+def _build_ms80105_fields(state_return: StateReturn) -> MS80105Fields:
+    """Map StateReturn.state_specific to MS80105Fields."""
+    ss = state_return.state_specific
+    return MS80105Fields(
+        state_adjusted_gross_income=ss.get("state_adjusted_gross_income", Decimal("0")),
+        state_standard_deduction=Decimal("0"),  # graph backend does not separate this
+        state_taxable_income=ss.get("state_taxable_income", Decimal("0")),
+        state_tax_before_credits=ss.get("state_total_tax_resident_basis", Decimal("0")),
+        state_total_tax=ss.get("state_total_tax", Decimal("0")),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Plugin
 # ---------------------------------------------------------------------------
 
@@ -399,10 +427,37 @@ class MississippiPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(ms-pdf): fan-out follow-up — fill MS Form 80-105 (and
-        # 80-205 for nonresidents, 80-108 for itemizers) using pypdf
-        # against the MS DOR's fillable PDFs.
-        return []
+        from dataclasses import asdict
+
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        _REF = Path(__file__).resolve().parents[2] / "reference"
+        _WIDGET_MAP = _REF / "ms-80105-acroform-map.json"
+        _SOURCE_PDF = _REF / "state_forms" / "ms_80105.pdf"
+
+        wmap = load_widget_map(_WIDGET_MAP)
+        fetch_and_verify_source_pdf(
+            _SOURCE_PDF, wmap.source_pdf_url, wmap.source_pdf_sha256
+        )
+
+        fields = _build_ms80105_fields(state_return)
+        widget_values: dict[str, str] = {}
+        for sem_name, value in asdict(fields).items():
+            widget_names = wmap.widget_names_for(sem_name)
+            if not widget_names:
+                continue
+            text = format_money(value) if isinstance(value, Decimal) else str(value) if value else ""
+            for wn in widget_names:
+                widget_values[wn] = text
+
+        out_path = out_dir / "ms_80105.pdf"
+        fill_acroform_pdf(_SOURCE_PDF, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["MS Form 80-105"]

@@ -365,6 +365,44 @@ def mo_tax_from_table(taxable_income: Decimal) -> Decimal:
 
 
 # ---------------------------------------------------------------------------
+# Layer 1: MO-1040 field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MO1040Fields:
+    """Frozen snapshot of MO Form MO-1040 line values, ready for rendering."""
+
+    state_federal_agi: Decimal = Decimal("0")
+    state_adjusted_gross_income: Decimal = Decimal("0")
+    state_pension_ss_exemption: Decimal = Decimal("0")
+    state_federal_tax_input: Decimal = Decimal("0")
+    state_federal_tax_deduction: Decimal = Decimal("0")
+    state_standard_deduction: Decimal = Decimal("0")
+    state_total_deductions: Decimal = Decimal("0")
+    state_taxable_income: Decimal = Decimal("0")
+    state_total_tax_line30: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+
+
+def _build_mo1040_fields(state_return: StateReturn) -> MO1040Fields:
+    """Map StateReturn.state_specific to MO1040Fields."""
+    ss = state_return.state_specific
+    return MO1040Fields(
+        state_federal_agi=ss.get("state_federal_agi", Decimal("0")),
+        state_adjusted_gross_income=ss.get("state_adjusted_gross_income", Decimal("0")),
+        state_pension_ss_exemption=ss.get("state_pension_ss_exemption", Decimal("0")),
+        state_federal_tax_input=ss.get("state_federal_tax_input", Decimal("0")),
+        state_federal_tax_deduction=ss.get("state_federal_tax_deduction", Decimal("0")),
+        state_standard_deduction=ss.get("state_standard_deduction", Decimal("0")),
+        state_total_deductions=ss.get("state_total_deductions", Decimal("0")),
+        state_taxable_income=ss.get("state_taxable_income", Decimal("0")),
+        state_total_tax_line30=ss.get("state_total_tax_resident_basis", Decimal("0")),
+        state_total_tax=ss.get("state_total_tax", Decimal("0")),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Plugin
 # ---------------------------------------------------------------------------
 
@@ -574,9 +612,37 @@ class MissouriPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(mo-pdf): fan-out follow-up — fill MO-1040 + MO-A using
-        # pypdf against the DOR's fillable PDFs.
-        return []
+        from dataclasses import asdict
+
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        _REF = Path(__file__).resolve().parents[2] / "reference"
+        _WIDGET_MAP = _REF / "mo-1040-acroform-map.json"
+        _SOURCE_PDF = _REF / "state_forms" / "mo_1040.pdf"
+
+        wmap = load_widget_map(_WIDGET_MAP)
+        fetch_and_verify_source_pdf(
+            _SOURCE_PDF, wmap.source_pdf_url, wmap.source_pdf_sha256
+        )
+
+        fields = _build_mo1040_fields(state_return)
+        widget_values: dict[str, str] = {}
+        for sem_name, value in asdict(fields).items():
+            widget_names = wmap.widget_names_for(sem_name)
+            if not widget_names:
+                continue
+            text = format_money(value) if isinstance(value, Decimal) else str(value) if value else ""
+            for wn in widget_names:
+                widget_values[wn] = text
+
+        out_path = out_dir / "mo_1040.pdf"
+        fill_acroform_pdf(_SOURCE_PDF, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["MO Form MO-1040"]

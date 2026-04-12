@@ -1,0 +1,226 @@
+{
+  "source_pdf_url": "https://www.tax.ny.gov/pdf/current_forms/it/it201_fill_in.pdf",
+  "source_pdf_sha256": "cfe63039ffa4374f5fff67b7d2b37c5bdb802211fac55c69386e8f15c20d3e08",
+  "form_year": 2025,
+  "total_widgets": 233,
+  "mapped_count": 30,
+  "notes": [
+    "NY IT-201 fillable PDF downloaded from the NYS Department of Taxation and Finance.",
+    "Widget names are human-readable (TP_first_name, Line1, etc.) unlike the federal f1040.",
+    "Filing_status is a radio button group (/Btn) with 5 options on page 1.",
+    "Lines 1-37 are on page 2, lines 38-61 on page 3, lines 62-82 on page 4.",
+    "Only the most important income/tax/refund lines are mapped for the initial render."
+  ],
+  "mapping": {
+    "taxpayer_first_name": {
+      "widget_name": "TP_first_name",
+      "terminal_name": "TP_first_name",
+      "type": "text",
+      "page": 1,
+      "note": "Taxpayer first name"
+    },
+    "taxpayer_mi": {
+      "widget_name": "TP_MI",
+      "terminal_name": "TP_MI",
+      "type": "text",
+      "page": 1,
+      "note": "Taxpayer middle initial"
+    },
+    "taxpayer_last_name": {
+      "widget_name": "TP_last_name",
+      "terminal_name": "TP_last_name",
+      "type": "text",
+      "page": 1,
+      "note": "Taxpayer last name"
+    },
+    "taxpayer_ssn": {
+      "widget_name": "TP_SSN",
+      "terminal_name": "TP_SSN",
+      "type": "text",
+      "page": 1,
+      "note": "Taxpayer SSN. Also appears on pages 2-4 as header."
+    },
+    "taxpayer_dob": {
+      "widget_name": "TP_DOB",
+      "terminal_name": "TP_DOB",
+      "type": "text",
+      "page": 1,
+      "note": "Taxpayer date of birth"
+    },
+    "mailing_address": {
+      "widget_name": "TP_mail_address",
+      "terminal_name": "TP_mail_address",
+      "type": "text",
+      "page": 1,
+      "note": "Mailing address street"
+    },
+    "mailing_city": {
+      "widget_name": "TP_mail_city",
+      "terminal_name": "TP_mail_city",
+      "type": "text",
+      "page": 1,
+      "note": "City"
+    },
+    "mailing_state": {
+      "widget_name": "TP_mail_state",
+      "terminal_name": "TP_mail_state",
+      "type": "text",
+      "page": 1,
+      "note": "State"
+    },
+    "mailing_zip": {
+      "widget_name": "TP_mail_zip",
+      "terminal_name": "TP_mail_zip",
+      "type": "text",
+      "page": 1,
+      "note": "ZIP code"
+    },
+    "nys_county": {
+      "widget_name": "NYS_county_residence",
+      "terminal_name": "NYS_county_residence",
+      "type": "text",
+      "page": 1,
+      "note": "NYS county of residence"
+    },
+    "line1_wages": {
+      "widget_name": "Line1",
+      "terminal_name": "Line1",
+      "type": "text",
+      "page": 2,
+      "note": "Line 1: Wages, salaries, tips (federal amount)"
+    },
+    "line2_taxable_interest": {
+      "widget_name": "Line2",
+      "terminal_name": "Line2",
+      "type": "text",
+      "page": 2,
+      "note": "Line 2: Taxable interest income"
+    },
+    "line3_ordinary_dividends": {
+      "widget_name": "Line3",
+      "terminal_name": "Line3",
+      "type": "text",
+      "page": 2,
+      "note": "Line 3: Ordinary dividends"
+    },
+    "line17_federal_agi": {
+      "widget_name": "Line17",
+      "terminal_name": "Line17",
+      "type": "text",
+      "page": 2,
+      "note": "Line 17: Federal AGI"
+    },
+    "line19_nys_additions": {
+      "widget_name": "Line19",
+      "terminal_name": "Line19",
+      "type": "text",
+      "page": 2,
+      "note": "Line 19: NYS additions"
+    },
+    "line21_nys_income": {
+      "widget_name": "Line21",
+      "terminal_name": "Line21",
+      "type": "text",
+      "page": 2,
+      "note": "Line 21: NYS income"
+    },
+    "line24_nys_subtractions": {
+      "widget_name": "Line24",
+      "terminal_name": "Line24",
+      "type": "text",
+      "page": 2,
+      "note": "Line 24: NYS subtractions"
+    },
+    "line25_nys_agi": {
+      "widget_name": "Line25",
+      "terminal_name": "Line25",
+      "type": "text",
+      "page": 2,
+      "note": "Line 25: NYS AGI"
+    },
+    "line33_nys_deduction": {
+      "widget_name": "Line33",
+      "terminal_name": "Line33",
+      "type": "text",
+      "page": 2,
+      "note": "Line 33: NY standard or itemized deduction"
+    },
+    "line35_nys_taxable_income": {
+      "widget_name": "Line35",
+      "terminal_name": "Line35",
+      "type": "text",
+      "page": 2,
+      "note": "Line 35: NYS taxable income"
+    },
+    "line37_nys_tax_on_ti": {
+      "widget_name": "Line37",
+      "terminal_name": "Line37",
+      "type": "text",
+      "page": 2,
+      "note": "Line 37: NYS tax on taxable income from tax table/rate schedule"
+    },
+    "line39_nys_household_credit": {
+      "widget_name": "Line39",
+      "terminal_name": "Line39",
+      "type": "text",
+      "page": 3,
+      "note": "Line 39: NYS household credit"
+    },
+    "line46_nys_other_credits": {
+      "widget_name": "Line46",
+      "terminal_name": "Line46",
+      "type": "text",
+      "page": 3,
+      "note": "Line 46: Other NYS credits"
+    },
+    "line47_nys_net_tax": {
+      "widget_name": "Line47",
+      "terminal_name": "Line47",
+      "type": "text",
+      "page": 3,
+      "note": "Line 47: NY state net tax"
+    },
+    "line59_total_nys_tax": {
+      "widget_name": "Line59",
+      "terminal_name": "Line59",
+      "type": "text",
+      "page": 3,
+      "note": "Line 59: Total NYS tax"
+    },
+    "line62_nys_tax_withheld": {
+      "widget_name": "Line62",
+      "terminal_name": "Line62",
+      "type": "text",
+      "page": 4,
+      "note": "Line 62: NYS tax withheld (from W-2)"
+    },
+    "line71_total_payments": {
+      "widget_name": "Line71",
+      "terminal_name": "Line71",
+      "type": "text",
+      "page": 4,
+      "note": "Line 71: Total NY/NYC/Yonkers tax withheld"
+    },
+    "line73_total_payments_credits": {
+      "widget_name": "Line73",
+      "terminal_name": "Line73",
+      "type": "text",
+      "page": 4,
+      "note": "Line 73: Total payments/credits"
+    },
+    "line78_refund": {
+      "widget_name": "Line78",
+      "terminal_name": "Line78",
+      "type": "text",
+      "page": 4,
+      "note": "Line 78: Refund amount (overpayment)"
+    },
+    "line80_amount_owed": {
+      "widget_name": "Line80",
+      "terminal_name": "Line80",
+      "type": "text",
+      "page": 4,
+      "note": "Line 80: Amount you owe"
+    }
+  }
+}

@@ -236,11 +236,18 @@ class NewJerseyPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO: fan-out follow-up — fill NJ Form NJ-1040 (and NJ-1040NR for
-        # nonresidents) using pypdf against the NJ Division of Taxation's
-        # fillable PDFs. The output renderer suite is the right home for
-        # this; this plugin returns structured state_specific data that the
-        # renderer will consume.
+        # NJ-1040 fillable PDF (https://www.nj.gov/treasury/taxation/pdf/
+        # current/1040.pdf) uses digit-by-digit entry for all monetary
+        # amounts: each dollar line has 8+ individual single-character text
+        # widgets (one per digit). The form has 844 widget annotations,
+        # almost all of which are these single-digit cells with garbled
+        # names (e.g. "Text100", "undefined_37", "4036y54ethdf%%^87").
+        #
+        # Implementing a reliable renderer requires mapping each digit
+        # position across ~70 line items, handling right-to-left fill, and
+        # dealing with the non-semantic widget names. This is deferred to a
+        # dedicated NJ rendering sprint. The compute() method correctly
+        # produces state_specific data for downstream consumers.
         return []
 
     def form_ids(self) -> list[str]:

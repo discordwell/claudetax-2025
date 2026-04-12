@@ -12,7 +12,7 @@ Scope (v0.1):
   full-year-equivalent state tax. This is a stopgap — the correct treatment
   is Form IT-203 (Nonresident / Part-Year) which uses NY-source income ratios
   rather than day counts. See the TODO in compute() and form_ids().
-- PDF rendering is deferred (TODO) until the state PDF fill module lands.
+- PDF rendering fills the IT-201 fillable PDF via pypdf AcroForm overlay.
 
 Reciprocity: NY has NO bilateral reciprocity agreements with any state
 (verified in skill/reference/state-reciprocity.json). This is important: a
@@ -33,6 +33,12 @@ from skill.scripts.models import (
     ResidencyStatus,
     StateReturn,
 )
+from skill.scripts.output._acroform_overlay import (
+    fetch_and_verify_source_pdf,
+    fill_acroform_pdf,
+    format_money,
+    load_widget_map,
+)
 from skill.scripts.states._hand_rolled_base import (
     state_has_w2_state_rows,
     state_source_schedule_c,
@@ -46,6 +52,93 @@ from skill.scripts.states._plugin_api import (
     StateStartingPoint,
     SubmissionChannel,
 )
+
+
+# ---------------------------------------------------------------------------
+# Reference paths
+# ---------------------------------------------------------------------------
+
+_REF_DIR = Path(__file__).resolve().parent.parent.parent / "reference"
+_WIDGET_MAP_JSON = _REF_DIR / "ny-it201-acroform-map.json"
+_STATE_FORMS_DIR = _REF_DIR / "state_forms"
+_CACHED_PDF = _STATE_FORMS_DIR / "ny-it201.pdf"
+
+
+# ---------------------------------------------------------------------------
+# Layer 1 dataclass: IT-201 field snapshot
+# ---------------------------------------------------------------------------
+
+
+_ZERO = Decimal("0")
+
+
+@dataclass(frozen=True)
+class IT201Fields:
+    """Frozen snapshot of NY IT-201 line values for rendering.
+
+    Field names match semantic keys in ny-it201-acroform-map.json.
+    """
+
+    # Header / identity
+    taxpayer_first_name: str = ""
+    taxpayer_mi: str = ""
+    taxpayer_last_name: str = ""
+    taxpayer_ssn: str = ""
+    taxpayer_dob: str = ""
+    mailing_address: str = ""
+    mailing_city: str = ""
+    mailing_state: str = ""
+    mailing_zip: str = ""
+    nys_county: str = ""
+
+    # Income lines (page 2)
+    line1_wages: Decimal = _ZERO
+    line2_taxable_interest: Decimal = _ZERO
+    line3_ordinary_dividends: Decimal = _ZERO
+    line17_federal_agi: Decimal = _ZERO
+    line19_nys_additions: Decimal = _ZERO
+    line21_nys_income: Decimal = _ZERO
+    line24_nys_subtractions: Decimal = _ZERO
+    line25_nys_agi: Decimal = _ZERO
+    line33_nys_deduction: Decimal = _ZERO
+    line35_nys_taxable_income: Decimal = _ZERO
+    line37_nys_tax_on_ti: Decimal = _ZERO
+
+    # Credits / tax (page 3)
+    line39_nys_household_credit: Decimal = _ZERO
+    line46_nys_other_credits: Decimal = _ZERO
+    line47_nys_net_tax: Decimal = _ZERO
+    line59_total_nys_tax: Decimal = _ZERO
+
+    # Payments / refund (page 4)
+    line62_nys_tax_withheld: Decimal = _ZERO
+    line71_total_payments: Decimal = _ZERO
+    line73_total_payments_credits: Decimal = _ZERO
+    line78_refund: Decimal = _ZERO
+    line80_amount_owed: Decimal = _ZERO
+
+
+def _build_it201_fields(
+    state_return: StateReturn,
+) -> IT201Fields:
+    """Build an IT201Fields from a computed StateReturn.
+
+    Maps state_specific keys produced by compute() to form fields.
+    """
+    ss = state_return.state_specific
+
+    state_agi = ss.get("state_adjusted_gross_income", _ZERO)
+    state_ti = ss.get("state_taxable_income", _ZERO)
+    state_tax = ss.get("state_total_tax", _ZERO)
+
+    return IT201Fields(
+        line17_federal_agi=state_agi,
+        line25_nys_agi=state_agi,
+        line35_nys_taxable_income=state_ti,
+        line37_nys_tax_on_ti=state_tax,
+        line47_nys_net_tax=state_tax,
+        line59_total_nys_tax=state_tax,
+    )
 
 
 def _d(v: object) -> Decimal:
@@ -296,13 +389,38 @@ class NewYorkPlugin:
         )
 
     def render_pdfs(self, state_return: StateReturn, out_dir: Path) -> list[Path]:
-        """Render NY state PDFs.
+        """Render NY IT-201 by filling the NYS fillable PDF via AcroForm overlay."""
+        wmap = load_widget_map(_WIDGET_MAP_JSON)
 
-        TODO: wire this up to the state PDF fill module once that lands in
-        fan-out. For v0.1 we return an empty list; the paper bundle / output
-        layer knows to skip states that produce no PDFs.
-        """
-        return []
+        # Ensure the source PDF is cached locally.
+        source_pdf = fetch_and_verify_source_pdf(
+            _CACHED_PDF, wmap.source_pdf_url, wmap.source_pdf_sha256
+        )
+
+        # Build the Layer 1 field snapshot.
+        fields = _build_it201_fields(state_return)
+
+        # Build widget values from the dataclass.
+        from dataclasses import asdict
+
+        raw = asdict(fields)
+        widget_values: dict[str, str] = {}
+        for sem_name, value in raw.items():
+            widget_names = wmap.widget_names_for(sem_name)
+            if not widget_names:
+                continue
+            if isinstance(value, Decimal):
+                text = format_money(value)
+            elif value is None:
+                text = ""
+            else:
+                text = str(value)
+            for wn in widget_names:
+                widget_values[wn] = text
+
+        out_path = Path(out_dir) / "NY-IT-201.pdf"
+        fill_acroform_pdf(source_pdf, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         """Return canonical NY form identifiers.

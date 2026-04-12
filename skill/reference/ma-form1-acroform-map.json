@@ -1,0 +1,233 @@
+{
+  "source_pdf_url": "https://www.mass.gov/doc/2025-form-1-massachusetts-resident-income-tax-return/download",
+  "source_pdf_sha256": "e25f0567e7e9829f4c85f471f919bb5271f8e456d14d8bc6f499617951f6036d",
+  "form_year": 2025,
+  "total_widgets": 179,
+  "mapped_count": 30,
+  "notes": [
+    "MA Form 1 fillable PDF downloaded from mass.gov DOR.",
+    "Widget names are long descriptive strings matching the form labels.",
+    "Filing status is a radio group (line 1 filing status) with 4 options on page 1.",
+    "Page 1: header, exemptions, signature. Page 2: income lines 3-23. Page 3: tax/credits lines 24-38. Page 4: payments/refund/due lines 39-55.",
+    "Only the most important income/tax/refund lines are mapped for the initial render."
+  ],
+  "mapping": {
+    "taxpayer_first_name": {
+      "widget_name": "taxpayer's first name",
+      "terminal_name": "taxpayer's first name",
+      "type": "text",
+      "page": 1,
+      "note": "Taxpayer first name (page 1 header; also on pages 2-4)"
+    },
+    "taxpayer_mi": {
+      "widget_name": "taxpayer's middle initial",
+      "terminal_name": "taxpayer's middle initial",
+      "type": "text",
+      "page": 1,
+      "note": "Taxpayer middle initial"
+    },
+    "taxpayer_last_name": {
+      "widget_name": "taxpayer's last name",
+      "terminal_name": "taxpayer's last name",
+      "type": "text",
+      "page": 1,
+      "note": "Taxpayer last name"
+    },
+    "taxpayer_ssn": {
+      "widget_name": "taxpayer's social security number",
+      "terminal_name": "taxpayer's social security number",
+      "type": "text",
+      "page": 1,
+      "note": "Taxpayer SSN (page 1 header; also on pages 2-4)"
+    },
+    "mailing_address": {
+      "widget_name": "Mailing address (no. & street; apt./suite/postal box). If you have a foreign address, also complete line below",
+      "terminal_name": "Mailing address (no. & street; apt./suite/postal box). If you have a foreign address, also complete line below",
+      "type": "text",
+      "page": 1,
+      "note": "Mailing address"
+    },
+    "mailing_city": {
+      "widget_name": "city or town",
+      "terminal_name": "city or town",
+      "type": "text",
+      "page": 1,
+      "note": "City"
+    },
+    "mailing_state": {
+      "widget_name": "state",
+      "terminal_name": "state",
+      "type": "text",
+      "page": 1,
+      "note": "State"
+    },
+    "mailing_zip": {
+      "widget_name": "zip",
+      "terminal_name": "zip",
+      "type": "text",
+      "page": 1,
+      "note": "ZIP code"
+    },
+    "line_2a_personal_exemption": {
+      "widget_name": "line 2a Personal exemptions. Single/Married filing separately ($4,400), Head of household ($6,800), Married filing jointly ($8,800)",
+      "terminal_name": "line 2a Personal exemptions. Single/Married filing separately ($4,400), Head of household ($6,800), Married filing jointly ($8,800)",
+      "type": "text",
+      "page": 1,
+      "note": "Line 2a: personal exemption amount"
+    },
+    "line_2g_total_exemptions": {
+      "widget_name": "line 2g. Total exemptions. Add lines 2a through 2f. Enter here and on line 18",
+      "terminal_name": "line 2g. Total exemptions. Add lines 2a through 2f. Enter here and on line 18",
+      "type": "text",
+      "page": 1,
+      "note": "Line 2g: total exemptions"
+    },
+    "line_3_wages": {
+      "widget_name": "line 3. Wages, salaries, tips and other employee compensation (from all Forms W-2)",
+      "terminal_name": "line 3. Wages, salaries, tips and other employee compensation (from all Forms W-2)",
+      "type": "text",
+      "page": 2,
+      "note": "Line 3: wages from W-2s"
+    },
+    "line_5_bank_interest": {
+      "widget_name": "line 5. Massachusetts bank interest",
+      "terminal_name": "line 5. Massachusetts bank interest",
+      "type": "text",
+      "page": 2,
+      "note": "Line 5: MA bank interest"
+    },
+    "line_6a_business_income": {
+      "widget_name": "line 6a. Business/profession income or loss. Enclose Schedule C",
+      "terminal_name": "line 6a. Business/profession income or loss. Enclose Schedule C",
+      "type": "text",
+      "page": 2,
+      "note": "Line 6a: business income from Schedule C"
+    },
+    "line_10_total_5pct_income": {
+      "widget_name": "line 10. Total 5.0% income. Add lines 3 through 9. Be sure to subtract any losses in lines 6 or 7",
+      "terminal_name": "line 10. Total 5.0% income. Add lines 3 through 9. Be sure to subtract any losses in lines 6 or 7",
+      "type": "text",
+      "page": 2,
+      "note": "Line 10: total 5.0% income"
+    },
+    "line_16_total_deductions": {
+      "widget_name": "line 16. Total deductions. Add lines 11 through 15",
+      "terminal_name": "line 16. Total deductions. Add lines 11 through 15",
+      "type": "text",
+      "page": 2,
+      "note": "Line 16: total deductions"
+    },
+    "line_17_income_after_deductions": {
+      "widget_name": "line 17. 5.0% Income after deductions. Subtract line 16 from line 10. Not less than 0",
+      "terminal_name": "line 17. 5.0% Income after deductions. Subtract line 16 from line 10. Not less than 0",
+      "type": "text",
+      "page": 2,
+      "note": "Line 17: 5.0% income after deductions"
+    },
+    "line_18_exemption_amount": {
+      "widget_name": "line 18. Total exemption amount (from line 2g)",
+      "terminal_name": "line 18. Total exemption amount (from line 2g)",
+      "type": "text",
+      "page": 2,
+      "note": "Line 18: total exemption amount from page 1"
+    },
+    "line_19_income_after_exemptions": {
+      "widget_name": "line 19. 5.0% Income After Exemptions. Subtract line 18 from line 17. Not less than 0. If line 17 is less than line 18, see instructions",
+      "terminal_name": "line 19. 5.0% Income After Exemptions. Subtract line 18 from line 17. Not less than 0. If line 17 is less than line 18, see instructions",
+      "type": "text",
+      "page": 2,
+      "note": "Line 19: 5.0% income after exemptions"
+    },
+    "line_21_total_taxable_5pct": {
+      "widget_name": "line 21. Total Taxable 5.0% Income. Add lines 19 and 20",
+      "terminal_name": "line 21. Total Taxable 5.0% Income. Add lines 19 and 20",
+      "type": "text",
+      "page": 2,
+      "note": "Line 21: total taxable 5.0% income"
+    },
+    "line_22_tax_on_5pct_income": {
+      "widget_name": "line 22. Tax On 5.0% Income (from tax table). If line 21 is more than $24,000, multiply by .05",
+      "terminal_name": "line 22. Tax On 5.0% Income (from tax table). If line 21 is more than $24,000, multiply by .05",
+      "type": "text",
+      "page": 2,
+      "note": "Line 22: tax on 5.0% income"
+    },
+    "line_28a_income_tax": {
+      "widget_name": "line 28a. Income tax. Add lines 22 through 26",
+      "terminal_name": "line 28a. Income tax. Add lines 22 through 26",
+      "type": "text",
+      "page": 3,
+      "note": "Line 28a: income tax subtotal"
+    },
+    "line_28_total_tax": {
+      "widget_name": "line 28. Total tax. Add lines 28a and 28b",
+      "terminal_name": "line 28. Total tax. Add lines 28a and 28b",
+      "type": "text",
+      "page": 3,
+      "note": "Line 28: total tax"
+    },
+    "line_32_tax_after_credits": {
+      "widget_name": "line 32. Income Tax After Credits. Subtract total of lines 29 through 31 from line 28. Not less than 0",
+      "terminal_name": "line 32. Income Tax After Credits. Subtract total of lines 29 through 31 from line 28. Not less than 0",
+      "type": "text",
+      "page": 3,
+      "note": "Line 32: income tax after credits"
+    },
+    "line_37_tax_after_additions": {
+      "widget_name": "line 37. Income Tax After Credits, Contributions, Use Tax And Hc Penalty. Add lines 32 through 36",
+      "terminal_name": "line 37. Income Tax After Credits, Contributions, Use Tax And Hc Penalty. Add lines 32 through 36",
+      "type": "text",
+      "page": 3,
+      "note": "Line 37: total tax due"
+    },
+    "line_38a_w2_withholding": {
+      "widget_name": "Line 38a. Massachusetts income tax withheld from Form(s) W-2",
+      "terminal_name": "Line 38a. Massachusetts income tax withheld from Form(s) W-2",
+      "type": "text",
+      "page": 3,
+      "note": "Line 38a: MA income tax withheld from W-2"
+    },
+    "line_38_total_withholding": {
+      "widget_name": "Line 38. Total Massachusetts income tax withheld. Add lines 38a through 38c",
+      "terminal_name": "Line 38. Total Massachusetts income tax withheld. Add lines 38a through 38c",
+      "type": "text",
+      "page": 3,
+      "note": "Line 38: total MA withholding"
+    },
+    "line_48_total_refundable_credits": {
+      "widget_name": "line 48. Total Refundable Credits. Add lines 43 through 47",
+      "terminal_name": "line 48. Total Refundable Credits. Add lines 43 through 47",
+      "type": "text",
+      "page": 4,
+      "note": "Line 48: total refundable credits"
+    },
+    "line_51_total_payments": {
+      "widget_name": "line 51. Total. Add lines 38 through 42 and lines 48 through 50",
+      "terminal_name": "line 51. Total. Add lines 38 through 42 and lines 48 through 50",
+      "type": "text",
+      "page": 4,
+      "note": "Line 51: total payments and credits"
+    },
+    "line_52_overpayment": {
+      "widget_name": "line 52. Overpayment. If line 37 is smaller than line 51, subtract line 37 from line 51. If line 37 is larger than line 51, go to line 55. If line 37 and line 51 are equal, enter 0 in line 54",
+      "terminal_name": "line 52. Overpayment. If line 37 is smaller than line 51, subtract line 37 from line 51. If line 37 is larger than line 51, go to line 55. If line 37 and line 51 are equal, enter 0 in line 54",
+      "type": "text",
+      "page": 4,
+      "note": "Line 52: overpayment (refund)"
+    },
+    "line_54_refund": {
+      "widget_name": "line 54. This Is Your Refund. Subtract line 53 from line 52. Mail to: Massachusetts DOR, PO Box 7000, Boston, MA 02204",
+      "terminal_name": "line 54. This Is Your Refund. Subtract line 53 from line 52. Mail to: Massachusetts DOR, PO Box 7000, Boston, MA 02204",
+      "type": "text",
+      "page": 4,
+      "note": "Line 54: refund amount"
+    },
+    "line_55_tax_due": {
+      "widget_name": "line 55. Tax Due. Subtract line 51 from line 37. Pay in full online at mass.gov/masstaxconnect",
+      "terminal_name": "line 55. Tax Due. Subtract line 51 from line 37. Pay in full online at mass.gov/masstaxconnect",
+      "type": "text",
+      "page": 4,
+      "note": "Line 55: amount you owe"
+    }
+  }
+}

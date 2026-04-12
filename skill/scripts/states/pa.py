@@ -295,10 +295,17 @@ class PennsylvaniaPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO: fan-out follow-up — fill PA Form PA-40 using pypdf against
-        # the DOR's fillable PDF. The output renderer suite is the right
-        # home for this; this plugin returns structured state_specific
-        # data that the renderer will consume.
+        # PA-40 fillable PDF is not available for automated download.
+        # The PA DOR website (revenue.pa.gov) returns HTML portal pages
+        # instead of PDFs for all PA-40 URLs tested, including:
+        #   - https://www.revenue.pa.gov/.../2025/2025_pa-40.pdf
+        #   - https://www.revenue.pa.gov/.../pa-40.pdf
+        #   - https://www.revenue.pa.gov/.../pa-40in.pdf
+        # The site appears to require JavaScript/portal navigation to
+        # access the actual PDF. Other PA forms (e.g. rev-276) do serve
+        # directly. Until the PA-40 PDF can be obtained, render_pdfs()
+        # returns []. The compute() method correctly produces state_specific
+        # data for downstream consumers (e.g. the myPATH e-file portal).
         return []
 
     def form_ids(self) -> list[str]:

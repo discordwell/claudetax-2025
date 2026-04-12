@@ -392,26 +392,43 @@ class TestMassachusettsPluginFormIds:
     def test_form_ids_returns_form_1(self):
         assert PLUGIN.form_ids() == ["MA Form 1"]
 
-    def test_render_pdfs_returns_empty_list(
+    def test_render_pdfs_produces_filled_pdf(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
-        """Fan-out follow-up: actual Form 1 fill is not yet implemented."""
+        """render_pdfs should produce a filled MA Form 1 PDF."""
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert PLUGIN.render_pdfs(state_return, tmp_path) == []
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+        result = PLUGIN.render_pdfs(state_return, tmp_path)
+        assert len(result) == 1
+        pdf_path = result[0]
+        assert pdf_path.exists()
+        assert pdf_path.stat().st_size > 0
+        assert pdf_path.name == "MA-Form-1.pdf"
 
-    def test_render_pdfs_accepts_path(
-        self, single_65k_return, federal_single_65k
+    def test_render_pdfs_output_has_form_fields(
+        self, single_65k_return, federal_single_65k, tmp_path
     ):
+        """Rendered PDF should still have AcroForm fields (not flattened)."""
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        # Even with a nonexistent path, a no-op render should not raise.
-        assert PLUGIN.render_pdfs(state_return, Path("/tmp")) == []
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+        result = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(result[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+        assert len(fields) > 0

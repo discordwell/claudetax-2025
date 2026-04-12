@@ -239,17 +239,46 @@ class TestOtherProtocolMethods:
         assert app.state_source_wages < Decimal("80000")
         assert app.state_source_wages > Decimal("0")
 
-    def test_render_pdfs_returns_empty_list(
-        self, canonical_return_single_80k, federal_single_80k
+    def test_render_pdfs_produces_filled_pdf(
+        self, canonical_return_single_80k, federal_single_80k, tmp_path
     ):
-        """PDF rendering is a TODO — returns []."""
+        """render_pdfs should produce a filled NY IT-201 PDF."""
         state_return = PLUGIN.compute(
             canonical_return_single_80k,
             federal_single_80k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert PLUGIN.render_pdfs(state_return, Path("/tmp")) == []
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+        result = PLUGIN.render_pdfs(state_return, tmp_path)
+        assert len(result) == 1
+        pdf_path = result[0]
+        assert pdf_path.exists()
+        assert pdf_path.stat().st_size > 0
+        assert pdf_path.name == "NY-IT-201.pdf"
+
+    def test_render_pdfs_output_has_form_fields(
+        self, canonical_return_single_80k, federal_single_80k, tmp_path
+    ):
+        """Rendered PDF should still have AcroForm fields (not flattened)."""
+        state_return = PLUGIN.compute(
+            canonical_return_single_80k,
+            federal_single_80k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+        result = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(result[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+        assert len(fields) > 0
 
     def test_form_ids_resident(self):
         """Resident form is IT-201."""

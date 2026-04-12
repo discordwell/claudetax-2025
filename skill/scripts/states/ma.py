@@ -50,6 +50,12 @@ from skill.scripts.models import (
     ResidencyStatus,
     StateReturn,
 )
+from skill.scripts.output._acroform_overlay import (
+    fetch_and_verify_source_pdf,
+    fill_acroform_pdf,
+    format_money,
+    load_widget_map,
+)
 from skill.scripts.states._plugin_api import (
     FederalTotals,
     IncomeApportionment,
@@ -58,6 +64,101 @@ from skill.scripts.states._plugin_api import (
     StateStartingPoint,
     SubmissionChannel,
 )
+
+
+# ---------------------------------------------------------------------------
+# Reference paths
+# ---------------------------------------------------------------------------
+
+_REF_DIR = Path(__file__).resolve().parent.parent.parent / "reference"
+_WIDGET_MAP_JSON = _REF_DIR / "ma-form1-acroform-map.json"
+_STATE_FORMS_DIR = _REF_DIR / "state_forms"
+_CACHED_PDF = _STATE_FORMS_DIR / "ma-form1.pdf"
+
+
+# ---------------------------------------------------------------------------
+# Layer 1 dataclass: MA Form 1 field snapshot
+# ---------------------------------------------------------------------------
+
+
+_ZERO_MA = Decimal("0")
+
+
+@dataclass(frozen=True)
+class MAForm1Fields:
+    """Frozen snapshot of MA Form 1 line values for rendering.
+
+    Field names match semantic keys in ma-form1-acroform-map.json.
+    """
+
+    # Header / identity
+    taxpayer_first_name: str = ""
+    taxpayer_mi: str = ""
+    taxpayer_last_name: str = ""
+    taxpayer_ssn: str = ""
+    mailing_address: str = ""
+    mailing_city: str = ""
+    mailing_state: str = ""
+    mailing_zip: str = ""
+
+    # Exemptions (page 1)
+    line_2a_personal_exemption: Decimal = _ZERO_MA
+    line_2g_total_exemptions: Decimal = _ZERO_MA
+
+    # Income (page 2)
+    line_3_wages: Decimal = _ZERO_MA
+    line_5_bank_interest: Decimal = _ZERO_MA
+    line_6a_business_income: Decimal = _ZERO_MA
+    line_10_total_5pct_income: Decimal = _ZERO_MA
+    line_16_total_deductions: Decimal = _ZERO_MA
+    line_17_income_after_deductions: Decimal = _ZERO_MA
+    line_18_exemption_amount: Decimal = _ZERO_MA
+    line_19_income_after_exemptions: Decimal = _ZERO_MA
+    line_21_total_taxable_5pct: Decimal = _ZERO_MA
+    line_22_tax_on_5pct_income: Decimal = _ZERO_MA
+
+    # Tax / credits (page 3)
+    line_28a_income_tax: Decimal = _ZERO_MA
+    line_28_total_tax: Decimal = _ZERO_MA
+    line_32_tax_after_credits: Decimal = _ZERO_MA
+    line_37_tax_after_additions: Decimal = _ZERO_MA
+
+    # Withholding / payments (pages 3-4)
+    line_38a_w2_withholding: Decimal = _ZERO_MA
+    line_38_total_withholding: Decimal = _ZERO_MA
+    line_48_total_refundable_credits: Decimal = _ZERO_MA
+    line_51_total_payments: Decimal = _ZERO_MA
+
+    # Refund / amount owed (page 4)
+    line_52_overpayment: Decimal = _ZERO_MA
+    line_54_refund: Decimal = _ZERO_MA
+    line_55_tax_due: Decimal = _ZERO_MA
+
+
+def _build_ma_form1_fields(
+    state_return: StateReturn,
+) -> MAForm1Fields:
+    """Build an MAForm1Fields from a computed StateReturn.
+
+    Maps state_specific keys produced by compute() to form fields.
+    """
+    ss = state_return.state_specific
+
+    state_agi = ss.get("state_adjusted_gross_income", _ZERO_MA)
+    state_ti = ss.get("state_taxable_income", _ZERO_MA)
+    state_tax = ss.get("state_total_tax", _ZERO_MA)
+
+    return MAForm1Fields(
+        line_10_total_5pct_income=state_agi,
+        line_17_income_after_deductions=state_agi,
+        line_19_income_after_exemptions=state_ti,
+        line_21_total_taxable_5pct=state_ti,
+        line_22_tax_on_5pct_income=state_tax,
+        line_28a_income_tax=state_tax,
+        line_28_total_tax=state_tax,
+        line_32_tax_after_credits=state_tax,
+        line_37_tax_after_additions=state_tax,
+    )
 
 
 _CENTS = Decimal("0.01")
@@ -249,11 +350,38 @@ class MassachusettsPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO: fan-out follow-up — fill MA Form 1 (and Schedule B for Part
-        # A interest/dividends, Schedule D for Part C LTCG) using pypdf
-        # against DOR's fillable PDFs. This plugin returns structured
-        # state_specific data that the renderer will consume.
-        return []
+        """Render MA Form 1 by filling the DOR fillable PDF via AcroForm overlay."""
+        wmap = load_widget_map(_WIDGET_MAP_JSON)
+
+        # Ensure the source PDF is cached locally.
+        source_pdf = fetch_and_verify_source_pdf(
+            _CACHED_PDF, wmap.source_pdf_url, wmap.source_pdf_sha256
+        )
+
+        # Build the Layer 1 field snapshot.
+        fields = _build_ma_form1_fields(state_return)
+
+        # Build widget values from the dataclass.
+        from dataclasses import asdict
+
+        raw = asdict(fields)
+        widget_values: dict[str, str] = {}
+        for sem_name, value in raw.items():
+            widget_names = wmap.widget_names_for(sem_name)
+            if not widget_names:
+                continue
+            if isinstance(value, Decimal):
+                text = format_money(value)
+            elif value is None:
+                text = ""
+            else:
+                text = str(value)
+            for wn in widget_names:
+                widget_values[wn] = text
+
+        out_path = Path(out_dir) / "MA-Form-1.pdf"
+        fill_acroform_pdf(source_pdf, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["MA Form 1"]

@@ -8,13 +8,9 @@ tenforty returns, and folds the result into Credits + Payments.
 All numeric parameters (per-child amount, refundable cap, phase-out thresholds,
 phase-out step) are loaded from C.ctc_params(status) — do NOT hardcode.
 
-ODC $500 note: the $500 Credit for Other Dependents is currently hardcoded in
-this file (see _ODC_PER_DEPENDENT). It is NOT yet in
-skill/reference/ty2025-constants.json. TODO: add it alongside
-child_tax_credit.amount_per_other_dependent and wire it through
-constants.ctc_params or a new odc_params accessor. Cannot add here because
-this patch is not authorized to touch constants.py or the JSON file; the
-coordinator should include the constants update when merging fan-out.
+ODC $500 and ACTC floor/rate are loaded from ty2025-constants.json via
+the constants module (child_tax_credit.amount_per_other_dependent_odc,
+actc_earned_income_floor, actc_earned_income_rate).
 
 Phase-out ordering: we apply the $50-per-$1,000 reduction to the COMBINED
 base (CTC + ODC), then subtract from ODC first and CTC second. This tracks
@@ -33,17 +29,10 @@ from typing import Any
 from skill.scripts.calc import constants as C
 from skill.scripts.models import CanonicalReturn, Dependent, FilingStatus
 
-# ---------------------------------------------------------------------------
-# TODO(constants): the $500 Credit for Other Dependents is not yet in
-# ty2025-constants.json. Once added, replace this literal with
-# C.ctc_params(status).amount_per_other_dependent (or a separate accessor).
-# Source: IRC §24(h)(4), unchanged by OBBBA.
-# ---------------------------------------------------------------------------
-_ODC_PER_DEPENDENT: Decimal = Decimal("500")
-
-# ACTC earned-income floor and rate (IRC §24(d)(1)(B))
-_ACTC_EARNED_INCOME_FLOOR: Decimal = Decimal("2500")
-_ACTC_EARNED_INCOME_RATE: Decimal = Decimal("0.15")
+# ODC, ACTC floor, and ACTC rate loaded from ty2025-constants.json.
+_ODC_PER_DEPENDENT: Decimal = Decimal(C.odc_per_dependent())
+_ACTC_EARNED_INCOME_FLOOR: Decimal = Decimal(C.actc_earned_income_floor())
+_ACTC_EARNED_INCOME_RATE: Decimal = Decimal(str(C.actc_earned_income_rate()))
 
 
 @dataclass(frozen=True)

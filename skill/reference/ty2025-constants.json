@@ -160,6 +160,9 @@
     "phase_out_start_single_hoh_mfs": 200000,
     "phase_out_start_mfj_qss": 400000,
     "phase_out_reduction_per_1000_over_threshold": 50,
+    "amount_per_other_dependent_odc": 500,
+    "actc_earned_income_floor": 2500,
+    "actc_earned_income_rate": 0.15,
     "_sources": ["obbba_provisions", "irs_ctc"]
   },
 
@@ -215,6 +218,37 @@
       "3_or_more": 68675
     },
     "investment_income_disqualifier": 11950,
+    "phase_in_rate_by_qualifying_children": {
+      "0": 0.0765,
+      "1": 0.34,
+      "2": 0.40,
+      "3_or_more": 0.45
+    },
+    "earned_income_for_max_credit_by_qualifying_children": {
+      "0": 8490,
+      "1": 12730,
+      "2": 17880,
+      "3_or_more": 17880
+    },
+    "phase_out_rate_by_qualifying_children": {
+      "0": 0.0765,
+      "1": 0.1598,
+      "2": 0.2106,
+      "3_or_more": 0.2106
+    },
+    "phase_out_begin_non_mfj_by_qualifying_children": {
+      "0": 10620,
+      "1": 23350,
+      "2": 23350,
+      "3_or_more": 23350
+    },
+    "phase_out_begin_mfj_by_qualifying_children": {
+      "0": 17730,
+      "1": 30470,
+      "2": 30470,
+      "3_or_more": 30470
+    },
+    "mfj_phase_out_begin_delta": 7110,
     "_sources": ["irs_eitc_tables", "rev_proc_2024_40"]
   },
 

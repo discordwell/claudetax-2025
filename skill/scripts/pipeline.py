@@ -455,6 +455,7 @@ def run_pipeline(
     render_schedule_b: bool = True,
     render_schedule_c: bool = True,
     render_schedule_d: bool = True,
+    render_form_8949: bool = True,
     render_schedule_se: bool = True,
     render_form_6251: bool = True,
     render_form_4562: bool = True,
@@ -708,11 +709,14 @@ def run_pipeline(
 
             # Render the companion Form 8949 pages (one per box code
             # present). The renderer returns a list — possibly empty
-            # if Schedule D only has cap gain distributions.
-            f8949_paths = render_form_8949_pdf(
-                fields_d.form_8949_fields, output_dir / "form_8949.pdf"
-            )
-            rendered.extend(f8949_paths)
+            # if Schedule D only has cap gain distributions. Gated by
+            # the render_form_8949 flag so callers can suppress 8949
+            # independently of Schedule D.
+            if render_form_8949:
+                f8949_paths = render_form_8949_pdf(
+                    fields_d.form_8949_fields, output_dir / "form_8949.pdf"
+                )
+                rendered.extend(f8949_paths)
 
     if render_schedule_se:
         from skill.scripts.output.schedule_se import (

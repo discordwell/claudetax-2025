@@ -541,6 +541,7 @@ class ScheduleK1(_StrictModel):
     short_term_capital_gain_loss: Money = Decimal("0")
     long_term_capital_gain_loss: Money = Decimal("0")
     section_179_deduction: Money = Decimal("0")
+    box14_self_employment_earnings: Money = Decimal("0")
     qbi_qualified: bool = False
     section_199a_w2_wages: Money = Decimal("0")
     section_199a_ubia: Money = Decimal("0")

@@ -190,6 +190,10 @@ SCHEDULE_K1_FIELD_MAP: dict[str, str] = {
     ),
     # Part III Box 12 (1065) / Box 11 (1120-S) — Section 179 deduction
     "section_179_deduction": "schedules_k1[0].section_179_deduction",
+    # Part III Box 14 (1065) — Self-employment earnings (loss)
+    "box14_self_employment_earnings": (
+        "schedules_k1[0].box14_self_employment_earnings"
+    ),
     # Part III Box 20 code Z (1065) / Box 17 code V (1120-S) — QBI flag
     "qbi_qualified": "schedules_k1[0].qbi_qualified",
     # Part III Box 20 code AA (1065) / Box 17 code V (1120-S) — 199A W-2 wages

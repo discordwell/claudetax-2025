@@ -116,6 +116,8 @@ _FULL_PARTNERSHIP_FIELDS: dict[str, str] = {
     "short_term_capital_gain_loss": "-200.00",
     "long_term_capital_gain_loss": "8500.00",
     "section_179_deduction": "5000.00",
+    # Box 14 — Self-employment earnings
+    "box14_self_employment_earnings": "30000.00",
     # Box 20 codes
     "qbi_qualified": "true",
     "section_199a_w2_wages": "85000.00",
@@ -143,6 +145,8 @@ _FULL_S_CORP_FIELDS: dict[str, str] = {
     "short_term_capital_gain_loss": "0.00",
     "long_term_capital_gain_loss": "3200.00",
     "section_179_deduction": "8000.00",
+    # Box 14 — S-corp doesn't generate SE earnings, but field still exists
+    "box14_self_employment_earnings": "0.00",
     # Box 17 codes (1120-S analog of 1065 Box 20)
     "qbi_qualified": "true",
     "section_199a_w2_wages": "150000.00",

@@ -5298,6 +5298,20 @@
       "additionalProperties": false,
       "description": "Schedule K-1 (Form 1065 for partnerships, 1120-S for S-corps).\n\nTyped stub \u2014 extend in fan-out. K-1 items flow to many 1040 lines depending\non the box and the partnership/S-corp source.",
       "properties": {
+        "box14_self_employment_earnings": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box14 Self Employment Earnings"
+        },
         "guaranteed_payments": {
           "anyOf": [
             {

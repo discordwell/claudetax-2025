@@ -492,9 +492,17 @@ def _to_tenforty_input(
     # Schedule C net profit (Line 31), summed across all businesses.
     # Any 1099-NEC linked to a Schedule C should have its nonemployee
     # compensation already reflected in that Schedule C's gross_receipts.
-    se_net_profit = sum(
+    sc_se_net = sum(
         (schedule_c_net_profit(sc) for sc in return_.schedules_c), start=Decimal("0")
     )
+
+    # K-1 Box 14: self-employment earnings from partnerships flow to
+    # Schedule SE alongside Schedule C net profit.
+    k1_se = sum(
+        (k1.box14_self_employment_earnings for k1 in return_.schedules_k1),
+        start=Decimal("0"),
+    )
+    se_net_profit = sc_se_net + k1_se
 
     # Schedule E net rental income, summed across properties + schedules.
     rental_net = sum(
@@ -569,9 +577,15 @@ def total_income(return_: CanonicalReturn) -> Decimal:
             else:
                 st_1099b += gain
 
-    se_net = sum(
+    sc_se_net = sum(
         (schedule_c_net_profit(sc) for sc in return_.schedules_c), start=Decimal("0")
     )
+    k1_se = sum(
+        (k1.box14_self_employment_earnings for k1 in return_.schedules_k1),
+        start=Decimal("0"),
+    )
+    se_net = sc_se_net + k1_se
+
     rental_net = sum(
         (schedule_e_total_net(sched) for sched in return_.schedules_e),
         start=Decimal("0"),
@@ -699,17 +713,20 @@ def earned_income(return_: CanonicalReturn) -> Decimal:
       - SSA-1099 Social Security benefits
       - Unemployment (1099-G box 1)
 
-    TODO: Include Schedule SE-eligible partnership earnings from K-1. The v1
-    ScheduleK1 model carries ordinary_business_income and guaranteed_payments,
-    but classification as SE-eligible requires source_type inspection and a
-    material-participation flag we do not yet model. Deferred.
+    K-1 Box 14 self-employment earnings are included when present on
+    partnership K-1s (source_type == "partnership"). S-corp K-1s do not
+    generate SE earnings (S-corp shareholders are not subject to SE tax
+    on distributions).
     """
     w2_sum = sum((w2.box1_wages for w2 in return_.w2s), start=Decimal("0"))
     sc_net = sum(
         (schedule_c_net_profit(sc) for sc in return_.schedules_c), start=Decimal("0")
     )
-    # TODO(k1-se): add SE-eligible partnership earnings from K-1s.
-    return w2_sum + sc_net
+    k1_se = sum(
+        (k1.box14_self_employment_earnings for k1 in return_.schedules_k1),
+        start=Decimal("0"),
+    )
+    return w2_sum + sc_net + k1_se
 
 
 def investment_income(return_: CanonicalReturn) -> Decimal:

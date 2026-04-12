@@ -292,7 +292,11 @@ def test_render_scaffold_contains_title_text(tmp_path: Path) -> None:
     out_path = tmp_path / "schedule_2.pdf"
     render_schedule_2_pdf(fields, out_path)
 
-    pypdf = pytest.importorskip("pypdf")
+    try:
+        import pypdf
+    except BaseException:
+        pytest.skip("pypdf not importable in this environment")
+
     reader = pypdf.PdfReader(str(out_path))
     text = reader.pages[0].extract_text() or ""
     assert "Schedule 2" in text
@@ -321,7 +325,11 @@ def test_render_scaffold_shows_nonzero_values(tmp_path: Path) -> None:
     out_path = tmp_path / "schedule_2.pdf"
     render_schedule_2_pdf(fields, out_path)
 
-    pypdf = pytest.importorskip("pypdf")
+    try:
+        import pypdf
+    except BaseException:
+        pytest.skip("pypdf not importable in this environment")
+
     reader = pypdf.PdfReader(str(out_path))
     text = reader.pages[0].extract_text() or ""
     assert "12345.00" in text

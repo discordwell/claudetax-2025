@@ -67,7 +67,7 @@ fan-out work.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields as dc_fields
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
@@ -77,8 +77,15 @@ import tenforty
 from skill.scripts.calc.engine import _to_tenforty_input
 from skill.scripts.models import (
     CanonicalReturn,
+    FilingStatus,
     ResidencyStatus,
     StateReturn,
+)
+from skill.scripts.output._acroform_overlay import (
+    fetch_and_verify_source_pdf,
+    fill_acroform_pdf,
+    format_money,
+    load_widget_map,
 )
 from skill.scripts.states._plugin_api import (
     FederalTotals,
@@ -91,6 +98,137 @@ from skill.scripts.states._plugin_api import (
 
 
 _CENTS = Decimal("0.01")
+_ZERO = Decimal("0")
+
+_REF_DIR = Path(__file__).resolve().parent.parent.parent / "reference"
+_STATE_FORMS_DIR = _REF_DIR / "state_forms"
+_WIDGET_MAP_PATH = _REF_DIR / "nc-d400-acroform-map.json"
+
+
+# ---------------------------------------------------------------------------
+# Layer 1: D-400 field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class D400Fields:
+    """Frozen snapshot of NC D-400 line values, ready for rendering.
+
+    Field names follow the 2025 NC D-400 line numbers. All numeric fields
+    are Decimal. Header / identity fields are strings.
+    """
+
+    # Identity / header
+    taxpayer_first_name: str = ""
+    taxpayer_middle_initial: str = ""
+    taxpayer_last_name: str = ""
+    taxpayer_ssn: str = ""
+    spouse_first_name: str = ""
+    spouse_middle_initial: str = ""
+    spouse_last_name: str = ""
+    spouse_ssn: str = ""
+    address: str = ""
+    city: str = ""
+    state: str = "NC"
+    zip: str = ""
+    county: str = ""
+    filing_status: str = ""  # single/mfj/mfs/hoh/qss
+
+    # Income / tax lines
+    line_6_federal_agi: Decimal = _ZERO
+    line_7_additions: Decimal = _ZERO
+    line_8_add_lines_6_and_7: Decimal = _ZERO
+    line_9_deductions_from_fagi: Decimal = _ZERO
+    line_10a_child_deduction: Decimal = _ZERO
+    line_10b_subtract: Decimal = _ZERO
+    line_11_nc_standard_or_itemized: Decimal = _ZERO
+    line_12a_subtract: Decimal = _ZERO
+    line_12b_nc_taxable_income: Decimal = _ZERO
+    line_13_nc_income_tax: Decimal = _ZERO
+    line_14_nc_tax_credit: Decimal = _ZERO
+    line_15_nc_tax_minus_credits: Decimal = _ZERO
+
+    # Page 2 lines
+    line_16_consumer_use_tax: Decimal = _ZERO
+    line_17_add_lines_15_and_16: Decimal = _ZERO
+    line_18_use_tax_paid: Decimal = _ZERO
+    line_19_total_nc_tax: Decimal = _ZERO
+    line_20a_nc_withholding: Decimal = _ZERO
+    line_20b_estimated_tax: Decimal = _ZERO
+    line_22_total_nc_payments: Decimal = _ZERO
+    line_23_tax_due: Decimal = _ZERO
+    line_24_overpayment: Decimal = _ZERO
+    line_27_refund: Decimal = _ZERO
+    line_34_total_amount_due: Decimal = _ZERO
+
+
+def _compute_d400_fields(
+    return_: CanonicalReturn,
+    state_return: StateReturn,
+) -> D400Fields:
+    """Layer 1: map CanonicalReturn + StateReturn.state_specific to D400Fields."""
+    ss = state_return.state_specific
+    agi = ss.get("state_adjusted_gross_income", _ZERO)
+    ti = ss.get("state_taxable_income", _ZERO)
+    tax = ss.get("state_total_tax", _ZERO)
+
+    # NC D-400 Line 6 = federal AGI. Lines 7-10 are additions/subtractions
+    # that tenforty handles internally. For a simple return, line 10b = AGI
+    # and line 11 is the NC standard deduction.
+    nc_deduction = agi - ti if agi > ti else _ZERO
+
+    # Withholding: sum W-2 box 17 (state income tax withheld) for NC
+    nc_withholding = _ZERO
+    for w2 in return_.w2s:
+        if hasattr(w2, "box17_state_income_tax") and w2.box17_state_income_tax:
+            nc_withholding += w2.box17_state_income_tax
+
+    # Payments vs tax
+    total_payments = nc_withholding
+    tax_due = max(tax - total_payments, _ZERO)
+    overpayment = max(total_payments - tax, _ZERO)
+
+    # Filing status mapping
+    fs_map = {
+        FilingStatus.SINGLE: "single",
+        FilingStatus.MFJ: "mfj",
+        FilingStatus.MFS: "mfs",
+        FilingStatus.HOH: "hoh",
+        FilingStatus.QSS: "qss",
+    }
+    filing_status = fs_map.get(return_.filing_status, "single")
+
+    # Identity
+    tp = return_.taxpayer
+    addr = return_.address
+
+    return D400Fields(
+        taxpayer_first_name=tp.first_name,
+        taxpayer_middle_initial="",
+        taxpayer_last_name=tp.last_name,
+        taxpayer_ssn=tp.ssn.replace("-", "") if tp.ssn else "",
+        address=addr.street1 if addr else "",
+        city=addr.city if addr else "",
+        state=addr.state if addr else "NC",
+        zip=addr.zip if addr else "",
+        filing_status=filing_status,
+        line_6_federal_agi=agi,
+        line_8_add_lines_6_and_7=agi,  # No additions for simple return
+        line_10b_subtract=agi,  # No subtractions for simple return
+        line_11_nc_standard_or_itemized=nc_deduction,
+        line_12a_subtract=max(agi - nc_deduction, _ZERO),
+        line_12b_nc_taxable_income=ti,
+        line_13_nc_income_tax=tax,
+        line_15_nc_tax_minus_credits=tax,
+        line_17_add_lines_15_and_16=tax,
+        line_19_total_nc_tax=tax,
+        line_20a_nc_withholding=nc_withholding,
+        line_22_total_nc_payments=total_payments,
+        line_23_tax_due=tax_due,
+        line_24_overpayment=overpayment,
+        line_27_refund=overpayment,
+        line_34_total_amount_due=tax_due,
+    )
 
 
 def _d(v: Any) -> Decimal:
@@ -276,12 +414,101 @@ class NorthCarolinaPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO: fan-out follow-up — fill NC Form D-400 (and Schedule PN where
-        # applicable) using pypdf against the NCDOR's fillable PDFs. The
-        # output renderer suite is the right home for this; this plugin
-        # returns structured state_specific data that the renderer will
-        # consume.
-        return []
+        """Fill NC Form D-400 using the NCDOR fillable PDF.
+
+        Layer 1: compute D400Fields from state_return.state_specific.
+        Layer 2: overlay onto the source PDF via fill_acroform_pdf.
+        """
+        # We need the CanonicalReturn to populate identity fields. If the
+        # caller only passes state_return (which is the Protocol contract),
+        # we fill what we can from state_specific alone.
+        d400 = D400Fields(
+            filing_status=state_return.state_specific.get("_filing_status", "single"),
+            taxpayer_first_name=state_return.state_specific.get("_taxpayer_first_name", ""),
+            taxpayer_last_name=state_return.state_specific.get("_taxpayer_last_name", ""),
+            taxpayer_ssn=state_return.state_specific.get("_taxpayer_ssn", ""),
+            address=state_return.state_specific.get("_address", ""),
+            city=state_return.state_specific.get("_city", ""),
+            state=state_return.state_specific.get("_state", "NC"),
+            zip=state_return.state_specific.get("_zip", ""),
+            line_6_federal_agi=state_return.state_specific.get("state_adjusted_gross_income", _ZERO),
+            line_8_add_lines_6_and_7=state_return.state_specific.get("state_adjusted_gross_income", _ZERO),
+            line_10b_subtract=state_return.state_specific.get("state_adjusted_gross_income", _ZERO),
+            line_11_nc_standard_or_itemized=max(
+                state_return.state_specific.get("state_adjusted_gross_income", _ZERO)
+                - state_return.state_specific.get("state_taxable_income", _ZERO),
+                _ZERO,
+            ),
+            line_12a_subtract=state_return.state_specific.get("state_taxable_income", _ZERO),
+            line_12b_nc_taxable_income=state_return.state_specific.get("state_taxable_income", _ZERO),
+            line_13_nc_income_tax=state_return.state_specific.get("state_total_tax", _ZERO),
+            line_15_nc_tax_minus_credits=state_return.state_specific.get("state_total_tax", _ZERO),
+            line_17_add_lines_15_and_16=state_return.state_specific.get("state_total_tax", _ZERO),
+            line_19_total_nc_tax=state_return.state_specific.get("state_total_tax", _ZERO),
+            line_20a_nc_withholding=state_return.state_specific.get("nc_withholding", _ZERO),
+            line_22_total_nc_payments=state_return.state_specific.get("nc_withholding", _ZERO),
+            line_23_tax_due=max(
+                state_return.state_specific.get("state_total_tax", _ZERO)
+                - state_return.state_specific.get("nc_withholding", _ZERO),
+                _ZERO,
+            ),
+            line_24_overpayment=max(
+                state_return.state_specific.get("nc_withholding", _ZERO)
+                - state_return.state_specific.get("state_total_tax", _ZERO),
+                _ZERO,
+            ),
+            line_27_refund=max(
+                state_return.state_specific.get("nc_withholding", _ZERO)
+                - state_return.state_specific.get("state_total_tax", _ZERO),
+                _ZERO,
+            ),
+            line_34_total_amount_due=max(
+                state_return.state_specific.get("state_total_tax", _ZERO)
+                - state_return.state_specific.get("nc_withholding", _ZERO),
+                _ZERO,
+            ),
+        )
+
+        # Load widget map
+        wmap = load_widget_map(_WIDGET_MAP_PATH)
+
+        # Fetch/verify source PDF
+        source_pdf = fetch_and_verify_source_pdf(
+            _STATE_FORMS_DIR / "nc-d400.pdf",
+            wmap.source_pdf_url,
+            wmap.source_pdf_sha256,
+        )
+
+        # Build widget values from the D400Fields dataclass
+        widget_values: dict[str, str | bool] = {}
+
+        # Map all Decimal/text fields via semantic_to_widget
+        money_fields = {
+            f.name for f in dc_fields(d400)
+            if f.name.startswith("line_")
+        }
+        for f in dc_fields(d400):
+            value = getattr(d400, f.name)
+            widget_names = wmap.widget_names_for(f.name)
+            if not widget_names:
+                continue
+            if f.name in money_fields:
+                text = format_money(value) if isinstance(value, Decimal) else str(value)
+            else:
+                text = str(value) if value else ""
+            for wn in widget_names:
+                widget_values[wn] = text
+
+        # Filing status checkbox
+        fs_label = d400.filing_status
+        if fs_label in wmap.filing_status_checkboxes:
+            widget_values[wmap.filing_status_checkboxes[fs_label]] = True
+
+        # Write the filled PDF
+        out_dir = Path(out_dir)
+        out_path = out_dir / "NC_D-400.pdf"
+        fill_acroform_pdf(source_pdf, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["NC Form D-400"]

@@ -1,0 +1,409 @@
+{
+  "source_pdf_url": "https://www.ncdor.gov/2025-d-400-web-filled-version/open",
+  "source_pdf_sha256": "2bf6e0b44e628a05cc401d22f7cf6f8c7b39db529d345f4bcf7d93ccfe170d63",
+  "form_year": 2025,
+  "notes": [
+    "NC D-400 web fill-in PDF from NCDOR. Page 1 is an instruction page with no widgets; page 2 is the D-400 page 1 (identity + lines 6-15); page 3 is D-400 page 2 (lines 16-34 + signature).",
+    "Filing status is a mutually-exclusive checkbox group (fstat1..fstat5): 1=Single, 2=MFJ, 3=MFS, 4=HOH, 5=QW.",
+    "NC standard deduction vs itemized is a checkbox pair (ncstandarddeduction / ncitemizeddeduction).",
+    "Widget names use y_d400wf_ prefix with line numbers (e.g. y_d400wf_li6_good = line 6)."
+  ],
+  "mapping": {
+    "taxpayer_first_name": {
+      "widget_name": "y_d400wf_fname1",
+      "terminal_name": "y_d400wf_fname1",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "taxpayer_middle_initial": {
+      "widget_name": "y_d400wf_mi1",
+      "terminal_name": "y_d400wf_mi1",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "taxpayer_last_name": {
+      "widget_name": "y_d400wf_lname1",
+      "terminal_name": "y_d400wf_lname1",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "taxpayer_ssn": {
+      "widget_name": "y_d400wf_ssn1",
+      "terminal_name": "y_d400wf_ssn1",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "spouse_first_name": {
+      "widget_name": "y_d400wf_fname2",
+      "terminal_name": "y_d400wf_fname2",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "spouse_middle_initial": {
+      "widget_name": "y_d400wf_mi2",
+      "terminal_name": "y_d400wf_mi2",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "spouse_last_name": {
+      "widget_name": "y_d400wf_lname2",
+      "terminal_name": "y_d400wf_lname2",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "spouse_ssn": {
+      "widget_name": "y_d400wf_ssn2",
+      "terminal_name": "y_d400wf_ssn2",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "address": {
+      "widget_name": "y_d400wf_add",
+      "terminal_name": "y_d400wf_add",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "apartment_number": {
+      "widget_name": "y_d400wf_apartment number",
+      "terminal_name": "y_d400wf_apartment number",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "city": {
+      "widget_name": "y_d400wf_city",
+      "terminal_name": "y_d400wf_city",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "state": {
+      "widget_name": "y_d400wf_state",
+      "terminal_name": "y_d400wf_state",
+      "type": "choice",
+      "page": 2,
+      "rect": null
+    },
+    "zip": {
+      "widget_name": "y_d400wf_zip",
+      "terminal_name": "y_d400wf_zip",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "county": {
+      "widget_name": "y_d400wf_county",
+      "terminal_name": "y_d400wf_county",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "line_6_federal_agi": {
+      "widget_name": "y_d400wf_li6_good",
+      "terminal_name": "y_d400wf_li6_good",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "Federal adjusted gross income (from federal Form 1040 line 11)"
+    },
+    "line_7_additions": {
+      "widget_name": "y_d400wf_li7_good",
+      "terminal_name": "y_d400wf_li7_good",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "Additions to federal AGI (from D-400 Schedule S, Part A)"
+    },
+    "line_8_add_lines_6_and_7": {
+      "widget_name": "y_d400wf_li8_good",
+      "terminal_name": "y_d400wf_li8_good",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "Sum of line 6 + line 7"
+    },
+    "line_9_deductions_from_fagi": {
+      "widget_name": "y_d400wf_li9_good",
+      "terminal_name": "y_d400wf_li9_good",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "Deductions from federal AGI (from D-400 Schedule S, Part B)"
+    },
+    "line_10a_child_deduction": {
+      "widget_name": "y_d400wf_li10a_good",
+      "terminal_name": "y_d400wf_li10a_good",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "Child deduction amount"
+    },
+    "line_10b_subtract": {
+      "widget_name": "y_d400wf_li10b_good",
+      "terminal_name": "y_d400wf_li10b_good",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "Line 8 minus lines 9 and 10a"
+    },
+    "line_11_nc_standard_or_itemized": {
+      "widget_name": "y_d400wf_li11_page1_good",
+      "terminal_name": "y_d400wf_li11_page1_good",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "NC standard deduction or NC itemized deductions"
+    },
+    "line_12a_subtract": {
+      "widget_name": "y_d400wf_li12a_pg1_good",
+      "terminal_name": "y_d400wf_li12a_pg1_good",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "Line 10b minus line 11 (cannot be less than zero)"
+    },
+    "line_12b_nc_taxable_income": {
+      "widget_name": "y_d400wf_li12b_pg1_good",
+      "terminal_name": "y_d400wf_li12b_pg1_good",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "NC taxable income"
+    },
+    "line_13_nc_income_tax": {
+      "widget_name": "y_d400wf_li13_page1_good",
+      "terminal_name": "y_d400wf_li13_page1_good",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "NC income tax (line 12b times flat rate)"
+    },
+    "line_14_nc_tax_credit": {
+      "widget_name": "y_d400wf_li14_pg1_good",
+      "terminal_name": "y_d400wf_li14_pg1_good",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "Tax credits (from D-400TC)"
+    },
+    "line_15_nc_tax_minus_credits": {
+      "widget_name": "y_d400wf_li15_pg1_good",
+      "terminal_name": "y_d400wf_li15_pg1_good",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "Line 13 minus line 14"
+    },
+    "line_16_consumer_use_tax": {
+      "widget_name": "y_d400wf_li16_pg2_good",
+      "terminal_name": "y_d400wf_li16_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null,
+      "note": "Consumer use tax"
+    },
+    "line_17_add_lines_15_and_16": {
+      "widget_name": "y_d400wf_li17_pg2_good",
+      "terminal_name": "y_d400wf_li17_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null,
+      "note": "Sum of line 15 and line 16"
+    },
+    "line_18_use_tax_paid": {
+      "widget_name": "y_d400wf_li18_pg2_good",
+      "terminal_name": "y_d400wf_li18_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null,
+      "note": "Consumer use tax paid with prior returns"
+    },
+    "line_19_total_nc_tax": {
+      "widget_name": "y_d400wf_li19_pg2_good",
+      "terminal_name": "y_d400wf_li19_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null,
+      "note": "Total NC income tax (line 17 minus line 18)"
+    },
+    "line_20a_nc_withholding": {
+      "widget_name": "y_d400wf_li20a_pg2_good",
+      "terminal_name": "y_d400wf_li20a_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null,
+      "note": "NC income tax withheld"
+    },
+    "line_20b_estimated_tax": {
+      "widget_name": "y_d400wf_li20b_pg2_good",
+      "terminal_name": "y_d400wf_li20b_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null,
+      "note": "Estimated income tax paid"
+    },
+    "line_21a_earned_income_credit": {
+      "widget_name": "y_d400wf_li21a_pg2_good",
+      "terminal_name": "y_d400wf_li21a_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null
+    },
+    "line_21b_ctc": {
+      "widget_name": "y_d400wf_li21b_pg2_good",
+      "terminal_name": "y_d400wf_li21b_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null
+    },
+    "line_21c_other_credits": {
+      "widget_name": "y_d400wf_li21c_pg2_good",
+      "terminal_name": "y_d400wf_li21c_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null
+    },
+    "line_21d_total_credits": {
+      "widget_name": "y_d400wf_li21d_pg2_good",
+      "terminal_name": "y_d400wf_li21d_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null
+    },
+    "line_22_total_nc_payments": {
+      "widget_name": "y_d400wf_li22_pg2_good",
+      "terminal_name": "y_d400wf_li22_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null,
+      "note": "Total NC tax payments and credits"
+    },
+    "line_23_tax_due": {
+      "widget_name": "y_d400wf_li23_pg2_good",
+      "terminal_name": "y_d400wf_li23_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null,
+      "note": "Tax due (line 19 minus line 22 if positive)"
+    },
+    "line_24_overpayment": {
+      "widget_name": "y_d400wf_li24_pg2_good",
+      "terminal_name": "y_d400wf_li24_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null,
+      "note": "Overpayment (line 22 minus line 19 if positive)"
+    },
+    "line_25_contribution": {
+      "widget_name": "y_d400wf_li25_pg2_good",
+      "terminal_name": "y_d400wf_li25_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null
+    },
+    "line_26a_amount_applied_next_year": {
+      "widget_name": "y_d400wf_li26a_pg2_good",
+      "terminal_name": "y_d400wf_li26a_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null
+    },
+    "line_27_refund": {
+      "widget_name": "y_d400wf_li27_pg2_good",
+      "terminal_name": "y_d400wf_li27_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null,
+      "note": "Amount to be refunded"
+    },
+    "line_28_interest": {
+      "widget_name": "y_d400wf_li28_pg2_good",
+      "terminal_name": "y_d400wf_li28_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null
+    },
+    "line_29_failure_to_file_penalty": {
+      "widget_name": "y_d400wf_li29_pg2_good",
+      "terminal_name": "y_d400wf_li29_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null
+    },
+    "line_30_failure_to_pay_penalty": {
+      "widget_name": "y_d400wf_li30_pg2_good",
+      "terminal_name": "y_d400wf_li30_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null
+    },
+    "line_31_underpayment_penalty": {
+      "widget_name": "y_d400wf_li31_pg2_good",
+      "terminal_name": "y_d400wf_li31_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null
+    },
+    "line_32_other_penalties": {
+      "widget_name": "y_d400wf_li32_pg2_good",
+      "terminal_name": "y_d400wf_li32_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null
+    },
+    "line_33_total_penalties": {
+      "widget_name": "y_d400wf_li33_pg2_good",
+      "terminal_name": "y_d400wf_li33_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null
+    },
+    "line_34_total_amount_due": {
+      "widget_name": "y_d400wf_li34_pg2_good",
+      "terminal_name": "y_d400wf_li34_pg2_good",
+      "type": "text",
+      "page": 3,
+      "rect": null,
+      "note": "Total amount due"
+    }
+  },
+  "filing_status_checkboxes": {
+    "single": {
+      "widget_name": "y_d400wf_fstat1",
+      "note": "Filing status 1 = Single"
+    },
+    "mfj": {
+      "widget_name": "y_d400wf_fstat2",
+      "note": "Filing status 2 = Married Filing Jointly"
+    },
+    "mfs": {
+      "widget_name": "y_d400wf_fstat3",
+      "note": "Filing status 3 = Married Filing Separately"
+    },
+    "hoh": {
+      "widget_name": "y_d400wf_fstat4",
+      "note": "Filing status 4 = Head of Household"
+    },
+    "qss": {
+      "widget_name": "y_d400wf_fstat5",
+      "note": "Filing status 5 = Qualifying Surviving Spouse"
+    }
+  },
+  "deduction_type_checkboxes": {
+    "standard": {
+      "widget_name": "y_d400wf_ncstandarddeduction"
+    },
+    "itemized": {
+      "widget_name": "y_d400wf_ncitemizeddeduction"
+    }
+  }
+}

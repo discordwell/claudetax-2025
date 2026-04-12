@@ -295,12 +295,20 @@ class OhioPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(oh-pdf): fan-out follow-up — fill Ohio IT-1040 (and the
-        # Schedule of Adjustments, Schedule of Credits, IT NRC for
-        # nonresidents, Schedule of Ohio Withholding) using pypdf against
-        # the Ohio DOT's fillable PDFs. The output renderer suite is the
-        # right home for this; this plugin returns structured
-        # state_specific data that the renderer will consume.
+        # Ohio IT-1040: The Ohio Department of Taxation publishes the
+        # IT-1040 bundle as a FLATTENED PDF (0 AcroForm fields, 0 widget
+        # annotations). Both the original bundle at:
+        #   dam.assets.ohio.gov/.../2025/1040-bundle.pdf
+        # and the amended bundle at:
+        #   dam.assets.ohio.gov/.../2025/1040-amended-bundle.pdf
+        # contain zero fillable fields. Ohio pushes taxpayers to its
+        # OH|TAX eServices electronic portal instead of providing
+        # fillable PDFs. Verified 2026-04-12.
+        #
+        # AcroForm PDF filling is not possible for this state form.
+        # A future enhancement could use reportlab to generate the form
+        # from scratch, but per the task spec we do NOT create reportlab
+        # scaffolds when the source PDF is not fillable.
         return []
 
     def form_ids(self) -> list[str]:

@@ -399,26 +399,40 @@ class TestNorthCarolinaPluginFormIds:
         assert "NC Form D-400" in ids
         assert ids == ["NC Form D-400"]
 
-    def test_render_pdfs_returns_empty_list(
+    def test_render_pdfs_produces_d400(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
-        """Fan-out follow-up: actual D-400 fill is not yet implemented."""
+        """render_pdfs should produce a filled NC D-400 PDF."""
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert PLUGIN.render_pdfs(state_return, tmp_path) == []
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+        pdfs = PLUGIN.render_pdfs(state_return, tmp_path)
+        assert len(pdfs) == 1
+        assert pdfs[0].name == "NC_D-400.pdf"
+        assert pdfs[0].stat().st_size > 0
 
-    def test_render_pdfs_accepts_path(
-        self, single_65k_return, federal_single_65k
+    def test_render_pdfs_output_is_valid_pdf(
+        self, single_65k_return, federal_single_65k, tmp_path
     ):
+        """The output PDF should be a valid PDF that pypdf can open."""
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        # Even with a nonexistent path, a no-op render should not raise.
-        assert PLUGIN.render_pdfs(state_return, Path("/tmp")) == []
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+        pdfs = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(pdfs[0]))
+        # NC D-400 source has 3 pages
+        assert len(reader.pages) >= 2

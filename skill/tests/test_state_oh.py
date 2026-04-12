@@ -469,7 +469,9 @@ class TestOhioPluginFormIds:
     def test_render_pdfs_returns_empty_list(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
-        """Fan-out follow-up: actual IT-1040 fill is not yet implemented."""
+        """Ohio IT-1040 PDF is flattened (0 AcroForm fields). render_pdfs
+        returns [] because AcroForm filling is not possible. See oh.py
+        docstring in render_pdfs for details."""
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
@@ -487,7 +489,7 @@ class TestOhioPluginFormIds:
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        # Even with a nonexistent path, a no-op render should not raise.
+        # Ohio PDF is flattened — render is a no-op.
         assert PLUGIN.render_pdfs(state_return, Path("/tmp")) == []
 
 

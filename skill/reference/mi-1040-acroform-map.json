@@ -1,0 +1,467 @@
+{
+  "source_pdf_url": "https://www.michigan.gov/taxes/-/media/Project/Websites/taxes/Forms/IIT/TY2025/MI-1040.pdf",
+  "source_pdf_sha256": "98e6d52b88e412a5d51529bc3144bd137eb24554e30c918f63fdcf82cf9cd01c",
+  "form_year": 2025,
+  "notes": [
+    "MI-1040 fillable PDF from Michigan Department of Treasury. 3 pages: page 1 (identity + exemptions + lines 10-17), page 2 (lines 18-34), page 3 (lines 35-40 + refund + signature).",
+    "Filing status is on line 7: 7a=Single, 7b=MFJ, 7c=MFS (requires spouse name). No HOH or QSS checkbox — MI maps HOH to Single and QSS to a distinct marital status.",
+    "Residency is on line 8: 8a=Resident, 8b=Nonresident, 8c=Part-Year Resident.",
+    "SSN is split into 3 widgets: FSSN1 (3 digits), FSSN2 (2 digits), FSSN3 (4 digits).",
+    "Line 10 = AGI from federal 1040 line 11. Line 11 = additions. Line 12 = line 10 + 11. Line 13 = subtractions. Line 14 = adjusted taxable income. Line 15 = exemption allowance. Line 16 = taxable income. Line 17 = tax."
+  ],
+  "mapping": {
+    "filer_first_name": {
+      "widget_name": "Filer's First Name",
+      "terminal_name": "Filer's First Name",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "filer_middle_initial": {
+      "widget_name": "Filer's Initial",
+      "terminal_name": "Filer's Initial",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "filer_last_name": {
+      "widget_name": "Filer's Last Name",
+      "terminal_name": "Filer's Last Name",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "filer_ssn_1": {
+      "widget_name": "FSSN1",
+      "terminal_name": "FSSN1",
+      "type": "text",
+      "page": 1,
+      "rect": null,
+      "note": "First 3 digits of filer SSN"
+    },
+    "filer_ssn_2": {
+      "widget_name": "FSSN2",
+      "terminal_name": "FSSN2",
+      "type": "text",
+      "page": 1,
+      "rect": null,
+      "note": "Middle 2 digits of filer SSN"
+    },
+    "filer_ssn_3": {
+      "widget_name": "FSSN3",
+      "terminal_name": "FSSN3",
+      "type": "text",
+      "page": 1,
+      "rect": null,
+      "note": "Last 4 digits of filer SSN"
+    },
+    "spouse_first_name": {
+      "widget_name": "Spouse's First Name",
+      "terminal_name": "Spouse's First Name",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "spouse_middle_initial": {
+      "widget_name": "Spouse's Initial",
+      "terminal_name": "Spouse's Initial",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "spouse_last_name": {
+      "widget_name": "Spouse's Last Name",
+      "terminal_name": "Spouse's Last Name",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "spouse_ssn_1": {
+      "widget_name": "SpSSN1",
+      "terminal_name": "SpSSN1",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "spouse_ssn_2": {
+      "widget_name": "SpSSN2",
+      "terminal_name": "SpSSN2",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "spouse_ssn_3": {
+      "widget_name": "SpSSN3",
+      "terminal_name": "SpSSN3",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "home_address": {
+      "widget_name": "Home address",
+      "terminal_name": "Home address",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "city": {
+      "widget_name": "City or town",
+      "terminal_name": "City or town",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "state": {
+      "widget_name": "State",
+      "terminal_name": "State",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "zip_code": {
+      "widget_name": "Zip Code",
+      "terminal_name": "Zip Code",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "school_district_code": {
+      "widget_name": "School District Code",
+      "terminal_name": "School District Code",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "line_9a_personal_exemptions_count": {
+      "widget_name": "Line 9a Number",
+      "terminal_name": "Line 9a Number",
+      "type": "text",
+      "page": 1,
+      "rect": null,
+      "note": "Number of personal and stillbirth exemptions"
+    },
+    "line_9a_personal_exemptions_amount": {
+      "widget_name": "Line 9a",
+      "terminal_name": "Line 9a",
+      "type": "text",
+      "page": 1,
+      "rect": null,
+      "note": "Personal exemption dollar amount"
+    },
+    "line_9b_special_exemptions_count": {
+      "widget_name": "Line 9b Numbers",
+      "terminal_name": "Line 9b Numbers",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "line_9b_special_exemptions_amount": {
+      "widget_name": "Line 9b",
+      "terminal_name": "Line 9b",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "line_9c_disabled_exemptions_count": {
+      "widget_name": "Line 9c Number",
+      "terminal_name": "Line 9c Number",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "line_9c_disabled_exemptions_amount": {
+      "widget_name": "Line 9c",
+      "terminal_name": "Line 9c",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "line_9d_qualified_disabled_veterans_count": {
+      "widget_name": "Line 9d Number",
+      "terminal_name": "Line 9d Number",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "line_9d_qualified_disabled_veterans_amount": {
+      "widget_name": "Line 9d",
+      "terminal_name": "Line 9d",
+      "type": "text",
+      "page": 1,
+      "rect": null
+    },
+    "line_9e_dependent_exemptions_amount": {
+      "widget_name": "Line 9e",
+      "terminal_name": "Line 9e",
+      "type": "text",
+      "page": 1,
+      "rect": null,
+      "note": "Dependent exemptions from MI-1040CR-7"
+    },
+    "line_9f_total_exemption_allowance": {
+      "widget_name": "Line 9f",
+      "terminal_name": "Line 9f",
+      "type": "text",
+      "page": 1,
+      "rect": null,
+      "note": "Total exemption allowance (sum of 9a-9e)"
+    },
+    "line_10_agi": {
+      "widget_name": "Line 10",
+      "terminal_name": "Line 10",
+      "type": "text",
+      "page": 1,
+      "rect": null,
+      "note": "Adjusted gross income from federal 1040 line 11"
+    },
+    "line_11_additions": {
+      "widget_name": "Line 11",
+      "terminal_name": "Line 11",
+      "type": "text",
+      "page": 1,
+      "rect": null,
+      "note": "Additions to income from Schedule 1, line 6"
+    },
+    "line_12_total_income": {
+      "widget_name": "Line 12",
+      "terminal_name": "Line 12",
+      "type": "text",
+      "page": 1,
+      "rect": null,
+      "note": "Add lines 10 and 11"
+    },
+    "line_13_subtractions": {
+      "widget_name": "Line 13",
+      "terminal_name": "Line 13",
+      "type": "text",
+      "page": 1,
+      "rect": null,
+      "note": "Subtractions from income from Schedule 1, line 24"
+    },
+    "line_14_adjusted_income": {
+      "widget_name": "Line 14",
+      "terminal_name": "Line 14",
+      "type": "text",
+      "page": 1,
+      "rect": null,
+      "note": "Line 12 minus line 13"
+    },
+    "line_15_exemption_allowance": {
+      "widget_name": "Line 15",
+      "terminal_name": "Line 15",
+      "type": "text",
+      "page": 1,
+      "rect": null,
+      "note": "Exemption allowance from line 9f"
+    },
+    "line_16_taxable_income": {
+      "widget_name": "Line 16",
+      "terminal_name": "Line 16",
+      "type": "text",
+      "page": 1,
+      "rect": null,
+      "note": "Taxable income (line 14 minus line 15)"
+    },
+    "line_17_tax": {
+      "widget_name": "Line 17",
+      "terminal_name": "Line 17",
+      "type": "text",
+      "page": 1,
+      "rect": null,
+      "note": "Tax (4.25% of line 16)"
+    },
+    "line_18a_voluntary_contributions": {
+      "widget_name": "Line 18a",
+      "terminal_name": "Line 18a",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "line_18b_use_tax": {
+      "widget_name": "Line 18b",
+      "terminal_name": "Line 18b",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "line_19a_total_credits": {
+      "widget_name": "Line 19a",
+      "terminal_name": "Line 19a",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "line_19b_recapture_credits": {
+      "widget_name": "Line 19b",
+      "terminal_name": "Line 19b",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "line_20a_income_tax_withheld": {
+      "widget_name": "Line 20a",
+      "terminal_name": "Line 20a",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "Michigan income tax withheld per W-2"
+    },
+    "line_20b_estimated_tax_paid": {
+      "widget_name": "Line 20b",
+      "terminal_name": "Line 20b",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "line_21_total_household_resources": {
+      "widget_name": "Line 21",
+      "terminal_name": "Line 21",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "line_22_balance_due": {
+      "widget_name": "Line 22",
+      "terminal_name": "Line 22",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "Tax due, or balance due if tax > payments/credits"
+    },
+    "line_23_earned_income_credit": {
+      "widget_name": "Line 23",
+      "terminal_name": "Line 23",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "line_24_total_payments_credits": {
+      "widget_name": "Line 24",
+      "terminal_name": "Line 24",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "line_25_overpayment": {
+      "widget_name": "Line 25",
+      "terminal_name": "Line 25",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "Overpayment (if payments > tax)"
+    },
+    "line_26_estimated_credit": {
+      "widget_name": "Line 26",
+      "terminal_name": "Line 26",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "line_27_adjusted_overpayment": {
+      "widget_name": "Line 27",
+      "terminal_name": "Line 27",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "line_28a_donations": {
+      "widget_name": "Line 28a",
+      "terminal_name": "Line 28a",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "line_28b_donations": {
+      "widget_name": "Line 28b",
+      "terminal_name": "Line 28b",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "line_29_total_donations": {
+      "widget_name": "Line 29",
+      "terminal_name": "Line 29",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "line_30_refund": {
+      "widget_name": "Line 30",
+      "terminal_name": "Line 30",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "Net refund"
+    },
+    "line_31_amount_owed": {
+      "widget_name": "Line 31",
+      "terminal_name": "Line 31",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "Amount owed with return"
+    },
+    "line_32_penalty_interest": {
+      "widget_name": "Line 32",
+      "terminal_name": "Line 32",
+      "type": "text",
+      "page": 2,
+      "rect": null
+    },
+    "line_34_total_amount_due": {
+      "widget_name": "Line 34",
+      "terminal_name": "Line 34",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "Total amount due"
+    },
+    "line_37_property_tax_credit": {
+      "widget_name": "Line 37",
+      "terminal_name": "Line 37",
+      "type": "text",
+      "page": 3,
+      "rect": null
+    },
+    "line_38_home_heating_credit": {
+      "widget_name": "Line 38",
+      "terminal_name": "Line 38",
+      "type": "text",
+      "page": 3,
+      "rect": null
+    },
+    "line_39_total_refundable_credits": {
+      "widget_name": "Line 39",
+      "terminal_name": "Line 39",
+      "type": "text",
+      "page": 3,
+      "rect": null
+    }
+  },
+  "filing_status_checkboxes": {
+    "single": {
+      "widget_name": "Line 7a Single Checkbox",
+      "note": "Line 7a = Single"
+    },
+    "mfj": {
+      "widget_name": "Line 7b Checkbox",
+      "note": "Line 7b = Married Filing Jointly"
+    },
+    "mfs": {
+      "widget_name": "Line 7c Checkbox",
+      "note": "Line 7c = Married Filing Separately"
+    }
+  },
+  "residency_checkboxes": {
+    "resident": {
+      "widget_name": "Line 8a Resident Chceckbox",
+      "note": "Note: widget name contains typo 'Chceckbox' in the source PDF"
+    },
+    "nonresident": {
+      "widget_name": "Line 8b Nonresident Checkbox"
+    },
+    "part_year": {
+      "widget_name": "Line 8c Part-Year Resident"
+    }
+  }
+}

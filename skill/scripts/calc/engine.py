@@ -369,18 +369,54 @@ def _sum_adjustments(adj: AdjustmentsToIncome) -> Decimal:
     )
 
 
+def _form_4797_schedule_1_amount(return_: CanonicalReturn) -> Decimal:
+    """Compute the Form 4797 amount that flows to Schedule 1 line 4.
+
+    This is the net of Part II ordinary gains/losses plus any Part I
+    §1231 net loss (§1231 losses are ordinary). When Part I §1231 net
+    is positive, it flows to Schedule D line 11 as a long-term capital
+    gain instead.
+
+    Lazy-imports the Form 4797 module to avoid a circular dependency.
+    Returns $0 when no Form 4797 sales are present.
+    """
+    if not return_.forms_4797:
+        return Decimal("0")
+    from skill.scripts.output.form_4797 import compute_form_4797_fields
+    fields = compute_form_4797_fields(return_)
+    return fields.schedule_1_line_4
+
+
+def _form_4797_schedule_d_amount(return_: CanonicalReturn) -> Decimal:
+    """Compute the Form 4797 §1231 gain that flows to Schedule D line 11.
+
+    Only nonzero when the Part I net is a gain (positive). This amount
+    is added to long-term capital gains in the tenforty input.
+    """
+    if not return_.forms_4797:
+        return Decimal("0")
+    from skill.scripts.output.form_4797 import compute_form_4797_fields
+    fields = compute_form_4797_fields(return_)
+    return fields.schedule_d_line_11
+
+
 def _sum_part_i_additional_income(return_: CanonicalReturn) -> Decimal:
     """Sum Schedule 1 Part I additional-income items from the canonical return.
 
     This is where we route income that doesn't fit tenforty's top-level
-    parameters. v0.1 handles unemployment (1099-G box 1). Other items (state
-    refund, alimony received, gambling, other) are fan-out work.
+    parameters. v0.1 handles unemployment (1099-G box 1) and Form 4797
+    gains/losses (Schedule 1 line 4). Other items (state refund, alimony
+    received, gambling, other) are fan-out work.
     """
     unemployment = sum(
         (f.box1_unemployment_compensation for f in return_.forms_1099_g),
         start=Decimal("0"),
     )
-    return unemployment
+    # Form 4797: ordinary gains/losses + §1231 losses flow to Schedule 1
+    # line 4. §1231 net gains (positive) flow to Schedule D instead and
+    # are handled in _to_tenforty_input via long_term_capital_gains.
+    form_4797_sched_1 = _form_4797_schedule_1_amount(return_)
+    return unemployment + form_4797_sched_1
 
 
 def schedule_1_net(return_: CanonicalReturn) -> Decimal:
@@ -477,6 +513,9 @@ def _to_tenforty_input(
 
     sched_1 = schedule_1_net(return_)
 
+    # Form 4797 §1231 net gain flows as long-term capital gain
+    form_4797_lt_gain = _form_4797_schedule_d_amount(return_)
+
     return TenfortyInput(
         year=return_.tax_year,
         filing_status=_TENFORTY_STATUS[return_.filing_status],
@@ -485,7 +524,7 @@ def _to_tenforty_input(
         qualified_dividends=float(qual_div_sum),
         ordinary_dividends=float(ord_div_sum),
         short_term_capital_gains=float(st_1099b),
-        long_term_capital_gains=float(lt_1099b + cap_gain_distr_sum),
+        long_term_capital_gains=float(lt_1099b + cap_gain_distr_sum + form_4797_lt_gain),
         self_employment_income=float(se_net_profit),
         rental_income=float(rental_net),
         schedule_1_income=float(sched_1),
@@ -538,8 +577,14 @@ def total_income(return_: CanonicalReturn) -> Decimal:
         start=Decimal("0"),
     )
 
-    # Schedule 1 Part I additions (unemployment, etc.)
+    # Schedule 1 Part I additions (unemployment, Form 4797 ordinary gains, etc.)
     sched_1_part_i = _sum_part_i_additional_income(return_)
+
+    # Form 4797 §1231 net gains that flow as long-term capital gains
+    # to Schedule D. These are NOT included in sched_1_part_i (which
+    # only carries the ordinary portion) and NOT included in 1099-B
+    # loops, so they must be added separately.
+    form_4797_lt = _form_4797_schedule_d_amount(return_)
 
     # 1099-R taxable amounts (pensions/IRAs/retirement)
     retirement = sum(
@@ -562,6 +607,7 @@ def total_income(return_: CanonicalReturn) -> Decimal:
         + se_net
         + rental_net
         + sched_1_part_i
+        + form_4797_lt
         + retirement
         + ssa
     )

@@ -815,6 +815,54 @@ class ScheduleE(_StrictModel):
 
 
 # ---------------------------------------------------------------------------
+# Form 4797 — Sales of Business Property
+# ---------------------------------------------------------------------------
+
+
+class Form4797Sale(_StrictModel):
+    """A single sale of business property reported on Form 4797.
+
+    Form 4797 reports gains/losses from the sale of business property,
+    rental property, and depreciable assets.  The ``section_type`` field
+    determines which Part of Form 4797 the sale lands in:
+
+    * ``"1231"`` — Part I: gains/losses from sales of property held more
+      than one year (§1231 assets). Net §1231 gains may be treated as
+      long-term capital gains; net §1231 losses are ordinary.
+    * ``"1245"`` — Part II: ordinary gains/losses from sale of personal
+      property (tangible and intangible) subject to §1245 depreciation
+      recapture. All depreciation is recaptured as ordinary income; any
+      gain above the depreciation is §1231 gain.
+    * ``"1250"`` — Part III: gain from sale of real property subject to
+      §1250 depreciation recapture. Unrecaptured §1250 gain (the
+      straight-line depreciation portion) is taxed at a maximum 25%
+      rate; excess gain is §1231 gain.
+
+    Flows to: Schedule 1 line 4 (other gains/losses), Schedule D (when
+    §1231 gain is treated as capital gain).
+
+    Authority: IRS Form 4797 (TY2025), Instructions for Form 4797.
+    """
+
+    description: str
+    """Description of the property (e.g., "Office Equipment", "Rental House")."""
+    date_acquired: dt.date | Literal["various"] | None = None
+    """Date the property was acquired. Use ``"various"`` for aggregated lots."""
+    date_sold: dt.date
+    """Date the property was sold or disposed of."""
+    gross_sales_price: Money
+    """Gross proceeds from the sale (Form 4797 column (d))."""
+    cost_or_basis: Money
+    """Original cost or other basis (Form 4797 column (e))."""
+    depreciation_allowed: Money = Decimal("0")
+    """Total depreciation allowed or allowable (Form 4797 column (f)).
+    Drives the §1245/§1250 recapture computation."""
+    section_type: Literal["1231", "1245", "1250"]
+    """Which IRC section governs the sale. Determines Part placement on
+    Form 4797 and the recapture computation method."""
+
+
+# ---------------------------------------------------------------------------
 # Adjustments, deductions, credits
 # ---------------------------------------------------------------------------
 
@@ -1156,6 +1204,16 @@ class CanonicalReturn(_StrictModel):
     schedules_c: list[ScheduleC] = Field(default_factory=list)
     schedules_e: list[ScheduleE] = Field(default_factory=list)
     schedules_k1: list[ScheduleK1] = Field(default_factory=list)
+
+    # Form 4797 — Sales of Business Property
+    forms_4797: list[Form4797Sale] = Field(default_factory=list)
+    """Sales of business property reported on Form 4797. Each entry
+    represents one disposition; the Form 4797 renderer classifies them
+    into Parts I/II/III based on ``section_type`` and computes the
+    depreciation recapture, §1231 gain/loss, and unrecaptured §1250
+    gain. Net results flow to Schedule 1 line 4 (other gains/losses)
+    and, when applicable, to Schedule D (§1231 net gain treated as
+    long-term capital gain)."""
 
     # ACA marketplace statements
     forms_1095_a: list[Form1095A] = Field(default_factory=list)

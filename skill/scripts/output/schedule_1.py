@@ -235,8 +235,13 @@ def compute_schedule_1_fields(canonical: CanonicalReturn) -> Schedule1Fields:
         start=_ZERO,
     )
 
-    # Line 4: other gains/losses (Form 4797) — DEFERRED
-    line_4 = _ZERO
+    # Line 4: other gains/losses (Form 4797)
+    if canonical.forms_4797:
+        from skill.scripts.output.form_4797 import compute_form_4797_fields
+        f4797 = compute_form_4797_fields(canonical)
+        line_4 = f4797.schedule_1_line_4
+    else:
+        line_4 = _ZERO
 
     # Line 5: rental real estate (Schedule E total net, summed)
     line_5 = sum(
@@ -363,6 +368,8 @@ def schedule_1_required(canonical: CanonicalReturn) -> bool:
     if canonical.schedules_e:
         return True
     if canonical.forms_1099_g:
+        return True
+    if canonical.forms_4797:
         return True
     if canonical.other_income:
         return True

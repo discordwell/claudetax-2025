@@ -115,6 +115,11 @@ from skill.scripts.output.form_8606 import (
     Form8606Fields,
     compute_form_8606_fields,
 )
+from skill.scripts.output.form_4797 import (
+    Form4797Fields,
+    compute_form_4797_fields,
+    form_4797_required,
+)
 
 
 _ZERO = Decimal("0")
@@ -321,6 +326,8 @@ class FFFFEntryMap:
             return "Form 8962 (Premium Tax Credit)"
         if form == "8606":
             return "Form 8606 (Nondeductible IRAs)"
+        if form == "4797":
+            return "Form 4797 (Sales of Business Property)"
         return form
 
 
@@ -949,6 +956,8 @@ def _schedule_1_entries(fields: Schedule1Fields) -> list[FFFFEntry]:
     rows: list[tuple[str, Decimal, str, str | None]] = [
         ("3", fields.line_3_business_income,
          "Business income or (loss) from Schedule C", None),
+        ("4", fields.line_4_other_gains,
+         "Other gains or (losses) from Form 4797", None),
         ("5", fields.line_5_rental_real_estate,
          "Rental real estate, royalties, partnerships, S corps", None),
         ("7", fields.line_7_unemployment,
@@ -1250,6 +1259,83 @@ def _form_8606_entries(fields: Form8606Fields) -> list[FFFFEntry]:
     ]
 
 
+def _form_4797_entries(fields: Form4797Fields) -> list[FFFFEntry]:
+    """Emit Form 4797 entries (sales of business property)."""
+    form = "4797"
+    entries: list[FFFFEntry] = []
+
+    # Part I sales
+    for r in fields.part_i_sales:
+        entries.append(FFFFEntry(
+            form=form,
+            line="I",
+            value=f"{r.sale.description}: {_format_money(r.section_1231_gain_or_loss)}",
+            description="Part I - Section 1231 gain or (loss)",
+        ))
+    entries.append(FFFFEntry(
+        form=form,
+        line="I-net",
+        value=_format_money(fields.part_i_net_gain_or_loss),
+        description="Net section 1231 gain or (loss)",
+    ))
+
+    # Part II ordinary
+    if fields.part_ii_ordinary_gain_or_loss != _ZERO:
+        for r in fields.part_ii_sales:
+            entries.append(FFFFEntry(
+                form=form,
+                line="II",
+                value=f"{r.sale.description}: {_format_money(r.ordinary_gain)}",
+                description="Part II - Ordinary gain (depreciation recapture)",
+            ))
+        entries.append(FFFFEntry(
+            form=form,
+            line="II-net",
+            value=_format_money(fields.part_ii_ordinary_gain_or_loss),
+            description="Net ordinary gain or (loss)",
+        ))
+
+    # Part III unrecaptured 1250
+    if fields.part_iii_total_unrecaptured_1250_gain != _ZERO:
+        for r in fields.part_iii_sales:
+            entries.append(FFFFEntry(
+                form=form,
+                line="III",
+                value=f"{r.sale.description}: {_format_money(r.unrecaptured_1250_gain)}",
+                description="Part III - Unrecaptured section 1250 gain",
+            ))
+        entries.append(FFFFEntry(
+            form=form,
+            line="III-total",
+            value=_format_money(fields.part_iii_total_unrecaptured_1250_gain),
+            description="Total unrecaptured section 1250 gain",
+        ))
+
+    # Flow-through lines
+    entries.append(FFFFEntry(
+        form=form,
+        line="S1-L4",
+        value=_format_money(fields.schedule_1_line_4),
+        description="-> Schedule 1 line 4 (other gains/losses)",
+    ))
+    if fields.schedule_d_line_11 != _ZERO:
+        entries.append(FFFFEntry(
+            form=form,
+            line="SD-L11",
+            value=_format_money(fields.schedule_d_line_11),
+            description="-> Schedule D line 11 (section 1231 gain)",
+        ))
+    if fields.schedule_d_line_19 != _ZERO:
+        entries.append(FFFFEntry(
+            form=form,
+            line="SD-L19",
+            value=_format_money(fields.schedule_d_line_19),
+            description="-> Schedule D line 19 (unrecaptured section 1250 gain)",
+        ))
+
+    return entries
+
+
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
@@ -1346,6 +1432,11 @@ def build_ffff_entry_map(canonical_return: CanonicalReturn) -> FFFFEntryMap:
     if canonical_return.ira_info is not None:
         f8606 = compute_form_8606_fields(canonical_return)
         entries.extend(_form_8606_entries(f8606))
+
+    # -- Form 4797 (Sales of Business Property) -------------------------
+    if form_4797_required(canonical_return):
+        f4797 = compute_form_4797_fields(canonical_return)
+        entries.extend(_form_4797_entries(f4797))
 
     # -- Optional wave-6 forms (Schedule D, Form 6251) -----------------
     # Wave-6 agents 2 and 3 are building these renderers in parallel.

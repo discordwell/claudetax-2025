@@ -197,6 +197,28 @@ def eitc_investment_income_disqualifier() -> int:
     return _raw()["eitc"]["investment_income_disqualifier"]
 
 
+def eitc_phase_in_rate(qualifying_children: int) -> float:
+    key = "3_or_more" if qualifying_children >= 3 else str(qualifying_children)
+    return _raw()["eitc"]["phase_in_rate_by_qualifying_children"][key]
+
+
+def eitc_earned_income_for_max_credit(qualifying_children: int) -> int:
+    key = "3_or_more" if qualifying_children >= 3 else str(qualifying_children)
+    return _raw()["eitc"]["earned_income_for_max_credit_by_qualifying_children"][key]
+
+
+def eitc_phase_out_rate(qualifying_children: int) -> float:
+    key = "3_or_more" if qualifying_children >= 3 else str(qualifying_children)
+    return _raw()["eitc"]["phase_out_rate_by_qualifying_children"][key]
+
+
+def eitc_phase_out_begin(qualifying_children: int, status: FilingStatus) -> int:
+    key = "3_or_more" if qualifying_children >= 3 else str(qualifying_children)
+    if status == "mfj":
+        return _raw()["eitc"]["phase_out_begin_mfj_by_qualifying_children"][key]
+    return _raw()["eitc"]["phase_out_begin_non_mfj_by_qualifying_children"][key]
+
+
 # ---------------------------------------------------------------------------
 # Retirement
 # ---------------------------------------------------------------------------

@@ -3079,6 +3079,96 @@
       "title": "Form1099R",
       "type": "object"
     },
+    "Form4797Sale": {
+      "additionalProperties": false,
+      "description": "A single sale of business property reported on Form 4797.\n\nForm 4797 reports gains/losses from the sale of business property,\nrental property, and depreciable assets.  The ``section_type`` field\ndetermines which Part of Form 4797 the sale lands in:\n\n* ``\"1231\"`` \u2014 Part I: gains/losses from sales of property held more\n  than one year (\u00a71231 assets). Net \u00a71231 gains may be treated as\n  long-term capital gains; net \u00a71231 losses are ordinary.\n* ``\"1245\"`` \u2014 Part II: ordinary gains/losses from sale of personal\n  property (tangible and intangible) subject to \u00a71245 depreciation\n  recapture. All depreciation is recaptured as ordinary income; any\n  gain above the depreciation is \u00a71231 gain.\n* ``\"1250\"`` \u2014 Part III: gain from sale of real property subject to\n  \u00a71250 depreciation recapture. Unrecaptured \u00a71250 gain (the\n  straight-line depreciation portion) is taxed at a maximum 25%\n  rate; excess gain is \u00a71231 gain.\n\nFlows to: Schedule 1 line 4 (other gains/losses), Schedule D (when\n\u00a71231 gain is treated as capital gain).\n\nAuthority: IRS Form 4797 (TY2025), Instructions for Form 4797.",
+      "properties": {
+        "cost_or_basis": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Cost Or Basis"
+        },
+        "date_acquired": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "const": "various",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Date Acquired"
+        },
+        "date_sold": {
+          "format": "date",
+          "title": "Date Sold",
+          "type": "string"
+        },
+        "depreciation_allowed": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Depreciation Allowed"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "gross_sales_price": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Gross Sales Price"
+        },
+        "section_type": {
+          "enum": [
+            "1231",
+            "1245",
+            "1250"
+          ],
+          "title": "Section Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "description",
+        "date_sold",
+        "gross_sales_price",
+        "cost_or_basis",
+        "section_type"
+      ],
+      "title": "Form4797Sale",
+      "type": "object"
+    },
     "FormSSA1099": {
       "additionalProperties": false,
       "description": "Form SSA-1099, Social Security Benefit Statement.\n\nTaxable portion of SS benefits is computed via the SS benefits worksheet.",
@@ -6005,6 +6095,13 @@
         "$ref": "#/$defs/Form1099R"
       },
       "title": "Forms 1099 R",
+      "type": "array"
+    },
+    "forms_4797": {
+      "items": {
+        "$ref": "#/$defs/Form4797Sale"
+      },
+      "title": "Forms 4797",
       "type": "array"
     },
     "forms_ssa_1099": {

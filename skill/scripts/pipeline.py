@@ -463,6 +463,7 @@ def run_pipeline(
     render_form_8606: bool = True,
     render_form_8863: bool = True,
     render_form_8962: bool = True,
+    render_form_4797: bool = True,
     render_schedule_1: bool = True,
     render_schedule_2: bool = True,
     render_schedule_3: bool = True,
@@ -678,6 +679,18 @@ def run_pipeline(
         out_path_8863 = output_dir / "form_8863.pdf"
         render_form_8863_pdf(fields_8863, out_path_8863)
         rendered.append(out_path_8863)
+
+    # Form 4797 — Sales of Business Property
+    if render_form_4797 and canonical.forms_4797:
+        from skill.scripts.output.form_4797 import (
+            compute_form_4797_fields,
+            render_form_4797_pdf,
+        )
+
+        fields_4797 = compute_form_4797_fields(canonical)
+        out_path_4797 = output_dir / "form_4797.pdf"
+        render_form_4797_pdf(fields_4797, out_path_4797)
+        rendered.append(out_path_4797)
 
     if render_schedule_d:
         from skill.scripts.output.schedule_d import (

@@ -31,13 +31,6 @@ Sources for TY2025 parameter values:
 - IRS Publication 596, Earned Income Credit.
   https://www.irs.gov/pub/irs-pdf/p596.pdf
 
-TODO (migrate to skill/reference/ty2025-constants.json):
-- EITC phase-in rates and "earned income amount" (max-credit-earnings) per
-  qualifying-children category.
-- EITC phase-out rates per qualifying-children category.
-- EITC phase-out begin (starting) thresholds for non-MFJ and MFJ per category.
-- MFJ marriage-penalty-relief delta ($7,110 for TY2025).
-
 TODO (EITC qualifying-child definition differs from CTC):
 - EITC treats a child as qualifying if they are under 19 at year end, under 24
   if a full-time student, OR any age if permanently and totally disabled. The
@@ -64,64 +57,10 @@ from skill.scripts.calc import constants as C
 from skill.scripts.models import CanonicalReturn, FilingStatus
 
 # ---------------------------------------------------------------------------
-# Parameter tables (TODO: migrate into ty2025-constants.json)
+# Parameter tables — now sourced from ty2025-constants.json via constants.py
 # ---------------------------------------------------------------------------
 
-# Keys: "0", "1", "2", "3_or_more" — matching the existing eitc constants shape
-# in ty2025-constants.json.
 _ChildKey = Literal["0", "1", "2", "3_or_more"]
-
-# Credit rate (phase-in rate). Source: Rev. Proc. 2024-40 via Tax Policy Center.
-# TODO: migrate to constants.json under eitc.phase_in_rate_by_qualifying_children.
-_PHASE_IN_RATE: dict[_ChildKey, Decimal] = {
-    "0": Decimal("0.0765"),
-    "1": Decimal("0.34"),
-    "2": Decimal("0.40"),
-    "3_or_more": Decimal("0.45"),
-}
-
-# Earned income at which the max credit is reached (end of phase-in).
-# TODO: migrate to constants.json under eitc.earned_income_for_max_credit_by_qualifying_children.
-_EARNED_INCOME_FOR_MAX: dict[_ChildKey, Decimal] = {
-    "0": Decimal("8490"),
-    "1": Decimal("12730"),
-    "2": Decimal("17880"),
-    "3_or_more": Decimal("17880"),
-}
-
-# Phase-out rate (reduction per $1 of phase determinant over phase_out_begin).
-# TODO: migrate to constants.json under eitc.phase_out_rate_by_qualifying_children.
-_PHASE_OUT_RATE: dict[_ChildKey, Decimal] = {
-    "0": Decimal("0.0765"),
-    "1": Decimal("0.1598"),
-    "2": Decimal("0.2106"),
-    "3_or_more": Decimal("0.2106"),
-}
-
-# Phase-out BEGIN for all filing statuses other than MFJ. (Phase-out ENDs are
-# in constants.json as eitc.agi_limit_single_hoh_qss_by_qualifying_children.)
-# TODO: migrate to constants.json under eitc.phase_out_begin_non_mfj_by_qualifying_children.
-_PHASE_OUT_BEGIN_NON_MFJ: dict[_ChildKey, Decimal] = {
-    "0": Decimal("10620"),
-    "1": Decimal("23350"),
-    "2": Decimal("23350"),
-    "3_or_more": Decimal("23350"),
-}
-
-# Phase-out BEGIN for MFJ filers. The delta over non-MFJ is $7,110 for TY2025
-# (marriage-penalty relief). Documenting the whole table for auditability.
-# TODO: migrate to constants.json under eitc.phase_out_begin_mfj_by_qualifying_children.
-_PHASE_OUT_BEGIN_MFJ: dict[_ChildKey, Decimal] = {
-    "0": Decimal("17730"),
-    "1": Decimal("30470"),
-    "2": Decimal("30470"),
-    "3_or_more": Decimal("30470"),
-}
-
-# TY2025 marriage-penalty-relief delta (informational; not used directly since
-# we carry the full MFJ phase-out-begin table above).
-# TODO: migrate to constants.json under eitc.mfj_phase_out_begin_delta.
-_MFJ_PHASE_OUT_BEGIN_DELTA = Decimal("7110")
 
 
 def _child_key(qualifying_children: int) -> _ChildKey:
@@ -203,17 +142,15 @@ def compute_eitc(
     phase_determinant = max(earned_income, agi)
 
     max_credit = Decimal(C.eitc_max_credit(qualifying_children))
-    phase_in_rate = _PHASE_IN_RATE[key]
-    phase_out_rate = _PHASE_OUT_RATE[key]
-    if return_.filing_status == FilingStatus.MFJ:
-        phase_out_begin = _PHASE_OUT_BEGIN_MFJ[key]
-    else:
-        phase_out_begin = _PHASE_OUT_BEGIN_NON_MFJ[key]
-
-    # Completed-phaseout (AGI limit) — already in constants.
+    phase_in_rate = Decimal(str(C.eitc_phase_in_rate(qualifying_children)))
+    phase_out_rate = Decimal(str(C.eitc_phase_out_rate(qualifying_children)))
     status_for_limit = (
         "mfj" if return_.filing_status == FilingStatus.MFJ else "single"
     )
+    phase_out_begin = Decimal(C.eitc_phase_out_begin(qualifying_children, status_for_limit))
+    earned_income_for_max = Decimal(C.eitc_earned_income_for_max_credit(qualifying_children))
+
+    # Completed-phaseout (AGI limit) — already in constants.
     agi_limit = Decimal(C.eitc_agi_limit(qualifying_children, status_for_limit))
     investment_limit = Decimal(C.eitc_investment_income_disqualifier())
 
@@ -222,7 +159,7 @@ def compute_eitc(
         "phase_out_rate": phase_out_rate,
         "phase_out_begin": phase_out_begin,
         "max_credit": max_credit,
-        "earned_income_for_max_credit": _EARNED_INCOME_FOR_MAX[key],
+        "earned_income_for_max_credit": earned_income_for_max,
         "agi_limit": agi_limit,
         "investment_income_limit": investment_limit,
         "child_key": key,

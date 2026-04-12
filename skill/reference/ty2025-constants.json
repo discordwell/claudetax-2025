@@ -164,13 +164,44 @@
   },
 
   "eitc": {
-    "note": "Earned Income Tax Credit. Source: Rev. Proc. 2024-40 and IRS EITC tables.",
+    "note": "Earned Income Tax Credit. Source: Rev. Proc. 2024-40, Tax Policy Center EITC Parameters table, and IRS EITC tables.",
     "max_credit_by_qualifying_children": {
       "0": 649,
       "1": 4328,
       "2": 7152,
       "3_or_more": 8046
     },
+    "phase_in_rate_by_qualifying_children": {
+      "0": 0.0765,
+      "1": 0.34,
+      "2": 0.40,
+      "3_or_more": 0.45
+    },
+    "earned_income_for_max_credit_by_qualifying_children": {
+      "0": 8490,
+      "1": 12730,
+      "2": 17880,
+      "3_or_more": 17880
+    },
+    "phase_out_rate_by_qualifying_children": {
+      "0": 0.0765,
+      "1": 0.1598,
+      "2": 0.2106,
+      "3_or_more": 0.2106
+    },
+    "phase_out_begin_non_mfj_by_qualifying_children": {
+      "0": 10620,
+      "1": 23350,
+      "2": 23350,
+      "3_or_more": 23350
+    },
+    "phase_out_begin_mfj_by_qualifying_children": {
+      "0": 17730,
+      "1": 30470,
+      "2": 30470,
+      "3_or_more": 30470
+    },
+    "mfj_phase_out_begin_delta": 7110,
     "agi_limit_single_hoh_qss_by_qualifying_children": {
       "0": 19104,
       "1": 50434,

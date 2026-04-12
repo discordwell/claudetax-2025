@@ -195,7 +195,7 @@ class NewYorkPlugin:
             residency=residency,
             days_in_state=days_in_state,
             state_specific={
-                "state_tax": state_tax,
+                "state_total_tax": state_tax,
                 "state_adjusted_gross_income": state_agi,
                 "state_taxable_income": state_ti,
                 "state_tax_bracket": state_bracket,

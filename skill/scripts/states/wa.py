@@ -9,7 +9,7 @@ couple, or domestic partnership, indexed annually for inflation.
 Because the tax is narrow (LTCG only), this plugin is a partial-income-tax
 implementation: `has_income_tax=False` (there's no BROAD income tax) and
 `starting_point=StateStartingPoint.NONE`, but `compute()` still returns a real
-dollar figure in `state_specific["state_tax"]` when the taxpayer has enough
+dollar figure in `state_specific["state_total_tax"]` when the taxpayer has enough
 long-term capital gains.
 
 Sources (verified 2026-04-10):
@@ -129,7 +129,7 @@ class WashingtonPlugin:
                 residency=residency,
                 days_in_state=days_in_state,
                 state_specific={
-                    "state_tax": Decimal("0"),
+                    "state_total_tax": Decimal("0"),
                     "total_ltcg": total_ltcg,
                     "exempt_threshold": WA_LTCG_EXEMPT_THRESHOLD_TY2025,
                     "taxable_ltcg": Decimal("0"),
@@ -157,7 +157,7 @@ class WashingtonPlugin:
             residency=residency,
             days_in_state=days_in_state,
             state_specific={
-                "state_tax": state_tax,
+                "state_total_tax": state_tax,
                 "total_ltcg": total_ltcg,
                 "exempt_threshold": WA_LTCG_EXEMPT_THRESHOLD_TY2025,
                 "taxable_ltcg": taxable_ltcg,

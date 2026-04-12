@@ -147,7 +147,7 @@ def test_compute_nonresident_state_tax_is_zero(canonical_return, federal_65k):
     )
     assert state_return.state == "DC"
     assert state_return.residency == ResidencyStatus.NONRESIDENT
-    assert state_return.state_specific["state_tax"] == Decimal("0")
+    assert state_return.state_specific["state_total_tax"] == Decimal("0")
 
 
 def test_compute_nonresident_has_exemption_reason(canonical_return, federal_65k):
@@ -168,7 +168,7 @@ def test_compute_resident_tax_is_positive(canonical_return, federal_65k):
     state_return = DC_PLUGIN.compute(
         canonical_return, federal_65k, ResidencyStatus.RESIDENT, days_in_state=365
     )
-    assert state_return.state_specific["state_tax"] > 0
+    assert state_return.state_specific["state_total_tax"] > 0
 
 
 def test_compute_resident_tax_65k_matches_hand_calc(canonical_return, federal_65k):
@@ -180,7 +180,7 @@ def test_compute_resident_tax_65k_matches_hand_calc(canonical_return, federal_65
     state_return = DC_PLUGIN.compute(
         canonical_return, federal_65k, ResidencyStatus.RESIDENT, days_in_state=365
     )
-    assert state_return.state_specific["state_tax"] == Decimal("2850.00")
+    assert state_return.state_specific["state_total_tax"] == Decimal("2850.00")
 
 
 def test_compute_resident_taxable_income_matches_agi_minus_std(
@@ -207,8 +207,8 @@ def test_compute_part_year_180_days_is_strictly_between(
     part_year = DC_PLUGIN.compute(
         canonical_return, federal_65k, ResidencyStatus.PART_YEAR, days_in_state=180
     )
-    resident_tax = full_year.state_specific["state_tax"]
-    part_year_tax = part_year.state_specific["state_tax"]
+    resident_tax = full_year.state_specific["state_total_tax"]
+    part_year_tax = part_year.state_specific["state_total_tax"]
     assert Decimal("0") < part_year_tax < resident_tax
 
 
@@ -220,9 +220,9 @@ def test_compute_part_year_approximately_half(canonical_return, federal_65k):
     part_year = DC_PLUGIN.compute(
         canonical_return, federal_65k, ResidencyStatus.PART_YEAR, days_in_state=180
     )
-    resident_tax = full_year.state_specific["state_tax"]
+    resident_tax = full_year.state_specific["state_total_tax"]
     expected = (resident_tax * Decimal(180) / Decimal(365)).quantize(Decimal("0.01"))
-    assert part_year.state_specific["state_tax"] == expected
+    assert part_year.state_specific["state_total_tax"] == expected
 
 
 # ---------------------------------------------------------------------------

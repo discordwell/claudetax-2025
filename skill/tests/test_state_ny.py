@@ -146,7 +146,7 @@ class TestCompute:
         assert state_return.residency == ResidencyStatus.RESIDENT
         assert state_return.days_in_state == 365
 
-        state_tax = state_return.state_specific["state_tax"]
+        state_tax = state_return.state_specific["state_total_tax"]
         assert isinstance(state_tax, Decimal)
         assert state_tax > Decimal("0")
 
@@ -162,7 +162,7 @@ class TestCompute:
         )
         ss = state_return.state_specific
         for key in (
-            "state_tax",
+            "state_total_tax",
             "state_adjusted_gross_income",
             "state_taxable_income",
         ):
@@ -186,8 +186,8 @@ class TestCompute:
             days_in_state=180,
         )
         assert (
-            nonresident.state_specific["state_tax"]
-            < resident.state_specific["state_tax"]
+            nonresident.state_specific["state_total_tax"]
+            < resident.state_specific["state_total_tax"]
         )
 
     def test_part_year_smaller_than_resident(
@@ -207,8 +207,8 @@ class TestCompute:
             days_in_state=180,
         )
         assert (
-            part_year.state_specific["state_tax"]
-            < resident.state_specific["state_tax"]
+            part_year.state_specific["state_total_tax"]
+            < resident.state_specific["state_total_tax"]
         )
 
 
@@ -412,4 +412,4 @@ class TestNewYorkPluginNonresidentSourcing:
         assert ss["used_w2_state_rows"] is False
         assert ss["ny_state_rows_present"] is False
         # Legacy day-prorate: state_tax < full_year_state_tax strictly.
-        assert ss["state_tax"] < ss["full_year_state_tax"]
+        assert ss["state_total_tax"] < ss["full_year_state_tax"]

@@ -363,13 +363,17 @@ class TestScheduleCAndE:
                 state="IL",
                 residency=ResidencyStatus.RESIDENT,
                 days_in_state=365,
-                state_specific={"exemption_credit": 2775},
+                state_specific={
+                    "state_total_tax": 2775,
+                    "exemption_credit": 2775,
+                },
             )
         )
         data = minimal_single_return.model_dump(mode="json")
         reloaded = CanonicalReturn.model_validate(data)
         assert reloaded.state_returns[0].state == "IL"
-        assert reloaded.state_returns[0].state_specific == {"exemption_credit": 2775}
+        assert reloaded.state_returns[0].state_specific["state_total_tax"] == 2775
+        assert reloaded.state_returns[0].state_specific["exemption_credit"] == 2775
 
 
 # ---------------------------------------------------------------------------

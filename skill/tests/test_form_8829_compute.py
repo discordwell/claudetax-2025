@@ -29,6 +29,7 @@ import pytest
 from skill.scripts.calc.engine import compute, schedule_c_net_profit
 from skill.scripts.models import (
     CanonicalReturn,
+    DepreciableAsset,
     HomeOffice,
     ScheduleC,
 )
@@ -513,3 +514,48 @@ def test_engine_compute_applies_regular_home_office_to_net_profit() -> None:
     assert computed.schedules_c[0].line30_home_office_expense == Decimal("1680.00")
     # Net profit = 100000 - 10000 - 1680 = 88320
     assert schedule_c_net_profit(computed.schedules_c[0]) == Decimal("88320.00")
+
+
+def test_form_4562_and_8829_combo_uses_overridden_depreciation() -> None:
+    """When a Schedule C has BOTH depreciable_assets (Form 4562) AND a
+    regular-method home_office (Form 8829), the home-office gross-income
+    cap (Form 8829 line 8) must use the 4562-computed depreciation, NOT
+    the stale sc.expenses.line13_depreciation.
+
+    Caught during wave 6 code review as a non-blocking item; promoted
+    to a fix + regression test."""
+    sc = _minimal_sch_c(
+        line1_gross_receipts="100000.00",
+        expenses={"line22_supplies": "5000.00"},
+    )
+    sc.depreciable_assets = [
+        DepreciableAsset(
+            description="Office Computer",
+            date_placed_in_service=date(2025, 1, 15),
+            cost=Decimal("10000.00"),
+            macrs_class="5",
+            bonus_depreciation_elected=False,
+        ),
+    ]
+    sc.home_office = HomeOffice(
+        method="regular",
+        business_sq_ft=Decimal("200"),
+        total_home_sq_ft=Decimal("2000"),
+        mortgage_interest_total=Decimal("12000"),
+        utilities_total=Decimal("4000"),
+        insurance_total=Decimal("800"),
+    )
+    return_ = _canonical_with_sc(sc)
+    computed = compute(return_)
+
+    sc_result = computed.schedules_c[0]
+    net = schedule_c_net_profit(sc_result)
+    home_expense = sc_result.line30_home_office_expense
+
+    # The 4562 produces depreciation ($10k * 20% MACRS 5yr half-year =
+    # $2,000). This REPLACES the raw expenses.line13_depreciation ($0).
+    # If the old bug were present, Form 8829 line 8 (tentative profit)
+    # would ignore the $2,000 depreciation → wrong cap → wrong line 30.
+    # With the fix, both Form 4562 and Form 8829 see the same expenses.
+    assert home_expense > Decimal("0")
+    assert net < Decimal("93000")  # must reflect both 4562 + 8829

@@ -170,7 +170,7 @@ class TestWashingtonCompute:
         assert state_return.state == "WA"
         assert state_return.residency == ResidencyStatus.RESIDENT
         spec = state_return.state_specific
-        assert spec["state_tax"] == Decimal("0")
+        assert spec["state_total_tax"] == Decimal("0")
         assert spec["total_ltcg"] == Decimal("0")
         assert spec["taxable_ltcg"] == Decimal("0")
         assert spec["exempt_threshold"] == WA_LTCG_EXEMPT_THRESHOLD_TY2025
@@ -190,7 +190,7 @@ class TestWashingtonCompute:
         )
         spec = state_return.state_specific
         assert spec["total_ltcg"] == Decimal("200000")
-        assert spec["state_tax"] == Decimal("0")
+        assert spec["state_total_tax"] == Decimal("0")
         assert spec["taxable_ltcg"] == Decimal("0")
 
     def test_resident_ltcg_exactly_at_threshold_owes_zero(self):
@@ -206,7 +206,7 @@ class TestWashingtonCompute:
         )
         spec = state_return.state_specific
         assert spec["total_ltcg"] == WA_LTCG_EXEMPT_THRESHOLD_TY2025
-        assert spec["state_tax"] == Decimal("0")
+        assert spec["state_total_tax"] == Decimal("0")
 
     def test_resident_ltcg_well_above_threshold_owes_seven_percent(self):
         # $1,000,000 LTCG → taxable = 1,000,000 - 278,000 = 722,000
@@ -224,7 +224,7 @@ class TestWashingtonCompute:
         spec = state_return.state_specific
         assert spec["total_ltcg"] == Decimal("1000000")
         assert spec["taxable_ltcg"] == Decimal("722000")
-        assert spec["state_tax"] == Decimal("50540.00")
+        assert spec["state_total_tax"] == Decimal("50540.00")
         assert spec["rate"] == Decimal("0.07")
         assert spec["exempt_threshold"] == Decimal("278000")
 
@@ -242,7 +242,7 @@ class TestWashingtonCompute:
         )
         spec = state_return.state_specific
         assert spec["total_ltcg"] == Decimal("0")
-        assert spec["state_tax"] == Decimal("0")
+        assert spec["state_total_tax"] == Decimal("0")
 
     def test_mixed_short_and_long_only_long_counts(self):
         return_ = CanonicalReturn(
@@ -262,7 +262,7 @@ class TestWashingtonCompute:
         assert spec["total_ltcg"] == Decimal("500000")
         # 500,000 - 278,000 = 222,000 * 0.07 = 15,540
         assert spec["taxable_ltcg"] == Decimal("222000")
-        assert spec["state_tax"] == Decimal("15540.00")
+        assert spec["state_total_tax"] == Decimal("15540.00")
 
     def test_1099_div_cap_gain_distributions_are_long_term(self):
         # Box 2a cap gain distributions from mutual funds are always long-term.
@@ -285,7 +285,7 @@ class TestWashingtonCompute:
         assert spec["total_ltcg"] == Decimal("400000")
         # 400,000 - 278,000 = 122,000 * 0.07 = 8,540
         assert spec["taxable_ltcg"] == Decimal("122000")
-        assert spec["state_tax"] == Decimal("8540.00")
+        assert spec["state_total_tax"] == Decimal("8540.00")
 
     def test_adjustment_amount_applied_to_ltcg(self):
         # Wash sale / adjustment increases gain.
@@ -319,7 +319,7 @@ class TestWashingtonCompute:
         assert spec["total_ltcg"] == Decimal("900000")
         # 900,000 - 278,000 = 622,000 * 0.07 = 43,540
         assert spec["taxable_ltcg"] == Decimal("622000")
-        assert spec["state_tax"] == Decimal("43540.00")
+        assert spec["state_total_tax"] == Decimal("43540.00")
 
     def test_nonresident_owes_zero_with_todo_flag(self):
         # RCW 82.87.100: intangibles are sourced only to domicile state. A
@@ -338,7 +338,7 @@ class TestWashingtonCompute:
         )
         spec = state_return.state_specific
         assert state_return.residency == ResidencyStatus.NONRESIDENT
-        assert spec["state_tax"] == Decimal("0")
+        assert spec["state_total_tax"] == Decimal("0")
         assert spec.get("nonresident_sourcing_todo") is True
 
 

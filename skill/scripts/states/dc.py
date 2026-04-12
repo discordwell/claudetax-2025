@@ -160,7 +160,7 @@ class DistrictOfColumbiaPlugin:
                 residency=residency,
                 days_in_state=days_in_state,
                 state_specific={
-                    "state_tax": Decimal("0"),
+                    "state_total_tax": Decimal("0"),
                     "reason": "DC universal nonresident exemption",
                     "standard_deduction": _dc_standard_deduction(federal.filing_status),
                     "taxable_income": Decimal("0"),
@@ -193,7 +193,7 @@ class DistrictOfColumbiaPlugin:
             residency=residency,
             days_in_state=days_in_state,
             state_specific={
-                "state_tax": state_tax,
+                "state_total_tax": state_tax,
                 "reason": reason,
                 "standard_deduction": _dc_standard_deduction(federal.filing_status),
                 "taxable_income": max(

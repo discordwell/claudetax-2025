@@ -181,7 +181,7 @@ class TestNoIncomeTaxPlugin:
         )
         assert state_return.state == "FL"
         assert state_return.residency == ResidencyStatus.RESIDENT
-        assert state_return.state_specific["state_tax"] == 0
+        assert state_return.state_specific["state_total_tax"] == 0
         assert state_return.state_specific["no_return_required"] is True
 
     def test_compute_nonresident(self, canonical_return, federal):
@@ -192,7 +192,7 @@ class TestNoIncomeTaxPlugin:
         )
         assert state_return.residency == ResidencyStatus.NONRESIDENT
         assert state_return.days_in_state == 180
-        assert state_return.state_specific["state_tax"] == 0
+        assert state_return.state_specific["state_total_tax"] == 0
 
     def test_apportion_income_all_zero(self, canonical_return):
         plugin = ALL_NO_TAX_PLUGINS["FL"]

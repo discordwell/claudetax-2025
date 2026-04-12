@@ -846,7 +846,16 @@ class StateReturn(_StrictModel):
     residency: ResidencyStatus
     days_in_state: int = Field(ge=0, le=366)
     state_specific: dict[str, Any] = Field(default_factory=dict)
-    """State plugins populate this with their own shape. Tighten per-state in fan-out."""
+    """All plugins must include ``state_total_tax`` (Decimal or int).
+    Per-state extensions are allowed beyond that base key."""
+
+    @model_validator(mode="after")
+    def _require_state_total_tax(self) -> "StateReturn":
+        if "state_total_tax" not in self.state_specific:
+            raise ValueError(
+                f"state_specific for {self.state} must include 'state_total_tax'"
+            )
+        return self
 
 
 # ---------------------------------------------------------------------------

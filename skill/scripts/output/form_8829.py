@@ -165,15 +165,19 @@ def _sch_c_non_home_office_expenses(sc: ScheduleC) -> Decimal:
 
     This is the building block for the Form 8829 line 8 gross-income
     limit: Sch C line 29 = line 7 - line 28, where line 28 is Part II
-    total expenses. We intentionally re-implement the formula here
-    rather than importing from calc.engine because the Form 8829
-    renderer lives in the `output` package and we do not want a
-    circular dependency (`output` depends on `calc` via the engine
-    helpers already, but `calc.engine` does NOT import from `output`).
+    total expenses. Uses the Form 4562-overridden depreciation when
+    ``depreciable_assets`` is populated so the gross-income cap
+    reflects the real line 13 figure.
     """
-    from skill.scripts.calc.engine import _sch_c_total_expenses
+    from skill.scripts.calc.engine import (
+        _effective_line_13_depreciation,
+        _sch_c_total_expenses,
+    )
 
-    return _sch_c_total_expenses(sc.expenses)
+    base = _sch_c_total_expenses(sc.expenses)
+    override_depr = _effective_line_13_depreciation(sc)
+    raw_depr = sc.expenses.line13_depreciation
+    return base - raw_depr + override_depr
 
 
 def _sch_c_line_29_tentative_profit(sc: ScheduleC) -> Decimal:

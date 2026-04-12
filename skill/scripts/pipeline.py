@@ -163,23 +163,57 @@ def _set_path(root: dict[str, Any], path: str, value: Any) -> None:
             cursor = cursor[key][idx]
 
 
+def _reindex_partial_paths(
+    partial: PartialReturn, base: dict[str, Any]
+) -> list[tuple[str, Any]]:
+    """Rewrite list indices in ``partial`` to append after existing items.
+
+    Every Tier-1 ingester hardcodes index 0 (e.g., ``w2s[0].box1_wages``).
+    When the pipeline processes multiple PDFs of the same type, the second
+    PDF's ``w2s[0]`` would clobber the first. This function detects list-
+    rooted paths, computes an offset equal to the current list length in
+    ``base``, and rewrites the index so the new document lands at the end.
+
+    Returns a list of (rewritten_path, value) pairs.
+    """
+    offsets: dict[str, int] = {}
+    result: list[tuple[str, Any]] = []
+    for extraction in partial.fields:
+        path = extraction.path
+        if path.startswith("_acroform_raw."):
+            continue
+        segments = _parse_path(path)
+        if segments and segments[0][1] is not None:
+            root_key = segments[0][0]
+            if root_key not in offsets:
+                existing = base.get(root_key, [])
+                offsets[root_key] = len(existing) if isinstance(existing, list) else 0
+            offset = offsets[root_key]
+            if offset > 0:
+                old_idx = segments[0][1]
+                new_idx = old_idx + offset
+                old_prefix = f"{root_key}[{old_idx}]"
+                new_prefix = f"{root_key}[{new_idx}]"
+                path = new_prefix + path[len(old_prefix):]
+        result.append((path, extraction.value))
+    return result
+
+
 def apply_partial_to_dict(
     partial: PartialReturn, base: dict[str, Any]
 ) -> dict[str, Any]:
     """Apply every ``FieldExtraction`` in ``partial`` onto ``base`` in place.
 
-    Silently skips pseudo-paths that start with ``_acroform_raw.`` —
-    those are the fallback capture from the pypdf base ingester and are
-    not part of the canonical schema. They indicate a per-form field
-    map is missing but do not block the pipeline.
+    List-rooted paths (e.g., ``w2s[0].*``) are reindexed via
+    ``_reindex_partial_paths`` so multiple PDFs of the same type append
+    to the list rather than clobbering index 0.
+
+    Silently skips pseudo-paths that start with ``_acroform_raw.``.
 
     Returns the same ``base`` dict for chaining convenience.
     """
-    for extraction in partial.fields:
-        path = extraction.path
-        if path.startswith("_acroform_raw."):
-            continue
-        _set_path(base, path, extraction.value)
+    for path, value in _reindex_partial_paths(partial, base):
+        _set_path(base, path, value)
     return base
 
 

@@ -325,6 +325,7 @@ def test_state_returns_present_is_informational() -> None:
         state="IL",
         residency=ResidencyStatus.RESIDENT,
         days_in_state=365,
+        state_specific={"state_total_tax": 0},
     )
     ret = _make_return(state_returns=[state_return])
     report = check_ffff_compatibility(ret)
@@ -370,6 +371,7 @@ def test_compliance_report_severity_split() -> None:
         state="IL",
         residency=ResidencyStatus.RESIDENT,
         days_in_state=365,
+        state_specific={"state_total_tax": 0},
     )
     ret = _make_return(
         w2_count=FFFF_MAX_W2S + 1,  # blocker

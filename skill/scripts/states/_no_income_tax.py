@@ -53,7 +53,7 @@ class NoIncomeTaxPlugin:
             residency=residency,
             days_in_state=days_in_state,
             state_specific={
-                "state_tax": 0,
+                "state_total_tax": 0,
                 "no_return_required": True,
                 "reason": f"{self.meta.name} has no individual income tax for TY2025.",
             },

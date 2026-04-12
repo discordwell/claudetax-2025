@@ -183,6 +183,73 @@ class TestPathHelpers:
         result = apply_partial_to_dict(partial, base)
         assert result is base
 
+    def test_apply_partial_reindexes_second_w2(self):
+        """Two W-2 partials applied sequentially must NOT clobber each
+        other. The first should land at w2s[0], the second at w2s[1],
+        even though both partials hardcode index 0 in their paths."""
+        p1 = PartialReturn()
+        p1.add("w2s[0].employer_name", "Acme")
+        p1.add("w2s[0].box1_wages", "60000")
+
+        p2 = PartialReturn()
+        p2.add("w2s[0].employer_name", "Beta Inc")
+        p2.add("w2s[0].box1_wages", "25000")
+
+        base: dict = {}
+        apply_partial_to_dict(p1, base)
+        apply_partial_to_dict(p2, base)
+
+        assert len(base["w2s"]) == 2
+        assert base["w2s"][0]["employer_name"] == "Acme"
+        assert base["w2s"][0]["box1_wages"] == "60000"
+        assert base["w2s"][1]["employer_name"] == "Beta Inc"
+        assert base["w2s"][1]["box1_wages"] == "25000"
+
+    def test_apply_partial_reindexes_preserves_json_preloaded_w2(self):
+        """When taxpayer_info.json already contains a W-2 (w2s[0]),
+        a PDF-ingested W-2 should land at w2s[1], not overwrite."""
+        base: dict = {
+            "w2s": [{"employer_name": "JSON Employer", "box1_wages": "50000"}]
+        }
+        partial = PartialReturn()
+        partial.add("w2s[0].employer_name", "PDF Employer")
+        partial.add("w2s[0].box1_wages", "30000")
+
+        apply_partial_to_dict(partial, base)
+
+        assert len(base["w2s"]) == 2
+        assert base["w2s"][0]["employer_name"] == "JSON Employer"
+        assert base["w2s"][1]["employer_name"] == "PDF Employer"
+
+    def test_apply_partial_reindexes_1099_int_too(self):
+        """Reindexing applies to any list-rooted path, not just w2s."""
+        p1 = PartialReturn()
+        p1.add("forms_1099_int[0].payer_name", "Bank A")
+        p2 = PartialReturn()
+        p2.add("forms_1099_int[0].payer_name", "Bank B")
+
+        base: dict = {}
+        apply_partial_to_dict(p1, base)
+        apply_partial_to_dict(p2, base)
+
+        assert len(base["forms_1099_int"]) == 2
+        assert base["forms_1099_int"][0]["payer_name"] == "Bank A"
+        assert base["forms_1099_int"][1]["payer_name"] == "Bank B"
+
+    def test_apply_partial_scalar_paths_still_overwrite(self):
+        """Non-list paths (e.g., taxpayer.first_name) should still
+        overwrite — reindexing only applies to indexed segments."""
+        p1 = PartialReturn()
+        p1.add("taxpayer.first_name", "Alex")
+        p2 = PartialReturn()
+        p2.add("taxpayer.first_name", "Jordan")
+
+        base: dict = {}
+        apply_partial_to_dict(p1, base)
+        apply_partial_to_dict(p2, base)
+
+        assert base["taxpayer"]["first_name"] == "Jordan"
+
 
 # ---------------------------------------------------------------------------
 # Cascade assembly
@@ -409,7 +476,7 @@ class TestPipelineStateDispatch:
         assert len(result.state_returns) == 1
         sr = result.state_returns[0]
         assert sr.state == "FL"
-        assert sr.state_specific["state_tax"] == 0
+        assert sr.state_specific["state_total_tax"] == 0
         assert sr.state_specific["no_return_required"] is True
         # FL emits no PDFs and no paper artifacts.
         assert not any(

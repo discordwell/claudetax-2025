@@ -6,6 +6,29 @@ Session memory for this project. Top section = most recent session summaries (ne
 
 ## Session Summaries
 
+### 2026-04-12 12:00 UTC — Wave 8C/8D/8E: nonresident apportionment, Form 4797, EITC, infrastructure
+
+**Wave 8C — Real nonresident apportionment (3 states):**
+- **CA**: Real 540NR per-category sourcing (wages from W-2, interest/dividends to domicile, rental by property address, Schedule C by business location). Tax = (CA tax on total income) * (CA-source / total). 21 new tests.
+- **NY**: Real IT-203 with workday allocation (wages: ny_workdays/total_workdays, fallback to W-2 rows). Interest/dividends not NY-source. Tax = ratio method. 17 new tests.
+- **IL**: Real Schedule NR (wages from W-2 rows, prorated exemption by IL income / total income ratio, flat 4.95% on IL net). Golden fixture updated PA→IL. 20 new tests.
+- Shared `state_source_rental` / `state_source_rental_from_schedule_e` / `state_source_rental_by_property_state` helpers — all identical, aliased together.
+
+**Wave 8D — Federal form gaps:**
+- **Form 4797** (Sales of Business Property): Full §1231/§1245/§1250 classification. Per-sale compute, Part I/II/III aggregation, Schedule 1 line 4 wiring, Schedule D LTCG flow. 30 tests.
+- **EITC constants migrated** to ty2025-constants.json (already implemented in engine — this wave centralized the constants).
+- **QBI (Form 8995)**: Agent rate-limited, retrying in background.
+
+**Wave 8E — Infrastructure:**
+- Form 8949 explicit pipeline gate (independent of Schedule D)
+- CTC constants migrated (ODC $500, ACTC floor $2,500, rate 15%)
+- K-1 Box 14 SE earnings wired to Schedule SE computation
+- Schema regenerated
+
+**Merge complexity**: 3 agents independently added identical rental sourcing helpers (aliased). EITC constants migrated by both 8D-2 and 8E (resolved by keeping 8D-2's version + adding 8E's CTC accessors).
+
+**Suite**: 3950 → **4057 passed**, 3 skipped (+107 net new tests).
+
 ### 2026-04-12 10:30 UTC — Wave 7B tech debt + Wave 8A/8B: 30 state renderers + 5 ingesters
 
 **Tech debt cleared first:**

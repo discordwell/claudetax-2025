@@ -968,6 +968,56 @@
       "title": "Dependent",
       "type": "object"
     },
+    "DependentCareExpenses": {
+      "additionalProperties": false,
+      "description": "Form 2441 \u2014 Child and Dependent Care Expenses.",
+      "properties": {
+        "care_providers": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Care Providers",
+          "type": "array"
+        },
+        "employer_benefits_excluded": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Employer Benefits Excluded"
+        },
+        "qualifying_persons": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Qualifying Persons",
+          "type": "integer"
+        },
+        "total_expenses_paid": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Total Expenses Paid"
+        }
+      },
+      "title": "DependentCareExpenses",
+      "type": "object"
+    },
     "DependentRelationship": {
       "enum": [
         "son",
@@ -4907,6 +4957,17 @@
     },
     "credits": {
       "$ref": "#/$defs/Credits"
+    },
+    "dependent_care": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DependentCareExpenses"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "dependents": {
       "items": {

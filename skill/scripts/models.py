@@ -833,6 +833,19 @@ class ItemizedDeductions(_StrictModel):
     other_itemized: dict[str, Money] = Field(default_factory=dict)
 
 
+class DependentCareExpenses(_StrictModel):
+    """Form 2441 — Child and Dependent Care Expenses."""
+
+    care_providers: list[dict[str, Any]] = Field(default_factory=list)
+    """List of care provider dicts with name, address, tin, amount_paid."""
+    qualifying_persons: int = Field(default=0, ge=0)
+    """Number of qualifying persons (children under 13 or disabled dependents)."""
+    total_expenses_paid: Money = Decimal("0")
+    """Total dependent care expenses paid during the tax year."""
+    employer_benefits_excluded: Money = Decimal("0")
+    """Box 10 of W-2 — dependent care benefits excluded from income."""
+
+
 class Credits(_StrictModel):
     child_tax_credit: Money = Decimal("0")  # computed
     additional_child_tax_credit_refundable: Money = Decimal("0")  # computed
@@ -1045,6 +1058,9 @@ class CanonicalReturn(_StrictModel):
     # timing, etc.) — optional; omit for taxpayers with no AMT preferences
     # beyond the SALT add-back (which the engine reads from itemized).
     amt_adjustments_manual: AMTAdjustments | None = None
+
+    # Form 2441 — Child and Dependent Care Expenses
+    dependent_care: DependentCareExpenses | None = None
 
     # States
     state_returns: list[StateReturn] = Field(default_factory=list)

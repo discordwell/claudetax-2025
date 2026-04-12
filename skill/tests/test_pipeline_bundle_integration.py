@@ -232,6 +232,7 @@ class TestPipelineEmptyRendered:
             render_schedule_b=False,
             render_schedule_c=False,
             render_schedule_se=False,
+            render_state_returns=False,
         )
         assert result.rendered_paths == []
         # Bundle path not created because rendered list is empty

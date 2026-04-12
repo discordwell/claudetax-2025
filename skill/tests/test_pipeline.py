@@ -261,8 +261,8 @@ class TestBuildDefaultCascade:
         cascade = build_default_cascade()
         names = cascade.ingester_names
         # W-2, 1099-INT, 1099-DIV, 1099-B, 1099-NEC, 1099-MISC, 1099-K,
-        # 1099-R, 1099-G, SSA-1099, Schedule K-1
-        assert len(names) == 11
+        # 1099-R, 1099-G, SSA-1099, Schedule K-1, 1098, 1098-E, 1098-T
+        assert len(names) == 14
 
     def test_every_ingester_is_tier_1(self):
         cascade = build_default_cascade()

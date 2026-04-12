@@ -398,6 +398,63 @@ class Form1099G(_StrictModel):
     box7_agricultural_payments: Money = Decimal("0")
 
 
+class Form1098(_StrictModel):
+    """Form 1098, Mortgage Interest Statement.
+
+    Reports mortgage interest received by a lender from a borrower.
+    Flows to Schedule A line 8a/8b (home mortgage interest deduction).
+    """
+
+    lender_name: str
+    lender_tin: str | None = None
+    recipient_is_taxpayer: bool = True
+    box1_mortgage_interest: Money = Decimal("0")
+    box2_outstanding_principal: Money = Decimal("0")
+    box3_mortgage_origination_date: str | None = None
+    box4_refund_of_overpaid_interest: Money = Decimal("0")
+    box5_mortgage_insurance_premiums: Money = Decimal("0")
+    box6_points_paid_on_purchase: Money = Decimal("0")
+    box9_number_of_properties: int | None = None
+    box10_other: str | None = None
+    box11_mortgage_acquisition_date: str | None = None
+
+
+class Form1098E(_StrictModel):
+    """Form 1098-E, Student Loan Interest Statement.
+
+    Reports student loan interest received by a lender from a borrower.
+    Flows to Schedule 1 line 21 (student loan interest deduction, capped
+    at $2,500).
+    """
+
+    lender_name: str
+    lender_tin: str | None = None
+    recipient_is_taxpayer: bool = True
+    box1_student_loan_interest: Money = Decimal("0")
+
+
+class Form1098T(_StrictModel):
+    """Form 1098-T, Tuition Statement.
+
+    Reports qualified tuition and related expenses paid to an eligible
+    educational institution. Flows to Form 8863 (education credits:
+    American Opportunity and Lifetime Learning).
+    """
+
+    institution_name: str
+    institution_ein: EIN | None = None
+    student_ssn: SSN | None = None
+    recipient_is_taxpayer: bool = True
+    box1_payments_received: Money = Decimal("0")
+    box4_adjustments_prior_year: Money = Decimal("0")
+    box5_scholarships: Money = Decimal("0")
+    box6_adjustments_to_scholarships: Money = Decimal("0")
+    box7_includes_next_year_amounts: bool = False
+    box8_half_time_student: bool = False
+    box9_graduate_student: bool = False
+    box10_insurance_contract_reimbursement: Money = Decimal("0")
+
+
 class ScheduleK1(_StrictModel):
     """Schedule K-1 (Form 1065 for partnerships, 1120-S for S-corps).
 
@@ -1027,6 +1084,9 @@ class CanonicalReturn(_StrictModel):
     forms_1099_r: list[Form1099R] = Field(default_factory=list)
     forms_1099_g: list[Form1099G] = Field(default_factory=list)
     forms_ssa_1099: list[FormSSA1099] = Field(default_factory=list)
+    forms_1098: list[Form1098] = Field(default_factory=list)
+    forms_1098_e: list[Form1098E] = Field(default_factory=list)
+    forms_1098_t: list[Form1098T] = Field(default_factory=list)
     schedules_c: list[ScheduleC] = Field(default_factory=list)
     schedules_e: list[ScheduleE] = Field(default_factory=list)
     schedules_k1: list[ScheduleK1] = Field(default_factory=list)

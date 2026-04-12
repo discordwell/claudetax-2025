@@ -1331,6 +1331,335 @@
       "title": "Form1095AMonthly",
       "type": "object"
     },
+    "Form1098": {
+      "additionalProperties": false,
+      "description": "Form 1098, Mortgage Interest Statement.\n\nReports mortgage interest received by a lender from a borrower.\nFlows to Schedule A line 8a/8b (home mortgage interest deduction).",
+      "properties": {
+        "box10_other": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Box10 Other"
+        },
+        "box11_mortgage_acquisition_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Box11 Mortgage Acquisition Date"
+        },
+        "box1_mortgage_interest": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box1 Mortgage Interest"
+        },
+        "box2_outstanding_principal": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box2 Outstanding Principal"
+        },
+        "box3_mortgage_origination_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Box3 Mortgage Origination Date"
+        },
+        "box4_refund_of_overpaid_interest": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box4 Refund Of Overpaid Interest"
+        },
+        "box5_mortgage_insurance_premiums": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box5 Mortgage Insurance Premiums"
+        },
+        "box6_points_paid_on_purchase": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box6 Points Paid On Purchase"
+        },
+        "box9_number_of_properties": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Box9 Number Of Properties"
+        },
+        "lender_name": {
+          "title": "Lender Name",
+          "type": "string"
+        },
+        "lender_tin": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lender Tin"
+        },
+        "recipient_is_taxpayer": {
+          "default": true,
+          "title": "Recipient Is Taxpayer",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "lender_name"
+      ],
+      "title": "Form1098",
+      "type": "object"
+    },
+    "Form1098E": {
+      "additionalProperties": false,
+      "description": "Form 1098-E, Student Loan Interest Statement.\n\nReports student loan interest received by a lender from a borrower.\nFlows to Schedule 1 line 21 (student loan interest deduction, capped\nat $2,500).",
+      "properties": {
+        "box1_student_loan_interest": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box1 Student Loan Interest"
+        },
+        "lender_name": {
+          "title": "Lender Name",
+          "type": "string"
+        },
+        "lender_tin": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lender Tin"
+        },
+        "recipient_is_taxpayer": {
+          "default": true,
+          "title": "Recipient Is Taxpayer",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "lender_name"
+      ],
+      "title": "Form1098E",
+      "type": "object"
+    },
+    "Form1098T": {
+      "additionalProperties": false,
+      "description": "Form 1098-T, Tuition Statement.\n\nReports qualified tuition and related expenses paid to an eligible\neducational institution. Flows to Form 8863 (education credits:\nAmerican Opportunity and Lifetime Learning).",
+      "properties": {
+        "box10_insurance_contract_reimbursement": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box10 Insurance Contract Reimbursement"
+        },
+        "box1_payments_received": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box1 Payments Received"
+        },
+        "box4_adjustments_prior_year": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box4 Adjustments Prior Year"
+        },
+        "box5_scholarships": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box5 Scholarships"
+        },
+        "box6_adjustments_to_scholarships": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Box6 Adjustments To Scholarships"
+        },
+        "box7_includes_next_year_amounts": {
+          "default": false,
+          "title": "Box7 Includes Next Year Amounts",
+          "type": "boolean"
+        },
+        "box8_half_time_student": {
+          "default": false,
+          "title": "Box8 Half Time Student",
+          "type": "boolean"
+        },
+        "box9_graduate_student": {
+          "default": false,
+          "title": "Box9 Graduate Student",
+          "type": "boolean"
+        },
+        "institution_ein": {
+          "anyOf": [
+            {
+              "description": "Employer Identification Number, dd-ddddddd",
+              "pattern": "^\\d{2}-?\\d{7}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Institution Ein"
+        },
+        "institution_name": {
+          "title": "Institution Name",
+          "type": "string"
+        },
+        "recipient_is_taxpayer": {
+          "default": true,
+          "title": "Recipient Is Taxpayer",
+          "type": "boolean"
+        },
+        "student_ssn": {
+          "anyOf": [
+            {
+              "description": "Social Security Number, ddd-dd-dddd or ddddddddd",
+              "pattern": "^\\d{3}-?\\d{2}-?\\d{4}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Student Ssn"
+        }
+      },
+      "required": [
+        "institution_name"
+      ],
+      "title": "Form1098T",
+      "type": "object"
+    },
     "Form1099B": {
       "additionalProperties": false,
       "description": "Form 1099-B, Proceeds From Broker and Barter Exchange Transactions.",
@@ -5090,6 +5419,27 @@
         "$ref": "#/$defs/Form1095A"
       },
       "title": "Forms 1095 A",
+      "type": "array"
+    },
+    "forms_1098": {
+      "items": {
+        "$ref": "#/$defs/Form1098"
+      },
+      "title": "Forms 1098",
+      "type": "array"
+    },
+    "forms_1098_e": {
+      "items": {
+        "$ref": "#/$defs/Form1098E"
+      },
+      "title": "Forms 1098 E",
+      "type": "array"
+    },
+    "forms_1098_t": {
+      "items": {
+        "$ref": "#/$defs/Form1098T"
+      },
+      "title": "Forms 1098 T",
       "type": "array"
     },
     "forms_1099_b": {

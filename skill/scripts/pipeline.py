@@ -233,6 +233,9 @@ def build_default_cascade() -> IngestCascade:
     Wave-5 state agents and the SKILL.md interview flow can call this
     helper instead of reaching into individual ingester modules.
     """
+    from skill.scripts.ingest._1098_acroform import INGESTER as I_1098
+    from skill.scripts.ingest._1098_e_acroform import INGESTER as I_1098_E
+    from skill.scripts.ingest._1098_t_acroform import INGESTER as I_1098_T
     from skill.scripts.ingest._1099_b_acroform import INGESTER as I_1099_B
     from skill.scripts.ingest._1099_div_acroform import INGESTER as I_1099_DIV
     from skill.scripts.ingest._1099_g_acroform import INGESTER as I_1099_G
@@ -253,6 +256,9 @@ def build_default_cascade() -> IngestCascade:
         I_1099_G,
         I_SSA_1099,
         I_K1,
+        I_1098,
+        I_1098_E,
+        I_1098_T,
     ]
     return IngestCascade(tier_1)
 

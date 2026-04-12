@@ -1,23 +1,25 @@
 {
-  "description": "Single filer, Schedule C with full Part II expenses ($27,000) plus home office ($3,000), no W-2s, $10,000 in 2025 estimated tax payments. Regression lock for the blocker-1 fix: proves the engine subtracts Schedule C expenses (so AGI is ~$83k, NOT ~$120k) and that SE tax plus the 1/2 SE tax adjustment flow through.",
+  "description": "Single filer, Schedule C with full Part II expenses ($27,000) plus home office ($3,000), no W-2s, $10,000 in 2025 estimated tax payments. Regression lock for the blocker-1 fix: proves the engine subtracts Schedule C expenses (so AGI is ~$83k, NOT ~$120k) and that SE tax plus the 1/2 SE tax adjustment flow through. QBI deduction (Section 199A) applies: min(20% of $90k QBI, 20% of $67,891.70 TI) = $13,578.34.",
   "authority": [
     "skill/reference/ty2025-constants.json for standard deduction $15,750 (OBBBA)",
     "skill/scripts/calc/engine.py::schedule_c_net_profit for Line 31 = Line 7 - Line 28 - Line 30",
     "tenforty evaluate_return for self-employment tax, 1/2 SE tax adjustment, and federal income tax",
-    "IRS 2025 Schedule SE: SE tax = net profit * 0.9235 * 0.153 when net SE earnings < $176,100 SS wage base"
+    "IRS 2025 Schedule SE: SE tax = net profit * 0.9235 * 0.153 when net SE earnings < $176,100 SS wage base",
+    "IRS Form 8995: QBI deduction = min(20% of total QBI, 20% of TI before QBI)"
   ],
   "expected_computed_totals": {
     "total_income": "90000.00",
     "adjustments_total": "0.00",
     "adjusted_gross_income": "83641.70",
     "deduction_taken": "15750.00",
-    "taxable_income": "67891.70",
-    "tentative_tax": "9847.00",
+    "qbi_deduction": "13578.34",
+    "taxable_income": "54313.36",
+    "tentative_tax": "6866.00",
     "other_taxes_total": "12716.60",
-    "total_tax": "22563.60",
+    "total_tax": "19582.60",
     "total_payments": "10000.00",
     "refund": null,
-    "amount_owed": "12563.60",
+    "amount_owed": "9582.60",
     "marginal_rate": 22.0
   },
   "hand_check": {
@@ -29,9 +31,11 @@
     "half_se_tax_adjustment": "12716.60 / 2 = 6358.30",
     "agi_calc": "90000 (SE net profit) - 6358.30 (1/2 SE tax) = 83641.70 — THIS IS THE REGRESSION LOCK. If AGI approaches 120000, the engine has lost Schedule C expenses.",
     "standard_deduction_single_ty2025_obbba": 15750,
-    "taxable_income_calc": "83641.70 - 15750 = 67891.70",
-    "bracket_formula_tax": "10% * 11925 + 12% * (48475 - 11925) + 22% * (67891.70 - 48475) = 1192.50 + 4386.00 + 4271.67 = 9850.17; tenforty produces 9847 (IRS tax-tables rounding, within $5)",
-    "total_tax_calc": "9847 (fed income tax) + 12716.60 (SE tax) = 22563.60",
-    "amount_owed_calc": "22563.60 - 10000 (2025 estimated payments) = 12563.60"
+    "ti_before_qbi_calc": "83641.70 - 15750 = 67891.70",
+    "qbi_deduction_calc": "min(20% * 90000, 20% * 67891.70) = min(18000, 13578.34) = 13578.34",
+    "taxable_income_calc": "67891.70 - 13578.34 = 54313.36",
+    "bracket_formula_tax": "10% * 11925 + 12% * (48475 - 11925) + 22% * (54313.36 - 48475) = 1192.50 + 4386.00 + 1284.64 = 6863.14; tenforty produces 6866 (IRS tax-tables rounding, within $5)",
+    "total_tax_calc": "6866 (fed income tax) + 12716.60 (SE tax) = 19582.60",
+    "amount_owed_calc": "19582.60 - 10000 (2025 estimated payments) = 9582.60"
   }
 }

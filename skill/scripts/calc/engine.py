@@ -1004,6 +1004,7 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     )
     from skill.scripts.calc.patches.niit import compute_niit
     from skill.scripts.calc.patches.obbba_schedule_1a import compute_schedule_1a
+    from skill.scripts.calc.patches.qbi import compute_qbi
     from skill.scripts.calc.patches.obbba_senior_deduction import (
         compute_senior_deduction,
     )
@@ -1166,6 +1167,79 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     fed_tax = _cents(tf_result.federal_income_tax)
     tf_total_tax = _cents(tf_result.federal_total_tax)
     deduction = (agi - ti) if (agi is not None and ti is not None) else None
+
+    # -------------------------------------------------------------------
+    # Patch: QBI deduction (Section 199A, Form 8995 simplified)
+    # -------------------------------------------------------------------
+    # QBI reduces taxable income (Form 1040 line 13) but NOT AGI. The
+    # deduction = min(20% of total QBI, 20% of TI before QBI). TI before
+    # QBI = AGI - standard/itemized deduction = what tenforty just gave us.
+    # When QBI > 0, we re-call tenforty with the QBI folded into the
+    # deduction amount so bracket/LTCG computation is correct on the lower
+    # taxable income. Returns with no QBI skip the re-call.
+    qbi_deduction_val = Decimal("0")
+    _has_qbi_sources = (
+        return_.schedules_c
+        or any(
+            p.qbi_qualified
+            for se in return_.schedules_e
+            for p in se.properties
+        )
+        or any(k1.qbi_qualified for k1 in return_.schedules_k1)
+    )
+    if _has_qbi_sources:
+        ti_before_qbi = ti if ti is not None else Decimal("0")
+        qbi_result = compute_qbi(return_=return_, taxable_income_before_qbi=ti_before_qbi)
+        if qbi_result.qbi_deduction > Decimal("0"):
+            qbi_deduction_val = qbi_result.qbi_deduction
+            # Re-call tenforty with the QBI deduction added to the
+            # standard/itemized deduction so taxable income and the
+            # bracket/LTCG tax computation reflect the lower TI.
+            return_for_qbi = return_.model_copy(
+                update={"adjustments": updated_adjustments}
+            )
+            tf_input_qbi = _to_tenforty_input(
+                return_for_qbi,
+                agi_for_medical_floor=(
+                    agi if agi is not None else Decimal("0")
+                ),
+            )
+            # Increase itemized_deductions by QBI so tenforty sees a
+            # higher deduction and computes a lower TI / tax. For
+            # standard-deduction filers we switch to "Itemized" and pass
+            # the standard deduction + QBI as the amount, because
+            # tenforty recomputes the standard deduction itself when it
+            # sees "Standard". Using "Itemized" with the sum forces our
+            # exact deduction through.
+            combined_deduction = float(
+                (deduction if deduction is not None else Decimal("0"))
+                + qbi_deduction_val
+            )
+            tf_input_qbi = TenfortyInput(
+                year=tf_input_qbi.year,
+                filing_status=tf_input_qbi.filing_status,
+                w2_income=tf_input_qbi.w2_income,
+                taxable_interest=tf_input_qbi.taxable_interest,
+                qualified_dividends=tf_input_qbi.qualified_dividends,
+                ordinary_dividends=tf_input_qbi.ordinary_dividends,
+                short_term_capital_gains=tf_input_qbi.short_term_capital_gains,
+                long_term_capital_gains=tf_input_qbi.long_term_capital_gains,
+                self_employment_income=tf_input_qbi.self_employment_income,
+                rental_income=tf_input_qbi.rental_income,
+                schedule_1_income=tf_input_qbi.schedule_1_income,
+                standard_or_itemized="Itemized",
+                itemized_deductions=combined_deduction,
+                num_dependents=tf_input_qbi.num_dependents,
+            )
+            tf_result_qbi = _call_tenforty(tf_input_qbi)
+            # AGI stays the same (QBI doesn't change AGI). Update only
+            # the TI, tax, and total_tax from the QBI-adjusted result.
+            # `deduction` is NOT updated — it stays as the
+            # standard/itemized deduction (Form 1040 line 12). QBI is
+            # separate (line 13) and stored on ComputedTotals.qbi_deduction.
+            ti = _cents(tf_result_qbi.federal_taxable_income)
+            fed_tax = _cents(tf_result_qbi.federal_income_tax)
+            tf_total_tax = _cents(tf_result_qbi.federal_total_tax)
 
     ti_val = _cents(total_income(return_))
     # adjustments_total must reflect the OBBBA patch outputs if they fired.
@@ -1394,6 +1468,7 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
         adjustments_total=adjustments_val,
         adjusted_gross_income=agi,
         deduction_taken=deduction,
+        qbi_deduction=qbi_deduction_val if qbi_deduction_val > Decimal("0") else None,
         taxable_income=ti,
         tentative_tax=fed_tax,
         total_credits_nonrefundable=_cents(total_credits_nonref),

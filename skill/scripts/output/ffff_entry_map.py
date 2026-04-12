@@ -115,6 +115,11 @@ from skill.scripts.output.form_8606 import (
     Form8606Fields,
     compute_form_8606_fields,
 )
+from skill.scripts.output.form_8995 import (
+    Form8995Fields,
+    compute_form_8995_fields,
+    form_8995_required,
+)
 from skill.scripts.output.form_4797 import (
     Form4797Fields,
     compute_form_4797_fields,
@@ -328,6 +333,8 @@ class FFFFEntryMap:
             return "Form 8606 (Nondeductible IRAs)"
         if form == "4797":
             return "Form 4797 (Sales of Business Property)"
+        if form == "8995":
+            return "Form 8995 (Qualified Business Income Deduction Simplified)"
         return form
 
 
@@ -444,7 +451,7 @@ def _form_1040_entries(
               "itemizing"),
         ("13", fields.line_13_qbi_deduction,
          "QBI deduction from Form 8995 or 8995-A",
-         "QBI deduction is not yet automated; verify"),
+         None),
         ("14", fields.line_14_sum_12_13,
          "Add lines 12 and 13", None),
         ("15", fields.line_15_taxable_income,
@@ -1336,6 +1343,73 @@ def _form_4797_entries(fields: Form4797Fields) -> list[FFFFEntry]:
     return entries
 
 
+def _form_8995_entries(fields: Form8995Fields) -> list[FFFFEntry]:
+    """Emit Form 8995 entries (QBI deduction simplified computation)."""
+    form = "8995"
+    entries: list[FFFFEntry] = []
+
+    # Business entries (lines 1-5)
+    for i, biz in enumerate(fields.business_entries, start=1):
+        if i > 5:
+            break  # Form 8995 has 5 lines max
+        entries.append(
+            FFFFEntry(
+                form=form,
+                line=f"{i}.name",
+                value=biz.business_name,
+                description=f"Line {i} - Trade, business, or aggregation name",
+            )
+        )
+        if biz.tin:
+            entries.append(
+                FFFFEntry(
+                    form=form,
+                    line=f"{i}.tin",
+                    value=biz.tin,
+                    description=f"Line {i} - TIN",
+                )
+            )
+        entries.append(
+            FFFFEntry(
+                form=form,
+                line=f"{i}.qbi",
+                value=_format_money(biz.qbi_amount),
+                description=f"Line {i} - QBI",
+            )
+        )
+
+    # Summary lines
+    rows: list[tuple[str, Decimal, str]] = [
+        ("6", fields.line_6_total_qbi,
+         "Total QBI"),
+        ("10", fields.line_10_qbi_component,
+         "QBI deduction (20% of total QBI)"),
+        ("11", fields.line_11_taxable_income_before_qbi,
+         "Taxable income before QBI deduction"),
+        ("12", fields.line_12_net_capital_gain,
+         "Net capital gain"),
+        ("13", fields.line_13_adjusted_ti,
+         "Line 11 minus line 12"),
+        ("14", fields.line_14_income_limitation,
+         "Income limitation (20% of line 13)"),
+        ("15", fields.line_15_qbi_deduction,
+         "QBI deduction (smaller of line 10 and line 14)"),
+        ("16", fields.line_16_total_deduction,
+         "Total QBI deduction (enters Form 1040 line 13)"),
+    ]
+    for line, value, desc in rows:
+        entries.append(
+            FFFFEntry(
+                form=form,
+                line=line,
+                value=_format_money(value),
+                description=desc,
+            )
+        )
+
+    return entries
+
+
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
@@ -1432,6 +1506,11 @@ def build_ffff_entry_map(canonical_return: CanonicalReturn) -> FFFFEntryMap:
     if canonical_return.ira_info is not None:
         f8606 = compute_form_8606_fields(canonical_return)
         entries.extend(_form_8606_entries(f8606))
+
+    # -- Form 8995 (QBI Deduction Simplified) ---------------------------
+    if form_8995_required(canonical_return):
+        f8995 = compute_form_8995_fields(canonical_return)
+        entries.extend(_form_8995_entries(f8995))
 
     # -- Form 4797 (Sales of Business Property) -------------------------
     if form_4797_required(canonical_return):

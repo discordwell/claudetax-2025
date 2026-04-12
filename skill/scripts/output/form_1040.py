@@ -31,7 +31,9 @@ Simplifications documented here (tracked for later waves):
   worksheet patch is not yet implemented.
 * Line 2a (tax-exempt interest) is read from Form1099INT.box8 if the
   model exposes it; otherwise 0.
-* Line 13 (QBI) is 0 — QBI patch is not yet wired in.
+* Line 13 (QBI) — Section 199A QBI deduction from Form 8995 (simplified).
+  Computed by ``skill.scripts.calc.patches.qbi`` and stored on
+  ``ComputedTotals.qbi_deduction``.
 * Line 17 (Schedule 2 Part I) is 0 — AMT/excess APTC is not yet modeled.
 * Line 20 / line 31 (Schedule 3) are 0 — nonrefundable credits beyond CTC
   and refundable credits beyond EITC/ACTC/AOTC are not yet modeled.
@@ -217,7 +219,7 @@ def compute_form_1040_fields(return_: CanonicalReturn) -> Form1040Fields:
     line_10 = _dec(c.adjustments_total)
     line_11 = _dec(c.adjusted_gross_income)
     line_12 = _dec(c.deduction_taken)
-    line_13 = _ZERO  # QBI not yet patched
+    line_13 = _dec(c.qbi_deduction)
     line_14 = line_12 + line_13
     line_15 = _dec(c.taxable_income)
 

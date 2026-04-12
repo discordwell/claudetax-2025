@@ -464,6 +464,7 @@ def run_pipeline(
     render_form_8606: bool = True,
     render_form_8863: bool = True,
     render_form_8962: bool = True,
+    render_form_8995: bool = True,
     render_form_4797: bool = True,
     render_schedule_1: bool = True,
     render_schedule_2: bool = True,
@@ -797,6 +798,21 @@ def run_pipeline(
         out_path_8962 = output_dir / "form_8962.pdf"
         render_form_8962_pdf(fields_8962, out_path_8962)
         rendered.append(out_path_8962)
+
+    # Form 8995 — QBI Deduction Simplified. Rendered when the engine
+    # computed a nonzero QBI deduction.
+    if render_form_8995:
+        from skill.scripts.output.form_8995 import (
+            compute_form_8995_fields,
+            form_8995_required,
+            render_form_8995_pdf,
+        )
+
+        if form_8995_required(canonical):
+            fields_8995 = compute_form_8995_fields(canonical)
+            out_path_8995 = output_dir / "form_8995.pdf"
+            render_form_8995_pdf(fields_8995, out_path_8995)
+            rendered.append(out_path_8995)
 
     # Schedule 2 — Additional Taxes. Rendered when any of the source
     # taxes (AMT, SE, additional Medicare, NIIT, early distribution

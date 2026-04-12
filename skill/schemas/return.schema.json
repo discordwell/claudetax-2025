@@ -2458,6 +2458,98 @@
       "title": "HomeOffice",
       "type": "object"
     },
+    "IRAInfo": {
+      "additionalProperties": false,
+      "description": "Form 8606 \u2014 IRA basis tracking.\n\nTracks nondeductible contributions to traditional IRAs, basis\ncarryover, and the nontaxable/taxable split of distributions and\nRoth conversions.  Required when a taxpayer makes nondeductible\ncontributions, takes distributions from a traditional IRA with\nbasis, or converts a traditional IRA to Roth with basis.\n\nAuthority: IRS Form 8606 (TY2025).",
+      "properties": {
+        "contributions_withdrawn_by_due_date": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Contributions Withdrawn By Due Date"
+        },
+        "distributions_received": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Distributions Received"
+        },
+        "nondeductible_contributions_current_year": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Nondeductible Contributions Current Year"
+        },
+        "prior_year_basis": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Prior Year Basis"
+        },
+        "roth_conversions": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Roth Conversions"
+        },
+        "total_ira_value_year_end": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Total Ira Value Year End"
+        }
+      },
+      "title": "IRAInfo",
+      "type": "object"
+    },
     "ItemizedDeductions": {
       "additionalProperties": false,
       "description": "Schedule A \u2014 Itemized Deductions.\n\nNote: the taxpayer must choose state/local INCOME tax OR state/local SALES tax\n(not both). Whichever is larger is typically elected. The SALT (state +\nlocal + real estate + personal property) total is CAPPED at $10,000 MFJ/S/HoH\nor $5,000 MFS. The cap is applied in the calc engine, not in this model.",
@@ -4807,6 +4899,17 @@
       "default": false,
       "title": "Has Foreign Trust Transaction",
       "type": "boolean"
+    },
+    "ira_info": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/IRAInfo"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "itemize_deductions": {
       "default": false,

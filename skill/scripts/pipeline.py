@@ -449,6 +449,7 @@ def run_pipeline(
     render_form_6251: bool = True,
     render_form_4562: bool = True,
     render_form_8829: bool = True,
+    render_form_8606: bool = True,
     render_state_returns: bool = True,
     build_paper_bundle: bool = True,
     emit_ffff_map: bool = True,
@@ -678,6 +679,18 @@ def run_pipeline(
             out_path_6251 = output_dir / "form_6251.pdf"
             render_form_6251_pdf(fields_6251, out_path_6251)
             rendered.append(out_path_6251)
+
+    # Form 8606 renders when the taxpayer has IRA basis info.
+    if render_form_8606 and canonical.ira_info is not None:
+        from skill.scripts.output.form_8606 import (
+            compute_form_8606_fields,
+            render_form_8606_pdf,
+        )
+
+        fields_8606 = compute_form_8606_fields(canonical)
+        out_path_8606 = output_dir / "form_8606.pdf"
+        render_form_8606_pdf(fields_8606, out_path_8606)
+        rendered.append(out_path_8606)
 
     # ------------------------------------------------------------------
     # 5. Emit result.json

@@ -762,6 +762,32 @@ class AMTAdjustments(_StrictModel):
     respected for lines 2b/2f/2s which enter as subtractions."""
 
 
+class IRAInfo(_StrictModel):
+    """Form 8606 — IRA basis tracking.
+
+    Tracks nondeductible contributions to traditional IRAs, basis
+    carryover, and the nontaxable/taxable split of distributions and
+    Roth conversions.  Required when a taxpayer makes nondeductible
+    contributions, takes distributions from a traditional IRA with
+    basis, or converts a traditional IRA to Roth with basis.
+
+    Authority: IRS Form 8606 (TY2025).
+    """
+
+    nondeductible_contributions_current_year: Money = Decimal("0")
+    """Line 1: nondeductible contributions made for the tax year."""
+    prior_year_basis: Money = Decimal("0")
+    """Line 2: total basis carryover from prior year Form 8606 line 14."""
+    contributions_withdrawn_by_due_date: Money = Decimal("0")
+    """Line 4: contributions withdrawn before the filing due date."""
+    total_ira_value_year_end: Money = Decimal("0")
+    """Line 6: value of ALL traditional IRAs as of Dec 31."""
+    distributions_received: Money = Decimal("0")
+    """Line 7: total traditional IRA distributions received during the year."""
+    roth_conversions: Money = Decimal("0")
+    """Line 8: amount converted from traditional IRA to Roth IRA."""
+
+
 class ItemizedDeductions(_StrictModel):
     """Schedule A — Itemized Deductions.
 
@@ -987,6 +1013,12 @@ class CanonicalReturn(_StrictModel):
     credits: Credits = Field(default_factory=Credits)
     other_taxes: OtherTaxes = Field(default_factory=OtherTaxes)
     payments: Payments = Field(default_factory=Payments)
+
+    # Form 8606 — IRA basis tracking (nondeductible contributions,
+    # distributions with basis, Roth conversions with basis). Optional;
+    # omit when the taxpayer has no nondeductible IRA contributions and
+    # no traditional IRA basis to track.
+    ira_info: IRAInfo | None = None
 
     # Form 6251 AMT manual adjustments (ISOs, PAB interest, depreciation
     # timing, etc.) — optional; omit for taxpayers with no AMT preferences

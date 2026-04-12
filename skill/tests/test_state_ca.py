@@ -4,6 +4,11 @@ Covers the CaliforniaPlugin wrapping tenforty's CA pass-through. Verified
 against the CP4 reference scenario: Single / $65k W-2 / Standard → CA
 state_total_tax ≈ $1,975, state bracket 8%, state taxable income $59,294.
 
+Wave 8C adds real nonresident income apportionment per Schedule CA (540NR):
+  - Per-category sourcing (wages, interest, dividends, Sch C, Sch E, cap gains)
+  - 540NR tax-rate method: tax = (tax on total income) * (CA-source / total)
+  - Property-level rental sourcing based on property address state
+
 Test structure mirrors `test_state_plugin_api.py` / `TestNoIncomeTaxPlugin`.
 """
 from __future__ import annotations
@@ -18,8 +23,13 @@ from skill.scripts.models import (
     Address,
     CanonicalReturn,
     FilingStatus,
+    Form1099INT,
+    Form1099DIV,
     Person,
     ResidencyStatus,
+    ScheduleC,
+    ScheduleE,
+    ScheduleEProperty,
     StateReturn,
     W2,
     W2StateRow,
@@ -563,3 +573,504 @@ class TestCaliforniaPluginNonresidentSourcing:
         assert ss["ca_state_rows_present"] is False
         # Day-prorated fraction = 182/365.
         assert ss["apportionment_fraction"] == Decimal(182) / Decimal("365")
+
+
+# ---------------------------------------------------------------------------
+# Wave 8C — Real nonresident income apportionment (540NR)
+# ---------------------------------------------------------------------------
+
+
+def _ny_address() -> Address:
+    """New York domicile address for nonresident fixtures."""
+    return Address(street1="1 Broadway", city="New York", state="NY", zip="10004")
+
+
+def _ca_address() -> Address:
+    """California address for CA-sourced properties."""
+    return Address(street1="1 Market St", city="San Francisco", state="CA", zip="94103")
+
+
+def _federal_for_agi(agi: Decimal) -> FederalTotals:
+    """Build a minimal FederalTotals stub for a given AGI."""
+    return FederalTotals(
+        filing_status=FilingStatus.SINGLE,
+        num_dependents=0,
+        adjusted_gross_income=agi,
+        taxable_income=agi - Decimal("15750"),
+        total_federal_tax=Decimal("5000"),
+        federal_income_tax=Decimal("5000"),
+        federal_standard_deduction=Decimal("15750"),
+        federal_itemized_deductions_total=Decimal("0"),
+        deduction_taken=Decimal("15750"),
+    )
+
+
+class TestNonresidentApportionIncomeWagesOnly:
+    """Nonresident with CA W-2 only: wages sourced, interest/dividends not."""
+
+    @pytest.fixture
+    def nr_w2_with_interest(self) -> CanonicalReturn:
+        """NY resident earning $65k wages ($20k in CA) plus $5k interest."""
+        return CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="Alex", last_name="Doe",
+                ssn="111-22-3333", date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=_ny_address(),
+            w2s=[
+                W2(
+                    employer_name="Multi Corp",
+                    box1_wages=Decimal("65000"),
+                    state_rows=[W2StateRow(state="CA", state_wages=Decimal("20000"))],
+                ),
+            ],
+            forms_1099_int=[
+                Form1099INT(payer_name="Bank Inc", box1_interest_income=Decimal("5000")),
+            ],
+            forms_1099_div=[
+                Form1099DIV(
+                    payer_name="Fund Co",
+                    box1a_ordinary_dividends=Decimal("3000"),
+                ),
+            ],
+        )
+
+    def test_wages_sourced_to_ca(self, nr_w2_with_interest):
+        app = PLUGIN.apportion_income(
+            nr_w2_with_interest, ResidencyStatus.NONRESIDENT, days_in_state=0
+        )
+        assert app.state_source_wages == Decimal("20000.00")
+
+    def test_interest_not_sourced_to_ca(self, nr_w2_with_interest):
+        """Interest is sourced to domicile (NY), not CA for nonresidents."""
+        app = PLUGIN.apportion_income(
+            nr_w2_with_interest, ResidencyStatus.NONRESIDENT, days_in_state=0
+        )
+        assert app.state_source_interest == Decimal("0")
+
+    def test_dividends_not_sourced_to_ca(self, nr_w2_with_interest):
+        """Dividends are sourced to domicile (NY), not CA for nonresidents."""
+        app = PLUGIN.apportion_income(
+            nr_w2_with_interest, ResidencyStatus.NONRESIDENT, days_in_state=0
+        )
+        assert app.state_source_dividends == Decimal("0")
+
+    def test_capital_gains_not_sourced_by_default(self, nr_w2_with_interest):
+        """Conservative: capital gains not sourced to CA unless flagged."""
+        app = PLUGIN.apportion_income(
+            nr_w2_with_interest, ResidencyStatus.NONRESIDENT, days_in_state=0
+        )
+        assert app.state_source_capital_gains == Decimal("0")
+
+    def test_total_equals_wages_only(self, nr_w2_with_interest):
+        """Total CA-source should be wages only (no interest/div/gains)."""
+        app = PLUGIN.apportion_income(
+            nr_w2_with_interest, ResidencyStatus.NONRESIDENT, days_in_state=0
+        )
+        assert app.state_source_total == Decimal("20000.00")
+
+
+class TestNonresidentApportionIncomeRental:
+    """Nonresident with CA rental: property in CA -> sourced; property in NY -> not."""
+
+    @pytest.fixture
+    def nr_with_ca_and_ny_rentals(self) -> CanonicalReturn:
+        """NY resident with one CA rental and one NY rental."""
+        return CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="Alex", last_name="Doe",
+                ssn="111-22-3333", date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=_ny_address(),
+            w2s=[
+                W2(
+                    employer_name="NYC Corp",
+                    box1_wages=Decimal("50000"),
+                    state_rows=[W2StateRow(state="CA", state_wages=Decimal("15000"))],
+                ),
+            ],
+            schedules_e=[
+                ScheduleE(
+                    properties=[
+                        ScheduleEProperty(
+                            address=_ca_address(),
+                            rents_received=Decimal("24000"),
+                            insurance=Decimal("2000"),
+                            taxes=Decimal("3000"),
+                            repairs=Decimal("1000"),
+                        ),
+                        ScheduleEProperty(
+                            address=_ny_address(),
+                            rents_received=Decimal("18000"),
+                            insurance=Decimal("1500"),
+                            taxes=Decimal("2500"),
+                        ),
+                    ]
+                ),
+            ],
+        )
+
+    def test_ca_rental_sourced(self, nr_with_ca_and_ny_rentals):
+        """CA property net income (24000-2000-3000-1000=18000) is sourced."""
+        app = PLUGIN.apportion_income(
+            nr_with_ca_and_ny_rentals, ResidencyStatus.NONRESIDENT, days_in_state=0
+        )
+        assert app.state_source_rental == Decimal("18000.00")
+
+    def test_ny_rental_not_sourced(self, nr_with_ca_and_ny_rentals):
+        """Only CA property counts — NY property's $14000 net is excluded."""
+        app = PLUGIN.apportion_income(
+            nr_with_ca_and_ny_rentals, ResidencyStatus.NONRESIDENT, days_in_state=0
+        )
+        # Total rental net = CA(18000) + NY(14000) = 32000, but only 18000 sourced
+        assert app.state_source_rental == Decimal("18000.00")
+        assert app.state_source_rental != Decimal("32000.00")
+
+    def test_wages_also_sourced(self, nr_with_ca_and_ny_rentals):
+        """Wages still sourced via W-2 state rows."""
+        app = PLUGIN.apportion_income(
+            nr_with_ca_and_ny_rentals, ResidencyStatus.NONRESIDENT, days_in_state=0
+        )
+        assert app.state_source_wages == Decimal("15000.00")
+
+    def test_total_is_wages_plus_ca_rental(self, nr_with_ca_and_ny_rentals):
+        """Total CA-source = wages ($15k) + CA rental ($18k) = $33k."""
+        app = PLUGIN.apportion_income(
+            nr_with_ca_and_ny_rentals, ResidencyStatus.NONRESIDENT, days_in_state=0
+        )
+        assert app.state_source_total == Decimal("33000.00")
+
+
+class TestNonresidentApportionMixed:
+    """Nonresident with mixed: W-2 in CA + rental in NY -> only W-2 portion sourced."""
+
+    @pytest.fixture
+    def nr_ca_w2_ny_rental(self) -> CanonicalReturn:
+        """NY resident with CA wages and NY rental only."""
+        return CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="Alex", last_name="Doe",
+                ssn="111-22-3333", date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=_ny_address(),
+            w2s=[
+                W2(
+                    employer_name="CA Corp",
+                    box1_wages=Decimal("80000"),
+                    state_rows=[W2StateRow(state="CA", state_wages=Decimal("80000"))],
+                ),
+            ],
+            forms_1099_int=[
+                Form1099INT(payer_name="Bank", box1_interest_income=Decimal("2000")),
+            ],
+            schedules_e=[
+                ScheduleE(
+                    properties=[
+                        ScheduleEProperty(
+                            address=_ny_address(),
+                            rents_received=Decimal("12000"),
+                            insurance=Decimal("1000"),
+                            taxes=Decimal("2000"),
+                        ),
+                    ]
+                ),
+            ],
+        )
+
+    def test_only_wages_sourced(self, nr_ca_w2_ny_rental):
+        app = PLUGIN.apportion_income(
+            nr_ca_w2_ny_rental, ResidencyStatus.NONRESIDENT, days_in_state=0
+        )
+        assert app.state_source_wages == Decimal("80000.00")
+        assert app.state_source_interest == Decimal("0")
+        assert app.state_source_rental == Decimal("0")
+        assert app.state_source_total == Decimal("80000.00")
+
+
+class TestNonresidentTaxRateMethod:
+    """Verify tax = (full-income tax rate) * CA-source income."""
+
+    @pytest.fixture
+    def nr_partial_ca(self) -> CanonicalReturn:
+        """NY resident with $65k wages, $20k sourced to CA."""
+        return CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="Alex", last_name="Doe",
+                ssn="111-22-3333", date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=_ny_address(),
+            w2s=[
+                W2(
+                    employer_name="Multi Corp",
+                    box1_wages=Decimal("65000"),
+                    state_rows=[W2StateRow(state="CA", state_wages=Decimal("20000"))],
+                ),
+            ],
+        )
+
+    def test_tax_rate_method_formula(self, nr_partial_ca, federal_single_65k):
+        """Tax = (tax on $65k) * ($20k / $65k AGI).
+
+        The tax on $65k is $1,975 (CP4). CA-source is $20k. AGI is $65k.
+        Expected: 1975 * (20000/65000) = 1975 * 0.30769... = $607.69
+        """
+        result = PLUGIN.compute(
+            nr_partial_ca, federal_single_65k,
+            ResidencyStatus.NONRESIDENT, days_in_state=0,
+        )
+        ss = result.state_specific
+        full_tax = ss["state_total_tax_resident_basis"]
+        assert full_tax == Decimal("1975.00")
+
+        ca_source = ss["ca_source_total"]
+        agi = ss["state_adjusted_gross_income"]
+        ratio = ca_source / agi
+
+        # The apportioned tax should equal full_tax * ratio, rounded to cents
+        expected = (full_tax * ratio).quantize(Decimal("0.01"))
+        assert ss["state_total_tax"] == expected
+
+    def test_nonresident_tax_less_than_resident(self, nr_partial_ca, federal_single_65k):
+        """Nonresident tax must be strictly less than resident tax."""
+        result = PLUGIN.compute(
+            nr_partial_ca, federal_single_65k,
+            ResidencyStatus.NONRESIDENT, days_in_state=0,
+        )
+        ss = result.state_specific
+        assert ss["state_total_tax"] < ss["state_total_tax_resident_basis"]
+        assert ss["state_total_tax"] > Decimal("0")
+
+    def test_sourcing_telemetry_fields(self, nr_partial_ca, federal_single_65k):
+        """New state_specific fields are populated correctly."""
+        result = PLUGIN.compute(
+            nr_partial_ca, federal_single_65k,
+            ResidencyStatus.NONRESIDENT, days_in_state=0,
+        )
+        ss = result.state_specific
+        assert ss["ca_sourced_wages_from_w2_state_rows"] == Decimal("20000.00")
+        assert ss["ca_sourced_interest"] == Decimal("0")
+        assert ss["ca_sourced_dividends"] == Decimal("0")
+        assert ss["ca_sourced_capital_gains"] == Decimal("0")
+        assert ss["ca_sourced_rental_net"] == Decimal("0")
+        assert ss["ca_source_total"] == Decimal("20000.00")
+
+    def test_apportionment_fraction_is_one_under_sourcing(
+        self, nr_partial_ca, federal_single_65k
+    ):
+        """Under real sourcing, apportionment_fraction is 1 (no day-proration)."""
+        result = PLUGIN.compute(
+            nr_partial_ca, federal_single_65k,
+            ResidencyStatus.NONRESIDENT, days_in_state=91,
+        )
+        assert result.state_specific["apportionment_fraction"] == Decimal("1")
+
+
+class TestNonresidentComputeWithRental:
+    """compute() with rental income uses the tax-rate method including rental."""
+
+    @pytest.fixture
+    def nr_ca_rental(self) -> CanonicalReturn:
+        """NY resident with $50k CA wages + $18k CA rental net."""
+        return CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="Alex", last_name="Doe",
+                ssn="111-22-3333", date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=_ny_address(),
+            w2s=[
+                W2(
+                    employer_name="CA Corp",
+                    box1_wages=Decimal("50000"),
+                    state_rows=[W2StateRow(state="CA", state_wages=Decimal("50000"))],
+                ),
+            ],
+            schedules_e=[
+                ScheduleE(
+                    properties=[
+                        ScheduleEProperty(
+                            address=_ca_address(),
+                            rents_received=Decimal("24000"),
+                            insurance=Decimal("2000"),
+                            taxes=Decimal("3000"),
+                            repairs=Decimal("1000"),
+                        ),
+                    ]
+                ),
+            ],
+        )
+
+    @pytest.fixture
+    def federal_68k(self) -> FederalTotals:
+        """Federal totals for $50k wages + $18k rental net = $68k AGI."""
+        return _federal_for_agi(Decimal("68000"))
+
+    def test_rental_included_in_ca_source(self, nr_ca_rental, federal_68k):
+        result = PLUGIN.compute(
+            nr_ca_rental, federal_68k,
+            ResidencyStatus.NONRESIDENT, days_in_state=0,
+        )
+        ss = result.state_specific
+        # CA-source = $50k wages + $18k rental = $68k
+        assert ss["ca_sourced_wages_from_w2_state_rows"] == Decimal("50000.00")
+        assert ss["ca_sourced_rental_net"] == Decimal("18000.00")
+        assert ss["ca_source_total"] == Decimal("68000.00")
+
+    def test_all_ca_source_means_full_tax(self, nr_ca_rental, federal_68k):
+        """When CA-source == total income, nonresident pays full tax."""
+        result = PLUGIN.compute(
+            nr_ca_rental, federal_68k,
+            ResidencyStatus.NONRESIDENT, days_in_state=0,
+        )
+        ss = result.state_specific
+        # CA-source ($68k) == AGI ($68k), so ratio = 1 → full tax
+        assert ss["state_total_tax"] == ss["state_total_tax_resident_basis"]
+
+
+class TestResidentApportionIncomeFull:
+    """Resident: all income sourced to CA (existing behavior preserved)."""
+
+    @pytest.fixture
+    def resident_mixed_income(self) -> CanonicalReturn:
+        return CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="Alex", last_name="Doe",
+                ssn="111-22-3333", date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=_ca_address(),
+            w2s=[
+                W2(employer_name="Acme", box1_wages=Decimal("50000")),
+            ],
+            forms_1099_int=[
+                Form1099INT(payer_name="Bank", box1_interest_income=Decimal("3000")),
+            ],
+            forms_1099_div=[
+                Form1099DIV(payer_name="Fund", box1a_ordinary_dividends=Decimal("2000")),
+            ],
+            schedules_e=[
+                ScheduleE(
+                    properties=[
+                        ScheduleEProperty(
+                            address=_ny_address(),
+                            rents_received=Decimal("12000"),
+                            taxes=Decimal("2000"),
+                        ),
+                    ]
+                ),
+            ],
+        )
+
+    def test_resident_all_income_sourced(self, resident_mixed_income):
+        """Residents: ALL income is CA-source, regardless of where earned."""
+        app = PLUGIN.apportion_income(
+            resident_mixed_income, ResidencyStatus.RESIDENT, days_in_state=365
+        )
+        assert app.state_source_wages == Decimal("50000.00")
+        assert app.state_source_interest == Decimal("3000.00")
+        assert app.state_source_dividends == Decimal("2000.00")
+        # NY rental: 12000-2000=10000 — still sourced to CA for a resident
+        assert app.state_source_rental == Decimal("10000.00")
+
+    def test_resident_total(self, resident_mixed_income):
+        app = PLUGIN.apportion_income(
+            resident_mixed_income, ResidencyStatus.RESIDENT, days_in_state=365
+        )
+        assert app.state_source_total == Decimal("65000.00")
+
+
+class TestStateSourceRentalHelper:
+    """Direct tests for the state_source_rental helper in _hand_rolled_base."""
+
+    def test_ca_property_sourced(self):
+        from skill.scripts.states._hand_rolled_base import state_source_rental
+
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B",
+                ssn="111-22-3333", date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=_ny_address(),
+            schedules_e=[
+                ScheduleE(
+                    properties=[
+                        ScheduleEProperty(
+                            address=_ca_address(),
+                            rents_received=Decimal("10000"),
+                            taxes=Decimal("1000"),
+                        ),
+                    ]
+                ),
+            ],
+        )
+        assert state_source_rental(ret, "CA") == Decimal("9000.00")
+
+    def test_non_ca_property_excluded(self):
+        from skill.scripts.states._hand_rolled_base import state_source_rental
+
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B",
+                ssn="111-22-3333", date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=_ny_address(),
+            schedules_e=[
+                ScheduleE(
+                    properties=[
+                        ScheduleEProperty(
+                            address=_ny_address(),
+                            rents_received=Decimal("10000"),
+                            taxes=Decimal("1000"),
+                        ),
+                    ]
+                ),
+            ],
+        )
+        assert state_source_rental(ret, "CA") == Decimal("0.00")
+
+    def test_mixed_properties(self):
+        from skill.scripts.states._hand_rolled_base import state_source_rental
+
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B",
+                ssn="111-22-3333", date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=_ny_address(),
+            schedules_e=[
+                ScheduleE(
+                    properties=[
+                        ScheduleEProperty(
+                            address=_ca_address(),
+                            rents_received=Decimal("20000"),
+                            taxes=Decimal("3000"),
+                        ),
+                        ScheduleEProperty(
+                            address=_ny_address(),
+                            rents_received=Decimal("15000"),
+                            taxes=Decimal("2000"),
+                        ),
+                    ]
+                ),
+            ],
+        )
+        # Only CA property: 20000-3000 = 17000
+        assert state_source_rental(ret, "CA") == Decimal("17000.00")
+        # Only NY property: 15000-2000 = 13000
+        assert state_source_rental(ret, "NY") == Decimal("13000.00")

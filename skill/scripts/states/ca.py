@@ -16,9 +16,17 @@ marshaling (so CA sees the same income/deduction numbers the federal calc
 does), calls tenforty with `state='CA'`, and converts the state_* floats back
 into Decimal for downstream consumers.
 
-Nonresident / part-year handling is a day-based proration TODO — see the
-comment inside `compute`. A full nonresident calc requires CA Schedule CA
-(540NR) apportionment by income sourcing, which is fan-out work.
+Nonresident / part-year handling implements real Schedule CA (540NR)
+apportionment by income sourcing:
+  - Wages: sourced to CA via W-2 state rows (box 16)
+  - Interest/Dividends: sourced to domicile state (NOT CA for nonresidents)
+  - Schedule C: sourced to CA if business_location_state == "CA"
+  - Schedule E rental: sourced to CA if property address is in CA
+  - Capital gains: conservative — not sourced to CA unless explicitly flagged
+  - Tax = (CA tax on total income) * (CA-source income / total income)
+    This is the 540NR "tax rate on all income applied to CA-source income"
+    method.
+When no W-2 state rows are present, falls back to legacy day-proration.
 """
 from __future__ import annotations
 
@@ -37,6 +45,7 @@ from skill.scripts.models import (
 )
 from skill.scripts.states._hand_rolled_base import (
     state_has_w2_state_rows,
+    state_source_rental,
     state_source_schedule_c,
     state_source_wages_from_w2s,
 )
@@ -75,6 +84,11 @@ class CA540Fields:
     apportionment_fraction: Decimal = Decimal("1")
     ca_sourced_wages_from_w2_state_rows: Decimal = Decimal("0")
     ca_sourced_schedule_c_net: Decimal = Decimal("0")
+    ca_sourced_rental_net: Decimal = Decimal("0")
+    ca_sourced_interest: Decimal = Decimal("0")
+    ca_sourced_dividends: Decimal = Decimal("0")
+    ca_sourced_capital_gains: Decimal = Decimal("0")
+    ca_source_total: Decimal = Decimal("0")
     ca_state_rows_present: bool = False
 
 
@@ -91,6 +105,11 @@ def compute_ca540_fields(state_return: StateReturn) -> CA540Fields:
         apportionment_fraction=ss.get("apportionment_fraction", Decimal("1")),
         ca_sourced_wages_from_w2_state_rows=ss.get("ca_sourced_wages_from_w2_state_rows", Decimal("0")),
         ca_sourced_schedule_c_net=ss.get("ca_sourced_schedule_c_net", Decimal("0")),
+        ca_sourced_rental_net=ss.get("ca_sourced_rental_net", Decimal("0")),
+        ca_sourced_interest=ss.get("ca_sourced_interest", Decimal("0")),
+        ca_sourced_dividends=ss.get("ca_sourced_dividends", Decimal("0")),
+        ca_sourced_capital_gains=ss.get("ca_sourced_capital_gains", Decimal("0")),
+        ca_source_total=ss.get("ca_source_total", Decimal("0")),
         ca_state_rows_present=ss.get("ca_state_rows_present", False),
     )
 
@@ -112,16 +131,14 @@ def _cents(v: Any) -> Decimal:
 def _apportionment_fraction(
     residency: ResidencyStatus, days_in_state: int
 ) -> Decimal:
-    """Days-based apportionment for nonresident / part-year.
+    """Days-based apportionment fallback for nonresident / part-year.
 
     Residents get 1.0 (full state tax). Nonresidents and part-year residents
     are prorated by days_in_state / 365. Clamped to [0, 1].
 
-    TODO: a real nonresident CA calculation uses Schedule CA (540NR) with
-    income-specific sourcing (wages sourced to work state, investment income
-    sourced to domicile, etc.) rather than a flat day ratio. Day-based
-    proration is a first-order approximation; fan-out will tighten this with
-    the real 540NR logic.
+    This is now a fallback path used only when no W-2 state rows are present
+    (i.e., no real sourcing data). The primary nonresident path uses real
+    per-category income sourcing via the 540NR tax-rate method.
     """
     if residency == ResidencyStatus.RESIDENT:
         return Decimal("1")
@@ -182,45 +199,61 @@ class CaliforniaPlugin:
         state_bracket = _d(tf_result.state_tax_bracket)
         state_eff_rate = _d(tf_result.state_effective_tax_rate)
 
-        # Wave 6: real Schedule CA (540NR) scaffolding. When the filer is
-        # not a CA resident AND at least one W-2 carries a state_rows
-        # entry for CA, re-compute the state tax on the CA-sourced wages
-        # (W-2 box 16 sum) as if they were the full w2_income. This
-        # matches the 540NR Schedule CA-NR pattern: income items are
-        # sourced to CA via their state-specific columns, then the tax
-        # is computed on that sourced base. For the all-wage case this
-        # simplifies to "tenforty on the sourced wage sum." When no state
-        # rows are present, fall back to the legacy day-proration path.
+        # Real Schedule CA (540NR) income sourcing for nonresidents.
+        # Each income category is sourced to CA per 540NR rules:
+        #   - Wages: W-2 state rows with state="CA"
+        #   - Interest/Dividends: sourced to domicile (NOT CA for nonresidents)
+        #   - Schedule C: business_location_state == "CA"
+        #   - Schedule E rental: property address in CA
+        #   - Capital gains: conservative — $0 unless explicitly CA-sourced
         ca_state_rows_present = state_has_w2_state_rows(return_, "CA")
         ca_sourced_wages = state_source_wages_from_w2s(return_, "CA")
         ca_sourced_se = state_source_schedule_c(return_, "CA")
+        ca_sourced_rental = state_source_rental(return_, "CA")
 
         if residency == ResidencyStatus.RESIDENT:
             fraction = Decimal("1")
             state_tax_apportioned = state_tax_full
-        elif ca_state_rows_present:
-            tf_sourced = tenforty.evaluate_return(
-                year=tf_input.year,
-                state="CA",
-                filing_status=tf_input.filing_status,
-                w2_income=float(ca_sourced_wages),
-                taxable_interest=0.0,
-                qualified_dividends=0.0,
-                ordinary_dividends=0.0,
-                short_term_capital_gains=0.0,
-                long_term_capital_gains=0.0,
-                self_employment_income=float(ca_sourced_se),
-                rental_income=0.0,
-                schedule_1_income=0.0,
-                standard_or_itemized=tf_input.standard_or_itemized,
-                itemized_deductions=tf_input.itemized_deductions,
-                num_dependents=tf_input.num_dependents,
+            # For residents, CA-source == total income
+            ca_source_total = state_agi
+            ca_sourced_interest = _cents(_d(tf_input.taxable_interest))
+            ca_sourced_dividends = _cents(_d(tf_input.ordinary_dividends))
+            ca_sourced_capital_gains = _cents(
+                _d(tf_input.short_term_capital_gains) + _d(tf_input.long_term_capital_gains)
             )
-            state_tax_apportioned = _cents(tf_sourced.state_total_tax)
+        elif ca_state_rows_present:
+            # Real 540NR per-category sourcing with tax-rate method.
+            # Interest and dividends are sourced to domicile, not CA.
+            ca_sourced_interest = Decimal("0")
+            ca_sourced_dividends = Decimal("0")
+            ca_sourced_capital_gains = Decimal("0")
+
+            ca_source_total = _cents(
+                ca_sourced_wages + ca_sourced_interest + ca_sourced_dividends
+                + ca_sourced_capital_gains + ca_sourced_se + ca_sourced_rental
+            )
+
+            # 540NR tax-rate method:
+            # tax = (tax on total income) * (CA-source income / total income)
+            # This uses the tax rate computed on ALL income, applied only
+            # to the CA-source portion.
+            if state_agi > Decimal("0") and ca_source_total > Decimal("0"):
+                ratio = ca_source_total / state_agi
+                if ratio > Decimal("1"):
+                    ratio = Decimal("1")
+                state_tax_apportioned = _cents(state_tax_full * ratio)
+            else:
+                state_tax_apportioned = Decimal("0.00")
+
             fraction = Decimal("1")  # no day-proration under sourcing
         else:
+            # Legacy day-proration fallback when no W-2 state rows present.
             fraction = _apportionment_fraction(residency, days_in_state)
             state_tax_apportioned = _cents(state_tax_full * fraction)
+            ca_sourced_interest = Decimal("0")
+            ca_sourced_dividends = Decimal("0")
+            ca_sourced_capital_gains = Decimal("0")
+            ca_source_total = _cents(state_agi * fraction)
 
         state_specific: dict[str, Any] = {
             "state_adjusted_gross_income": state_agi,
@@ -232,6 +265,11 @@ class CaliforniaPlugin:
             "apportionment_fraction": fraction,
             "ca_sourced_wages_from_w2_state_rows": ca_sourced_wages,
             "ca_sourced_schedule_c_net": ca_sourced_se,
+            "ca_sourced_rental_net": ca_sourced_rental,
+            "ca_sourced_interest": ca_sourced_interest,
+            "ca_sourced_dividends": ca_sourced_dividends,
+            "ca_sourced_capital_gains": ca_sourced_capital_gains,
+            "ca_source_total": ca_source_total,
             "ca_state_rows_present": ca_state_rows_present,
         }
 
@@ -250,13 +288,17 @@ class CaliforniaPlugin:
     ) -> IncomeApportionment:
         """Split canonical income into CA-source vs non-CA-source.
 
-        Residents: everything is CA-source. Nonresident / part-year: prorate
-        each category by days_in_state / 365.
+        Residents: everything is CA-source.
 
-        TODO: CA actually sources each income type differently (wages to the
-        work location, interest/dividends to the taxpayer's domicile, rental
-        to the property state, etc.). Day-based proration is the shared
-        first-cut across all fan-out state plugins; refine in follow-up.
+        Nonresidents with W-2 state rows: real per-category sourcing per
+        Schedule CA (540NR) rules:
+          - Wages: sourced via W-2 state rows (box 16)
+          - Interest/Dividends: sourced to domicile, NOT CA
+          - Schedule C: sourced if business_location_state == "CA"
+          - Schedule E rental: sourced if property address is in CA
+          - Capital gains: conservative $0 (not sourced to CA by default)
+
+        Nonresidents without W-2 state rows: legacy day-proration fallback.
         """
         wages = sum(
             (w2.box1_wages for w2 in return_.w2s), start=Decimal("0")
@@ -299,27 +341,43 @@ class CaliforniaPlugin:
             start=Decimal("0"),
         )
 
-        fraction = _apportionment_fraction(residency, days_in_state)
-
-        # Wave 6: prefer real W-2 state-row sourcing when the filer is
-        # not a CA resident AND at least one W-2 carries a CA state row.
-        # Fall back to day-proration when no state rows are present.
         if residency == ResidencyStatus.RESIDENT:
-            ca_wages = _cents(wages)
-            ca_se = _cents(se_net)
-        elif state_has_w2_state_rows(return_, "CA"):
-            ca_wages = state_source_wages_from_w2s(return_, "CA")
-            ca_se = state_source_schedule_c(return_, "CA")
-        else:
-            ca_wages = _cents(wages * fraction)
-            ca_se = _cents(se_net * fraction)
+            # All income is CA-source for residents.
+            return IncomeApportionment(
+                state_source_wages=_cents(wages),
+                state_source_interest=_cents(interest),
+                state_source_dividends=_cents(ord_div),
+                state_source_capital_gains=_cents(capital_gains),
+                state_source_self_employment=_cents(se_net),
+                state_source_rental=_cents(rental_net),
+            )
 
+        if state_has_w2_state_rows(return_, "CA"):
+            # Real per-category sourcing (540NR rules).
+            ca_wages = state_source_wages_from_w2s(return_, "CA")
+            ca_interest = Decimal("0")       # Interest sourced to domicile, not CA
+            ca_dividends = Decimal("0")      # Dividends sourced to domicile, not CA
+            ca_capital_gains = Decimal("0")  # Conservative: not sourced unless explicitly flagged
+            ca_se = state_source_schedule_c(return_, "CA")
+            ca_rental = state_source_rental(return_, "CA")
+
+            return IncomeApportionment(
+                state_source_wages=ca_wages,
+                state_source_interest=ca_interest,
+                state_source_dividends=ca_dividends,
+                state_source_capital_gains=ca_capital_gains,
+                state_source_self_employment=ca_se,
+                state_source_rental=ca_rental,
+            )
+
+        # Legacy day-proration fallback when no W-2 state rows are present.
+        fraction = _apportionment_fraction(residency, days_in_state)
         return IncomeApportionment(
-            state_source_wages=ca_wages,
+            state_source_wages=_cents(wages * fraction),
             state_source_interest=_cents(interest * fraction),
             state_source_dividends=_cents(ord_div * fraction),
             state_source_capital_gains=_cents(capital_gains * fraction),
-            state_source_self_employment=ca_se,
+            state_source_self_employment=_cents(se_net * fraction),
             state_source_rental=_cents(rental_net * fraction),
         )
 

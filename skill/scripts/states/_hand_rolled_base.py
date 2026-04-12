@@ -61,6 +61,7 @@ __all__ = [
     "state_source_wages_from_w2s",
     "state_has_w2_state_rows",
     "state_source_schedule_c",
+    "state_source_rental",
     "sourced_or_prorated_wages",
     "sourced_or_prorated_schedule_c",
 ]
@@ -347,6 +348,41 @@ def sourced_or_prorated_schedule_c(
     if any_sc_sourced:
         return sourced
     return day_prorate(full_year_se_net, days_in_state, total_days)
+
+
+def state_source_rental(
+    canonical: "CanonicalReturn", state_code: str
+) -> Decimal:
+    """Sum Schedule E property net income for properties located in ``state_code``.
+
+    A Schedule E rental property is sourced to the state where the
+    property is physically located, using the ``address.state`` field on
+    each ``ScheduleEProperty``. This is the standard rule across all
+    states: rental income from real property is sourced to the state
+    where the property sits, regardless of the taxpayer's domicile.
+
+    Parameters
+    ----------
+    canonical
+        The full CanonicalReturn.
+    state_code
+        Two-letter USPS state code (e.g. "CA", "NY", "PA").
+
+    Returns
+    -------
+    Decimal
+        Sum of net rental income for properties in ``state_code``,
+        quantized to the cent. Returns Decimal("0.00") if no properties
+        match.
+    """
+    from skill.scripts.calc.engine import schedule_e_property_net
+
+    total = Decimal("0")
+    for sched in canonical.schedules_e:
+        for prop in sched.properties:
+            if prop.address.state == state_code:
+                total += schedule_e_property_net(prop)
+    return cents(total)
 
 
 def state_source_schedule_c(

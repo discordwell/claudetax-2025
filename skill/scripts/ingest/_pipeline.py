@@ -55,6 +55,7 @@ class DocumentKind(str, Enum):
     FORM_1099_R = "form_1099_r"
     FORM_1099_G = "form_1099_g"
     FORM_SSA_1099 = "form_ssa_1099"
+    FORM_1095_A = "form_1095_a"
     FORM_1098 = "form_1098"
     FORM_1098_E = "form_1098_e"
     FORM_1098_T = "form_1098_t"

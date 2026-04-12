@@ -631,16 +631,47 @@ class TestArkansasPluginFormIds:
     def test_form_ids(self):
         assert PLUGIN.form_ids() == ["AR Form AR1000F"]
 
-    def test_render_pdfs_returns_empty_list(
+    def test_render_pdfs_produces_pdf(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
+        """render_pdfs should produce a filled AR AR1000F PDF."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert PLUGIN.render_pdfs(state_return, tmp_path) == []
+        pdfs = PLUGIN.render_pdfs(state_return, tmp_path)
+        assert len(pdfs) == 1
+        assert pdfs[0].name == "AR_AR1000F.pdf"
+        assert pdfs[0].stat().st_size > 0
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify rendered AR AR1000F PDF contains correct state_total_tax."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        pdfs = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(pdfs[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+        # Widget "F_NR-3-17" maps to state_total_tax (line 42)
+        from skill.scripts.output._acroform_overlay import format_money
+        expected_formatted = format_money(state_return.state_specific["state_total_tax"])
+        assert fields["F_NR-3-17"].get("/V") == expected_formatted
 
 
 # ---------------------------------------------------------------------------

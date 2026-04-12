@@ -282,7 +282,18 @@ class DistrictOfColumbiaPlugin:
         )
 
     def render_pdfs(self, state_return: StateReturn, out_dir: Path) -> list[Path]:
-        # TODO: fill DC Form D-40 (and D-40 Schedule S / Schedule H as needed).
+        # TODO(dc-pdf): DC Form D-40 fillable PDF not obtainable via
+        # direct URL from otr.cfo.dc.gov (tested 40+ URL variations;
+        # the DC OTR site uses a dynamic attachment system with
+        # unpredictable filenames). To implement:
+        # 1. Manually download the fillable D-40 from the DC OTR
+        #    individual tax forms page
+        #    (https://otr.cfo.dc.gov/page/individual-income-tax-forms).
+        # 2. Place at skill/reference/state_forms/dc_d40.pdf.
+        # 3. Enumerate AcroForm widgets and build
+        #    skill/reference/dc-d40-acroform-map.json.
+        # 4. Implement Layer 1 dataclass + Layer 2 render following
+        #    the Pattern B (see AR/CO implementations).
         return []
 
     def form_ids(self) -> list[str]:

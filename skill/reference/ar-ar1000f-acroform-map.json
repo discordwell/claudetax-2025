@@ -1,0 +1,42 @@
+{
+  "source_pdf_url": "https://www.dfa.arkansas.gov/wp-content/uploads/2025_AR1000F_FullYearResidentIndividualIncomeTaxReturn_1.pdf",
+  "source_pdf_sha256": "30265c7d372966307b6086aca5d95a9918202349a42c126d887ba4e6ec3d86b0",
+  "form_year": 2025,
+  "state": "AR",
+  "form": "AR1000F",
+  "total_widgets": 232,
+  "mapped_count": 3,
+  "notes": [
+    "AR1000F Full Year Resident Individual Income Tax Return from AR DFA.",
+    "Page 1 is the identity + income lines, page 2 is deductions/credits, page 3 is payments/refund.",
+    "Widget names use F_NR-{page}-{index} pattern. The form is shared with AR1000NR (nonresident).",
+    "Filing status checkboxes are F_NR-1-22 through F_NR-1-25 area but the exact mapping to Single/MFJ/etc requires inspection of the on-state values.",
+    "Key line mappings: F_NR-1-48=Line 1 (wages), F_NR-1-70=Line 23 (AR AGI), F_NR0-2-29=Line 24A (std ded), F_NR0-2-31=Line 25 (AR taxable income), F_NR-3-1=Line 26 (tax from table), F_NR-3-17=Line 42 (total tax)."
+  ],
+  "mapping": {
+    "state_adjusted_gross_income": {
+      "widget_name": "F_NR-1-70",
+      "terminal_name": "F_NR-1-70",
+      "type": "text",
+      "page": 1,
+      "rect": null,
+      "note": "AR adjusted gross income (line 23)"
+    },
+    "state_taxable_income": {
+      "widget_name": "F_NR0-2-31",
+      "terminal_name": "F_NR0-2-31",
+      "type": "text",
+      "page": 2,
+      "rect": null,
+      "note": "AR net taxable income (line 25)"
+    },
+    "state_total_tax": {
+      "widget_name": "F_NR-3-17",
+      "terminal_name": "F_NR-3-17",
+      "type": "text",
+      "page": 3,
+      "rect": null,
+      "note": "Total AR income tax (line 42) — state_total_tax from plugin"
+    }
+  }
+}

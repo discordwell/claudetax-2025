@@ -213,6 +213,51 @@ Source: https://content.leg.colorado.gov/sites/default/files/documents/audits/25
 """
 
 
+# ---------------------------------------------------------------------------
+# PDF rendering paths (Layer 2 AcroForm fill)
+# ---------------------------------------------------------------------------
+
+_REF_DIR = Path(__file__).resolve().parent.parent.parent / "reference"
+_STATE_FORMS_DIR = _REF_DIR / "state_forms"
+_WIDGET_MAP_PATH = _REF_DIR / "co-dr0104-acroform-map.json"
+
+
+# ---------------------------------------------------------------------------
+# Layer 1: DR 0104 field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DR0104Fields:
+    """Frozen snapshot of CO DR 0104 line values, ready for rendering.
+
+    Field names map to semantic names in the widget map JSON.
+    """
+
+    state_federal_taxable_income: Decimal = Decimal("0")
+    state_additions_total: Decimal = Decimal("0")
+    state_subtractions_total: Decimal = Decimal("0")
+    state_taxable_income: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+
+
+def _build_dr0104_fields(state_return: StateReturn) -> DR0104Fields:
+    """Layer 1: map StateReturn.state_specific to DR0104Fields."""
+    ss = state_return.state_specific
+    return DR0104Fields(
+        state_federal_taxable_income=ss.get("federal_taxable_income", ss.get("state_base_income_approx", Decimal("0"))),
+        state_additions_total=ss.get("co_additions_total", Decimal("0")),
+        state_subtractions_total=ss.get("co_subtractions_total", Decimal("0")),
+        state_taxable_income=ss.get("state_base_income_after_adjustments", Decimal("0")),
+        state_total_tax=ss.get("state_total_tax", Decimal("0")),
+    )
+
+
+# ---------------------------------------------------------------------------
+# V1 limitations
+# ---------------------------------------------------------------------------
+
+
 CO_V1_LIMITATIONS: tuple[str, ...] = (
     # Wave 4 PARTIALLY closed the adds/subs gap: state income tax addback,
     # non-CO muni interest addback, state refund subtraction, US Treasury
@@ -630,12 +675,41 @@ class ColoradoPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO: fan-out follow-up — fill CO Form DR 0104 (and DR 0104PN,
-        # DR 0104AD, DR 0104CR where applicable) using pypdf against the CO
-        # DOR's fillable PDFs. The output renderer suite is the right home
-        # for this; this plugin returns structured state_specific data that
-        # the renderer will consume.
-        return []
+        """Fill CO DR 0104 using the CO DOR fillable PDF.
+
+        Layer 1: build DR0104Fields via _build_dr0104_fields factory.
+        Layer 2: overlay onto the source PDF via fill_acroform_pdf.
+        """
+        from dataclasses import asdict
+
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        fields = _build_dr0104_fields(state_return)
+        wmap = load_widget_map(_WIDGET_MAP_PATH)
+
+        source_pdf = fetch_and_verify_source_pdf(
+            _STATE_FORMS_DIR / "co_dr0104.pdf",
+            wmap.source_pdf_url,
+            wmap.source_pdf_sha256,
+        )
+
+        widget_values: dict[str, str] = {}
+        for sem_name, value in asdict(fields).items():
+            widget_names = wmap.widget_names_for(sem_name)
+            if not widget_names:
+                continue
+            text = format_money(value) if isinstance(value, Decimal) else str(value) if value else ""
+            for wn in widget_names:
+                widget_values[wn] = text
+
+        out_path = Path(out_dir) / "CO_DR0104.pdf"
+        fill_acroform_pdf(source_pdf, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["CO Form DR 0104"]

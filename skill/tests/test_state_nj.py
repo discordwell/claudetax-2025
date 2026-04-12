@@ -36,7 +36,13 @@ from skill.scripts.states._plugin_api import (
     StateStartingPoint,
     SubmissionChannel,
 )
-from skill.scripts.states.nj import PLUGIN, NewJerseyPlugin
+from skill.scripts.states.nj import (
+    NJ1040Fields,
+    PLUGIN,
+    NewJerseyPlugin,
+    _build_nj1040_fields,
+    _split_money_to_digits,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -406,19 +412,159 @@ class TestNewJerseyPluginFormIds:
     def test_form_ids_returns_nj_1040(self):
         assert PLUGIN.form_ids() == ["NJ Form NJ-1040"]
 
-    def test_render_pdfs_returns_empty_list(
+    def test_render_pdfs_produces_pdf(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
-        """Fan-out follow-up: actual NJ-1040 fill is not yet implemented."""
+        """NJ-1040 AcroForm digit-by-digit fill produces a non-empty PDF."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert PLUGIN.render_pdfs(state_return, tmp_path) == []
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        assert len(paths) == 1
+        assert paths[0].exists()
+        assert paths[0].stat().st_size > 0
+        assert paths[0].name == "nj_1040.pdf"
 
-    def test_render_pdfs_accepts_path(
+    def test_render_pdfs_output_is_valid_pdf(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """The rendered PDF must be openable by pypdf."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        assert len(reader.pages) >= 1
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify that rendered NJ-1040 PDF contains correct digit values.
+
+        Line 15 (Gross Income = $65,000.00) should fill the 10 digit cells
+        with the individual characters of '0006500000' (8 dollar + 2 cent
+        digits), with leading zeros blanked.
+        """
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # Line 15 cells for $65,000.00:
+        # 10 cells = 8 dollar + 2 cent
+        # Dollar digits: "00065000" -> positions 0-7
+        # Cent digits: "00" -> positions 8-9
+        # Positions 0-2 are leading zeros (blanked)
+        # Position 3 (undefined_38) = "6"
+        # Position 4 (Text100) = "5"
+        # Positions 5-7 = "000"
+        # Positions 8-9 = "00" (cents)
+        assert fields["undefined_38"].get("/V") == "6"
+        assert fields["Text100"].get("/V") == "5"
+        assert fields["Text106"].get("/V") == "0"  # last cent digit
+
+
+# ---------------------------------------------------------------------------
+# _split_money_to_digits() unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestSplitMoneyToDigits:
+    """Unit tests for the digit-by-digit helper that powers NJ-1040
+    rendering. The NJ PDF uses single-character text widgets for all
+    monetary amounts."""
+
+    def test_basic_split_10_cells(self):
+        """$65,000.00 into 10 cells: 8 dollar + 2 cent."""
+        cells = ["c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9"]
+        result = _split_money_to_digits(Decimal("65000.00"), cells)
+        # 8 dollar digits: 00065000, 2 cent digits: 00
+        # Leading zeros blanked
+        assert result["c0"] == ""       # leading zero blanked
+        assert result["c1"] == ""       # leading zero blanked
+        assert result["c2"] == ""       # leading zero blanked
+        assert result["c3"] == "6"
+        assert result["c4"] == "5"
+        assert result["c5"] == "0"
+        assert result["c6"] == "0"
+        assert result["c7"] == "0"
+        assert result["c8"] == "0"      # cents
+        assert result["c9"] == "0"      # cents
+
+    def test_zero_amount_all_blank(self):
+        """Zero amounts should produce empty strings for all cells."""
+        cells = ["a", "b", "c", "d", "e"]
+        result = _split_money_to_digits(Decimal("0"), cells)
+        assert all(v == "" for v in result.values())
+
+    def test_none_amount_all_blank(self):
+        """None amounts should produce empty strings for all cells."""
+        cells = ["a", "b", "c"]
+        result = _split_money_to_digits(None, cells)
+        assert all(v == "" for v in result.values())
+
+    def test_cents_present(self):
+        """$2042.50 should show 50 in the cents cells."""
+        cells = ["d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "c0", "c1"]
+        result = _split_money_to_digits(Decimal("2042.50"), cells)
+        assert result["d4"] == "2"
+        assert result["d5"] == "0"
+        assert result["d6"] == "4"
+        assert result["d7"] == "2"
+        assert result["c0"] == "5"
+        assert result["c1"] == "0"
+
+    def test_small_amount(self):
+        """$1.23 into 5 cells (3 dollar + 2 cent)."""
+        cells = ["a", "b", "c", "d", "e"]
+        result = _split_money_to_digits(Decimal("1.23"), cells)
+        assert result["a"] == ""       # leading zero
+        assert result["b"] == ""       # leading zero
+        assert result["c"] == "1"
+        assert result["d"] == "2"      # cents
+        assert result["e"] == "3"      # cents
+
+    def test_returns_dict_with_all_keys(self):
+        """Every widget name must appear in the result dict."""
+        cells = ["x1", "x2", "x3", "x4"]
+        result = _split_money_to_digits(Decimal("99.99"), cells)
+        assert set(result.keys()) == set(cells)
+
+
+# ---------------------------------------------------------------------------
+# NJ1040Fields dataclass
+# ---------------------------------------------------------------------------
+
+
+class TestNJ1040Fields:
+    def test_build_from_state_return(
         self, single_65k_return, federal_single_65k
     ):
         state_return = PLUGIN.compute(
@@ -427,5 +573,8 @@ class TestNewJerseyPluginFormIds:
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        # Even with a nonexistent path, a no-op render should not raise.
-        assert PLUGIN.render_pdfs(state_return, Path("/tmp")) == []
+        fields = _build_nj1040_fields(state_return)
+        assert isinstance(fields, NJ1040Fields)
+        assert fields.state_adjusted_gross_income == Decimal("65000.00")
+        assert fields.state_taxable_income == Decimal("64000.00")
+        assert fields.state_total_tax == Decimal("2042.00")

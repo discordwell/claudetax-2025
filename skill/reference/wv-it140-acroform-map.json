@@ -1,0 +1,11 @@
+{
+  "source_pdf_url": "https://tax.wv.gov/Documents/PIT/2025/it140.PersonalIncomeTaxFormsAndInstructions.2025.pdf",
+  "source_pdf_sha256": null,
+  "form_year": 2025,
+  "state": "WV",
+  "form": "IT-140",
+  "total_widgets": 0,
+  "flattened": true,
+  "flattened_note": "The 2025 WV IT-140 form bundle (56 pages, instructions + forms) is fully flattened — zero AcroForm fields, zero widget annotations. The 2024 version (it140.2024.pdf) was fillable (564 fields), but WV switched to a non-fillable format for 2025. WV pushes taxpayers to its MyTaxes portal (https://mytaxes.wvtax.gov/) for electronic filing. Verified 2026-04-12.",
+  "mapping": {}
+}

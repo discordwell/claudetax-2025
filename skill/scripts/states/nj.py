@@ -29,6 +29,7 @@ approximation shared with the other fan-out state plugins.
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
@@ -53,6 +54,122 @@ from skill.scripts.states._plugin_api import (
 
 
 _CENTS = Decimal("0.01")
+
+
+# ---------------------------------------------------------------------------
+# Layer 1: NJ-1040 field dataclass + factory
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class NJ1040Fields:
+    """Frozen snapshot of NJ-1040 line values, ready for rendering.
+
+    Field names correspond to state_specific keys produced by
+    NewJerseyPlugin.compute(). Only the lines we can reliably map to
+    the NJ-1040 digit-entry widgets are included.
+    """
+
+    state_adjusted_gross_income: Decimal = Decimal("0")
+    state_taxable_income: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+    state_total_tax_resident_basis: Decimal = Decimal("0")
+
+
+def _build_nj1040_fields(state_return: StateReturn) -> NJ1040Fields:
+    """Map StateReturn.state_specific to NJ1040Fields."""
+    ss = state_return.state_specific
+    return NJ1040Fields(
+        state_adjusted_gross_income=ss.get(
+            "state_adjusted_gross_income", Decimal("0")
+        ),
+        state_taxable_income=ss.get(
+            "state_taxable_income", Decimal("0")
+        ),
+        state_total_tax=ss.get(
+            "state_total_tax", Decimal("0")
+        ),
+        state_total_tax_resident_basis=ss.get(
+            "state_total_tax_resident_basis", Decimal("0")
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Digit-by-digit helper for NJ-1040 single-char widget entry
+# ---------------------------------------------------------------------------
+
+
+def _split_money_to_digits(
+    amount: Decimal,
+    widget_names: list[str],
+) -> dict[str, str]:
+    """Split a money amount into individual digit characters for NJ-1040.
+
+    The NJ-1040 PDF uses single-character text widgets for monetary
+    amounts. Each line has N cells arranged left-to-right where the last
+    2 cells are cents and the preceding cells are dollar digits
+    (right-aligned, zero-padded to fill all available cells).
+
+    Parameters
+    ----------
+    amount
+        The monetary amount to split (e.g., Decimal("2042.00")).
+    widget_names
+        Ordered list of widget names for this line, left to right.
+
+    Returns
+    -------
+    dict
+        ``{widget_name: single_char}`` for each digit position.
+        Zero amounts return empty strings for all cells.
+    """
+    if amount is None or amount == Decimal("0"):
+        return {name: "" for name in widget_names}
+
+    num_cells = len(widget_names)
+    num_dollar_cells = num_cells - 2
+    num_cent_cells = 2
+
+    # Format to cents without decimal point: e.g., 2042.00 -> "204200"
+    cents_val = amount.quantize(Decimal("0.01"))
+    raw = str(cents_val).replace(".", "").replace("-", "")
+    # raw is e.g., "204200" for $2042.00
+
+    # Split: last 2 chars are cents, everything before is dollars
+    if len(raw) <= 2:
+        dollar_str = "0"
+        cent_str = raw.zfill(2)
+    else:
+        dollar_str = raw[:-2]
+        cent_str = raw[-2:]
+
+    # Pad dollar digits to fill available cells (right-aligned)
+    dollar_padded = dollar_str.zfill(num_dollar_cells)
+
+    # If the amount is too large for the available cells, truncate from left
+    # (this would only happen for very large amounts exceeding form capacity)
+    if len(dollar_padded) > num_dollar_cells:
+        dollar_padded = dollar_padded[-num_dollar_cells:]
+
+    all_digits = dollar_padded + cent_str
+    assert len(all_digits) == num_cells, (
+        f"digit count mismatch: {len(all_digits)} != {num_cells}"
+    )
+
+    result: dict[str, str] = {}
+    for i, name in enumerate(widget_names):
+        char = all_digits[i]
+        # Don't fill leading zeros in the dollar part (leave blank)
+        if i < num_dollar_cells and char == "0":
+            # Check if all remaining dollar digits up to this point are zeros
+            if all(all_digits[j] == "0" for j in range(i + 1)):
+                # But keep at least one zero before the cents
+                if i < num_dollar_cells - 1:
+                    result[name] = ""
+                    continue
+        result[name] = char
+    return result
 
 
 def _d(v: Any) -> Decimal:
@@ -236,19 +353,86 @@ class NewJerseyPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # NJ-1040 fillable PDF (https://www.nj.gov/treasury/taxation/pdf/
-        # current/1040.pdf) uses digit-by-digit entry for all monetary
-        # amounts: each dollar line has 8+ individual single-character text
-        # widgets (one per digit). The form has 844 widget annotations,
-        # almost all of which are these single-digit cells with garbled
-        # names (e.g. "Text100", "undefined_37", "4036y54ethdf%%^87").
-        #
-        # Implementing a reliable renderer requires mapping each digit
-        # position across ~70 line items, handling right-to-left fill, and
-        # dealing with the non-semantic widget names. This is deferred to a
-        # dedicated NJ rendering sprint. The compute() method correctly
-        # produces state_specific data for downstream consumers.
-        return []
+        """Fill the NJ-1040 PDF using digit-by-digit entry.
+
+        The NJ-1040 fillable PDF uses single-character text widgets for
+        monetary amounts: each line has 8-11 individual cells (one per
+        digit). Widget names are garbled/non-semantic (e.g. "Text100",
+        "undefined_37", "4036y54ethdf%%^87") but positionally stable.
+
+        This renderer fills the three key financial summary lines:
+        - Line 15: Gross Income (state_adjusted_gross_income)
+        - Line 27: NJ Taxable Income (state_taxable_income)
+        - Line 29: Tax (same as line 27's tax for simple returns)
+        """
+        from skill.scripts.output._acroform_overlay import (
+            fetch_and_verify_source_pdf,
+            fill_acroform_pdf,
+        )
+
+        _REF = Path(__file__).resolve().parents[2] / "reference"
+        _WIDGET_MAP_JSON = _REF / "nj-1040-acroform-map.json"
+        _SOURCE_PDF = _REF / "state_forms" / "nj-1040.pdf"
+
+        # Load the digit-cell widget map
+        if not _WIDGET_MAP_JSON.exists():
+            return []
+        map_data = json.loads(_WIDGET_MAP_JSON.read_text())
+
+        source_url = map_data["source_pdf_url"]
+        expected_sha = map_data["source_pdf_sha256"]
+
+        # Ensure source PDF is available
+        try:
+            fetch_and_verify_source_pdf(
+                _SOURCE_PDF, source_url, expected_sha
+            )
+        except RuntimeError:
+            return []
+
+        fields = _build_nj1040_fields(state_return)
+
+        # Map semantic fields to digit-cell widget names
+        line_map = map_data["mapping"]
+        widget_values: dict[str, str] = {}
+
+        # Line 15: Gross Income
+        if "line_15_gross_income" in line_map:
+            cells = line_map["line_15_gross_income"]["cells"]
+            widget_values.update(
+                _split_money_to_digits(fields.state_adjusted_gross_income, cells)
+            )
+
+        # Line 27: NJ Taxable Income
+        if "line_27_nj_taxable_income" in line_map:
+            cells = line_map["line_27_nj_taxable_income"]["cells"]
+            widget_values.update(
+                _split_money_to_digits(fields.state_taxable_income, cells)
+            )
+
+        # Line 29: Tax (use state_total_tax_resident_basis for resident
+        # tax before apportionment, which is the "tax from table" value)
+        if "line_29_tax" in line_map:
+            cells = line_map["line_29_tax"]["cells"]
+            widget_values.update(
+                _split_money_to_digits(
+                    fields.state_total_tax_resident_basis, cells
+                )
+            )
+
+        # Line 37: Total NJ Income Tax (only 3 cells available)
+        if "line_37_total_tax" in line_map:
+            cells = line_map["line_37_total_tax"]["cells"]
+            widget_values.update(
+                _split_money_to_digits(fields.state_total_tax, cells)
+            )
+
+        if not widget_values:
+            return []
+
+        out_path = out_dir / "nj_1040.pdf"
+        fill_acroform_pdf(_SOURCE_PDF, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["NJ Form NJ-1040"]

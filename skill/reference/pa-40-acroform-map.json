@@ -1,0 +1,11 @@
+{
+  "source_pdf_url": "https://www.revenue.pa.gov/FormsandPublications/FormsforIndividuals/PIT/Documents/2025/2025_pa-40.pdf",
+  "source_pdf_sha256": null,
+  "form_year": 2025,
+  "state": "PA",
+  "form": "PA-40",
+  "total_widgets": 0,
+  "not_available": true,
+  "not_available_note": "The PA DOR website (revenue.pa.gov) serves HTML portal pages instead of PDFs for all PA-40 URLs tested, including 2025_pa-40.pdf, pa-40.pdf, and 2025_PA-40.pdf. The site requires JavaScript/portal navigation to access the actual PDF. HTTP 200 is returned but content-type is text/html. PA pushes taxpayers to its myPATH portal (https://mypath.pa.gov/) for electronic filing. Other PA forms (e.g., REV-276) do serve directly as PDF. Verified 2026-04-12.",
+  "mapping": {}
+}

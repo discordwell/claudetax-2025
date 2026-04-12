@@ -747,6 +747,10 @@ class TestWestVirginiaPluginFormIds:
     def test_render_pdfs_returns_empty_list(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
+        """WV IT-140 2025 is fully flattened (0 AcroForm fields).
+        The 2024 version was fillable but WV switched to non-fillable
+        for 2025. render_pdfs returns [] because AcroForm filling is
+        not possible. See skill/reference/wv-it140-acroform-map.json."""
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,

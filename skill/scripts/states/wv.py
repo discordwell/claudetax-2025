@@ -559,10 +559,16 @@ class WestVirginiaPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(wv-pdf): fan-out follow-up — fill Form IT-140 (and
-        # Schedule M for modifications, Schedule TC-1/TC-2 for credits,
-        # Form IT-140NRS for nonresidents, IT-104R reciprocity form)
-        # using pypdf against the WV State Tax Department fillable PDFs.
+        # WV IT-140 2025: The WV State Tax Department published the 2025
+        # IT-140 form bundle (it140.PersonalIncomeTaxFormsAndInstructions.
+        # 2025.pdf) as a fully flattened PDF — zero AcroForm fields, zero
+        # widget annotations across all 56 pages. The 2024 version
+        # (it140.2024.pdf) was fillable (564 fields), but WV switched to
+        # a non-fillable format for 2025. WV pushes taxpayers to its
+        # MyTaxes portal (https://mytaxes.wvtax.gov/) for e-filing.
+        # AcroForm filling is not possible for this state form.
+        # See skill/reference/wv-it140-acroform-map.json for details.
+        # Verified 2026-04-12.
         return []
 
     def form_ids(self) -> list[str]:

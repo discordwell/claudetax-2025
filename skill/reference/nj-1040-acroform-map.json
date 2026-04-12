@@ -1,0 +1,67 @@
+{
+  "source_pdf_url": "https://www.nj.gov/treasury/taxation/pdf/current/1040.pdf",
+  "source_pdf_sha256": "3d15ad99f3ced62a38eb53c25bd53830a0b9e3927abcb75030ef06ec4c7eb6a3",
+  "form_year": 2025,
+  "state": "NJ",
+  "form": "NJ-1040",
+  "total_widgets": 814,
+  "digit_entry": true,
+  "digit_entry_note": "NJ-1040 uses single-character text widgets for monetary amounts. Each line has 8-11 individual cells arranged left-to-right. The last 2 cells are cents; the preceding cells are dollar digits (right-aligned, zero-padded). Lines with 11 cells have a leading sign/indicator cell at position 0.",
+  "mapped_count": 5,
+  "mapping": {
+    "line_15_gross_income": {
+      "type": "digit_row",
+      "page": 2,
+      "dollar_digits": 8,
+      "cent_digits": 2,
+      "cells": ["15", "undefined_36", "undefined_37", "undefined_38", "Text100", "Text101", "Text103", "Text104", "Text105", "Text106"],
+      "note": "NJ Gross Income (line 15) — maps to state_adjusted_gross_income"
+    },
+    "line_27_nj_taxable_income": {
+      "type": "digit_row",
+      "page": 2,
+      "dollar_digits": 9,
+      "cent_digits": 2,
+      "cells": ["263", "27", "183", "undefined_78", "184", "185", "undefined_79", "186", "187", "undefined_80", "188"],
+      "note": "NJ Taxable Income (line 27) — maps to state_taxable_income. First cell (263) is sign indicator."
+    },
+    "line_29_tax": {
+      "type": "digit_row",
+      "page": 2,
+      "dollar_digits": 9,
+      "cent_digits": 2,
+      "cells": ["270", "29", "204", "undefined_87", "205", "206", "undefined_88", "207", "208", "undefined_89", "209"],
+      "note": "Tax from table or rate schedule (line 29). First cell (270) is sign indicator."
+    },
+    "line_37_total_tax": {
+      "type": "digit_row",
+      "page": 2,
+      "dollar_digits": 1,
+      "cent_digits": 2,
+      "cells": ["37", "245", "24539a#2"],
+      "note": "Total NJ Income Tax (line 37) — maps to state_total_tax. Only 3 cells available on this shared row."
+    },
+    "line_53_balance_due": {
+      "type": "digit_row",
+      "page": 3,
+      "dollar_digits": 8,
+      "cent_digits": 2,
+      "cells": ["Enter Code4332243ew^^%$#", "4036y54ethdf%%^87", "53", "undefined_141", "undefined_142", "Text148", "Text149", "Text150", "Text151", "Text152"],
+      "note": "Balance due (line 53). First 2 cells are code indicator fields."
+    }
+  },
+  "filing_status_checkboxes": {
+    "single": {
+      "widget_name": "Check Box18",
+      "note": "Filing status: Single"
+    },
+    "married_filing_jointly": {
+      "widget_name": "Check Box19",
+      "note": "Filing status: Married/CU filing jointly"
+    },
+    "head_of_household": {
+      "widget_name": "Check Box20",
+      "note": "Filing status: Head of household"
+    }
+  }
+}

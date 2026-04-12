@@ -470,7 +470,12 @@ class TestPennsylvaniaPluginFormIds:
     def test_render_pdfs_returns_empty_list(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
-        """Fan-out follow-up: actual PA-40 fill is not yet implemented."""
+        """PA DOR serves HTML instead of PDF for PA-40 downloads.
+        The site requires JavaScript/portal navigation to access the
+        actual PDF. render_pdfs returns [] because the source PDF is
+        not available for automated download. PA pushes taxpayers to
+        its myPATH portal for e-filing.
+        See skill/reference/pa-40-acroform-map.json for details."""
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
@@ -488,5 +493,5 @@ class TestPennsylvaniaPluginFormIds:
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        # Even with a nonexistent path, a no-op render should not raise.
+        # PA-40 PDF not available — render is a no-op.
         assert PLUGIN.render_pdfs(state_return, Path("/tmp")) == []

@@ -170,6 +170,46 @@ from skill.scripts.models import (
     ResidencyStatus,
     StateReturn,
 )
+
+
+# ---------------------------------------------------------------------------
+# Layer 1: IL Form IL-1040 field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class IL1040Fields:
+    """Frozen snapshot of IL-1040 line values, ready for rendering.
+
+    Field names map to the semantic keys in il-1040-acroform-map.json.
+    """
+
+    state_federal_agi: Decimal = Decimal("0")
+    state_tax_exempt_interest_addback: Decimal = Decimal("0")
+    state_total_subtractions: Decimal = Decimal("0")
+    state_base_income: Decimal = Decimal("0")
+    state_exemption_allowance: Decimal = Decimal("0")
+    state_income_tax: Decimal = Decimal("0")
+    state_total_income: Decimal = Decimal("0")
+
+
+def _build_il1040_fields(state_return: "StateReturn") -> IL1040Fields:
+    """Map StateReturn.state_specific to IL1040Fields."""
+    ss = state_return.state_specific
+    additions = ss.get("il_additions", {})
+    subtractions = ss.get("il_subtractions", {})
+    return IL1040Fields(
+        state_federal_agi=ss.get("state_base_income_approx", Decimal("0")),
+        state_tax_exempt_interest_addback=additions.get(
+            "il_1040_line2_tax_exempt_interest_addback", Decimal("0")
+        ),
+        state_total_subtractions=ss.get("il_subtractions_total", Decimal("0")),
+        state_base_income=ss.get("state_base_income_after_adjustments", Decimal("0")),
+        state_exemption_allowance=ss.get("state_exemption_total", Decimal("0")),
+        state_income_tax=ss.get("state_total_tax", Decimal("0")),
+        state_total_income=ss.get("state_base_income_approx", Decimal("0"))
+        + additions.get("il_1040_line2_tax_exempt_interest_addback", Decimal("0")),
+    )
 from skill.scripts.states._hand_rolled_base import (
     state_has_w2_state_rows,
     state_source_schedule_c,
@@ -587,11 +627,38 @@ class IllinoisPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(il-pdf): fan-out follow-up — fill IL-1040 and Schedule NR /
-        # Schedule M / Schedule CR using pypdf against the IL DOR fillable
-        # PDFs. Renderer suite is the right home for this; this plugin
-        # returns structured state_specific that the renderer will consume.
-        return []
+        from dataclasses import asdict
+
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        _REF = Path(__file__).resolve().parents[2] / "reference"
+        wmap = load_widget_map(_REF / "il-1040-acroform-map.json")
+        fetch_and_verify_source_pdf(
+            _REF / "state_forms" / "il_1040.pdf",
+            wmap.source_pdf_url,
+            wmap.source_pdf_sha256,
+        )
+
+        fields = _build_il1040_fields(state_return)
+        widget_values: dict[str, str] = {}
+        for sem_name, value in asdict(fields).items():
+            for wn in wmap.widget_names_for(sem_name):
+                widget_values[wn] = (
+                    format_money(value)
+                    if isinstance(value, Decimal)
+                    else str(value) if value else ""
+                )
+
+        out_path = out_dir / "IL_1040.pdf"
+        fill_acroform_pdf(
+            _REF / "state_forms" / "il_1040.pdf", widget_values, out_path
+        )
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["IL Form IL-1040"]

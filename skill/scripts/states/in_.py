@@ -230,6 +230,41 @@ from skill.scripts.models import (
     ResidencyStatus,
     StateReturn,
 )
+
+
+# ---------------------------------------------------------------------------
+# Layer 1: IN Form IT-40 field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class INIT40Fields:
+    """Frozen snapshot of IN Form IT-40 line values, ready for rendering.
+
+    Field names map to the semantic keys in in-it40-acroform-map.json.
+    """
+
+    state_federal_agi: Decimal = Decimal("0")
+    state_addbacks: Decimal = Decimal("0")
+    state_deductions: Decimal = Decimal("0")
+    state_adjusted_gross_income: Decimal = Decimal("0")
+    state_exemptions: Decimal = Decimal("0")
+    state_taxable_income: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+
+
+def _build_it40_fields(state_return: "StateReturn") -> INIT40Fields:
+    """Map StateReturn.state_specific to INIT40Fields."""
+    ss = state_return.state_specific
+    return INIT40Fields(
+        state_federal_agi=ss.get("state_federal_agi", Decimal("0")),
+        state_addbacks=ss.get("in_addbacks_applied", Decimal("0")),
+        state_deductions=ss.get("in_subtractions_applied", Decimal("0")),
+        state_adjusted_gross_income=ss.get("state_adjusted_gross_income", Decimal("0")),
+        state_exemptions=ss.get("state_exemption_allowance", Decimal("0")),
+        state_taxable_income=ss.get("state_taxable_income", Decimal("0")),
+        state_total_tax=ss.get("state_total_tax", Decimal("0")),
+    )
 from skill.scripts.states._hand_rolled_base import (
     cents,
     d,
@@ -600,13 +635,38 @@ class IndianaPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(in-pdf): fan-out follow-up — fill IT-40 (and Schedules
-        # 1-7, CT-40 county tax, IN-EIC, IT-40PNR for nonresidents)
-        # using pypdf against the IN DOR's fillable PDFs. The output
-        # renderer suite is the right home for this; this plugin
-        # returns structured state_specific data that the renderer
-        # will consume.
-        return []
+        from dataclasses import asdict
+
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        _REF = Path(__file__).resolve().parents[2] / "reference"
+        wmap = load_widget_map(_REF / "in-it40-acroform-map.json")
+        fetch_and_verify_source_pdf(
+            _REF / "state_forms" / "in_it40.pdf",
+            wmap.source_pdf_url,
+            wmap.source_pdf_sha256,
+        )
+
+        fields = _build_it40_fields(state_return)
+        widget_values: dict[str, str] = {}
+        for sem_name, value in asdict(fields).items():
+            for wn in wmap.widget_names_for(sem_name):
+                widget_values[wn] = (
+                    format_money(value)
+                    if isinstance(value, Decimal)
+                    else str(value) if value else ""
+                )
+
+        out_path = out_dir / "IN_IT40.pdf"
+        fill_acroform_pdf(
+            _REF / "state_forms" / "in_it40.pdf", widget_values, out_path
+        )
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["IN Form IT-40"]

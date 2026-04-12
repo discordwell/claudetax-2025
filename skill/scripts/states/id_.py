@@ -152,6 +152,42 @@ from typing import Any
 
 import tenforty
 
+
+# ---------------------------------------------------------------------------
+# Layer 1: ID Form 40 field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class IDForm40Fields:
+    """Frozen snapshot of ID Form 40 line values, ready for rendering.
+
+    Field names correspond to state_specific keys produced by
+    IdahoPlugin.compute().
+    """
+
+    state_adjusted_gross_income: Decimal = Decimal("0")
+    state_taxable_income: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+    state_total_tax_resident_basis: Decimal = Decimal("0")
+    state_tax_bracket: Decimal = Decimal("0")
+    state_effective_tax_rate: Decimal = Decimal("0")
+    apportionment_fraction: Decimal = Decimal("1")
+
+
+def _build_form40_fields(state_return: "StateReturn") -> IDForm40Fields:
+    """Map StateReturn.state_specific to IDForm40Fields."""
+    ss = state_return.state_specific
+    return IDForm40Fields(
+        state_adjusted_gross_income=ss.get("state_adjusted_gross_income", Decimal("0")),
+        state_taxable_income=ss.get("state_taxable_income", Decimal("0")),
+        state_total_tax=ss.get("state_total_tax", Decimal("0")),
+        state_total_tax_resident_basis=ss.get("state_total_tax_resident_basis", Decimal("0")),
+        state_tax_bracket=ss.get("state_tax_bracket", Decimal("0")),
+        state_effective_tax_rate=ss.get("state_effective_tax_rate", Decimal("0")),
+        apportionment_fraction=ss.get("apportionment_fraction", Decimal("1")),
+    )
+
 from skill.scripts.calc.engine import _to_tenforty_input
 from skill.scripts.models import (
     CanonicalReturn,
@@ -357,10 +393,38 @@ class IdahoPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(id-pdf): fan-out follow-up — fill Idaho Form 40
-        # (and Form 39R, Form 43 for nonresidents) using pypdf
-        # against the ID DOR's fillable PDFs.
-        return []
+        from dataclasses import asdict
+
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        _REF = Path(__file__).resolve().parents[2] / "reference"
+        wmap = load_widget_map(_REF / "id-40-acroform-map.json")
+        fetch_and_verify_source_pdf(
+            _REF / "state_forms" / "id_40.pdf",
+            wmap.source_pdf_url,
+            wmap.source_pdf_sha256,
+        )
+
+        fields = _build_form40_fields(state_return)
+        widget_values: dict[str, str] = {}
+        for sem_name, value in asdict(fields).items():
+            for wn in wmap.widget_names_for(sem_name):
+                widget_values[wn] = (
+                    format_money(value)
+                    if isinstance(value, Decimal)
+                    else str(value) if value else ""
+                )
+
+        out_path = out_dir / "ID_Form40.pdf"
+        fill_acroform_pdf(
+            _REF / "state_forms" / "id_40.pdf", widget_values, out_path
+        )
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["ID Form 40"]

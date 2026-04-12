@@ -480,29 +480,53 @@ class TestHawaiiPluginFormIds:
     def test_form_ids(self):
         assert PLUGIN.form_ids() == ["HI Form N-11"]
 
-    def test_render_pdfs_returns_empty_list(
+    def test_render_pdfs_produces_pdf(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
-        state_return = PLUGIN.compute(
-            single_65k_return,
-            federal_single_65k,
-            ResidencyStatus.RESIDENT,
-            days_in_state=365,
-        )
-        assert PLUGIN.render_pdfs(state_return, tmp_path) == []
+        """HI Form N-11 AcroForm fill produces a non-empty PDF."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
 
-    def test_render_pdfs_accepts_path_object(
-        self, single_65k_return, federal_single_65k
-    ):
-        """Mirror the WI test pattern: even with a literal Path,
-        the no-op render_pdfs should not raise."""
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert PLUGIN.render_pdfs(state_return, Path("/tmp")) == []
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        assert len(paths) == 1
+        assert paths[0].exists()
+        assert paths[0].stat().st_size > 0
+        assert paths[0].name == "HI_N11.pdf"
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify that rendered HI N-11 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # Widget "7" maps to state_adjusted_gross_income (N-11 line 7)
+        assert fields["7"].get("/V") == "65000.00"
+        # Widget "27" maps to state_taxable_income (N-11 line 27)
+        assert fields["27"].get("/V") == "60600.00"
+        # Widget "28" maps to state_total_tax (N-11 line 28)
+        assert fields["28"].get("/V") == "3496.80"
 
 
 # ---------------------------------------------------------------------------

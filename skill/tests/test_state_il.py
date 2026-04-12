@@ -571,17 +571,54 @@ class TestIllinoisPluginFormIds:
     def test_form_ids_returns_il_1040(self):
         assert PLUGIN.form_ids() == ["IL Form IL-1040"]
 
-    def test_render_pdfs_returns_empty_list(
+    def test_render_pdfs_produces_pdf(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
-        """Fan-out follow-up — IL-1040 PDF fill not yet implemented."""
+        """IL-1040 AcroForm fill produces a non-empty PDF."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert PLUGIN.render_pdfs(state_return, tmp_path) == []
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        assert len(paths) == 1
+        assert paths[0].exists()
+        assert paths[0].stat().st_size > 0
+        assert paths[0].name == "IL_1040.pdf"
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify that rendered IL-1040 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # "Federally adjusted income" = state_federal_agi (IL-1040 Line 1)
+        assert fields["Federally adjusted income"].get("/V") == "65000.00"
+        # "Exemption allowance" = state_exemption_allowance (IL-1040 Line 10)
+        assert fields["Exemption allowance"].get("/V") == "2850.00"
+        # "Income tax" = state_income_tax (IL-1040 Line 12)
+        # $65,000 - $2,850 exemption = $62,150 * 0.0495 = $3,076.43
+        assert fields["Income tax"].get("/V") == "3076.43"
 
 
 # ---------------------------------------------------------------------------

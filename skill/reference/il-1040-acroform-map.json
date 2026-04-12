@@ -1,0 +1,60 @@
+{
+  "source_pdf_url": "https://tax.illinois.gov/content/dam/soi/en/web/tax/forms/incometax/documents/currentyear/individual/il-1040.pdf",
+  "source_pdf_sha256": "30651b8838b20758582d59febdd4bd8be015200b8f73b4ccec8300b14c79523a",
+  "form_year": 2025,
+  "state": "IL",
+  "form": "IL-1040",
+  "total_widgets": 103,
+  "mapped_count": 7,
+  "mapping": {
+    "state_federal_agi": {
+      "widget_name": "Federally adjusted income",
+      "terminal_name": "Federally adjusted income",
+      "type": "text",
+      "page": 1,
+      "note": "Federal adjusted gross income (IL-1040 Step 3 Line 1)"
+    },
+    "state_tax_exempt_interest_addback": {
+      "widget_name": "Federally tax-exempt interest",
+      "terminal_name": "Federally tax-exempt interest",
+      "type": "text",
+      "page": 1,
+      "note": "Federally tax-exempt interest and dividend income (IL-1040 Step 3 Line 2)"
+    },
+    "state_total_subtractions": {
+      "widget_name": "Total of your subtractions",
+      "terminal_name": "Total of your subtractions",
+      "type": "text",
+      "page": 1,
+      "note": "Total subtractions - SS + retirement + US Treasury (IL-1040 Step 3 Line 8)"
+    },
+    "state_base_income": {
+      "widget_name": "Illinois base income",
+      "terminal_name": "Illinois base income",
+      "type": "text",
+      "page": 1,
+      "note": "Illinois base income (IL-1040 Step 3 Line 9)"
+    },
+    "state_exemption_allowance": {
+      "widget_name": "Exemption allowance",
+      "terminal_name": "Exemption allowance",
+      "type": "text",
+      "page": 1,
+      "note": "Exemption allowance (IL-1040 Step 4 Line 10)"
+    },
+    "state_income_tax": {
+      "widget_name": "Income tax",
+      "terminal_name": "Income tax",
+      "type": "text",
+      "page": 1,
+      "note": "Income tax = net income * 4.95% (IL-1040 Step 5 Line 12)"
+    },
+    "state_total_income": {
+      "widget_name": "Total income",
+      "terminal_name": "Total income",
+      "type": "text",
+      "page": 1,
+      "note": "Total income = Line 1 + Line 2 + Line 3 (IL-1040 Step 3 Line 4)"
+    }
+  }
+}

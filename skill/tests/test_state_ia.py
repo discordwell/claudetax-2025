@@ -505,7 +505,9 @@ class TestIowaPluginFormIds:
     def test_render_pdfs_returns_empty_list(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
-        """Fan-out follow-up: actual IA 1040 fill is not yet implemented."""
+        """Iowa DOR does not publish a standalone fillable IA 1040 PDF
+        with AcroForm widgets for TY2025. render_pdfs returns [] until
+        a fillable PDF becomes available."""
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,

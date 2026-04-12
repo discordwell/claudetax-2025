@@ -408,12 +408,16 @@ class IowaPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(ia-pdf): fan-out follow-up — fill IA 1040 (and IA 126 for
-        # nonresidents, IA Schedule 1 for adjustments, IA 130 for the
-        # out-of-state tax credit) using pypdf against the IA DOR's
-        # fillable PDFs. The output renderer suite is the right home
-        # for this; this plugin returns structured state_specific data
-        # that the renderer will consume.
+        # IA 1040: the Iowa DOR (revenue.iowa.gov, formerly tax.iowa.gov)
+        # does not publish a standalone fillable IA 1040 PDF with AcroForm
+        # widgets for TY2025. The PDF available via the DOR media endpoint
+        # is a different form (composite return / power of attorney) and
+        # the IA 1040 itself is only available through the GovConnectIowa
+        # e-file portal at https://tax.iowa.gov/govconnect. Verified
+        # 2026-04-12 by probing revenue.iowa.gov media IDs and checking
+        # the resulting PDFs via pypdf PdfReader.get_fields().
+        # TODO(ia-pdf): if Iowa DOR publishes a standalone fillable IA
+        # 1040 with AcroForm widgets, implement AcroForm overlay here.
         return []
 
     def form_ids(self) -> list[str]:

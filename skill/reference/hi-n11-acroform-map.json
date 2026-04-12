@@ -1,0 +1,46 @@
+{
+  "source_pdf_url": "https://files.hawaii.gov/tax/forms/current/n11_f.pdf",
+  "source_pdf_sha256": "e0e707e1d2b3c58ec1e7bc837fce54ec87e61b8933fd2795dd8014147692b999",
+  "form_year": 2025,
+  "state": "HI",
+  "form": "N-11",
+  "total_widgets": 388,
+  "mapped_count": 5,
+  "mapping": {
+    "state_adjusted_gross_income": {
+      "widget_name": "7",
+      "terminal_name": "7",
+      "type": "text",
+      "page": 1,
+      "note": "Federal adjusted gross income (N-11 line 7)"
+    },
+    "state_taxable_income": {
+      "widget_name": "27",
+      "terminal_name": "27",
+      "type": "text",
+      "page": 1,
+      "note": "Hawaii taxable income (N-11 line 27)"
+    },
+    "state_total_tax": {
+      "widget_name": "28",
+      "terminal_name": "28",
+      "type": "text",
+      "page": 1,
+      "note": "Tax from tax table or tax rate schedule (N-11 line 28)"
+    },
+    "state_standard_deduction": {
+      "widget_name": "26",
+      "terminal_name": "26",
+      "type": "text",
+      "page": 1,
+      "note": "Standard deduction or itemized deductions (N-11 line 26)"
+    },
+    "state_exemptions": {
+      "widget_name": "25",
+      "terminal_name": "25",
+      "type": "text",
+      "page": 1,
+      "note": "Total exemptions (N-11 line 25)"
+    }
+  }
+}

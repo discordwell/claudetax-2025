@@ -724,16 +724,57 @@ class TestIndianaPluginFormIds:
         assert "IN Form IT-40" in form_ids
         assert form_ids == ["IN Form IT-40"]
 
-    def test_render_pdfs_returns_empty_list(
+    def test_render_pdfs_produces_pdf(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
+        """IN Form IT-40 AcroForm fill produces a non-empty PDF."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert PLUGIN.render_pdfs(state_return, tmp_path) == []
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        assert len(paths) == 1
+        assert paths[0].exists()
+        assert paths[0].stat().st_size > 0
+        assert paths[0].name == "IN_IT40.pdf"
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify that rendered IN IT-40 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # Widget "Line 1" maps to state_federal_agi (IT-40 Line 1)
+        assert fields["Line 1"].get("/V") == "65000.00"
+        # Widget "Line 5" maps to state_adjusted_gross_income (IT-40 Line 5)
+        assert fields["Line 5"].get("/V") == "65000.00"
+        # Widget "Line 6" maps to state_exemptions (IT-40 Line 6)
+        assert fields["Line 6"].get("/V") == "1000.00"
+        # Widget "Line 7" maps to state_taxable_income (IT-40 Line 7)
+        assert fields["Line 7"].get("/V") == "64000.00"
+        # Widget "Line 8" maps to state_total_tax (IT-40 Line 8)
+        assert fields["Line 8"].get("/V") == "1920.00"
 
 
 # ---------------------------------------------------------------------------

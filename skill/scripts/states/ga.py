@@ -523,11 +523,17 @@ class GeorgiaPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(ga-pdf): fan-out follow-up - fill GA Form 500 (and Schedule
-        # 3 for nonresidents / part-year) using pypdf against the GA DOR
-        # fillable PDFs. The output renderer suite is the right home for
-        # this; this plugin returns structured state_specific data that
-        # the renderer will consume.
+        # GA Form 500: the Georgia DOR distributes Form 500 only inside
+        # the IT-511 Individual Income Tax Booklet PDF, which is a
+        # FLATTENED print-ready document with NO AcroForm widgets
+        # (verified 2026-04-12 via pypdf PdfReader.get_fields() returning
+        # None on the 2025 IT-511 booklet from
+        # https://dor.georgia.gov/document/document/2025-it-511-individual-income-tax-booklet/download).
+        # A standalone fillable Form 500 PDF is not published by the GA
+        # DOR for TY2025. The recommended filing path is the Georgia Tax
+        # Center (GTC) free e-file portal at https://gtc.dor.ga.gov/_/.
+        # TODO(ga-pdf): if GA DOR publishes a standalone fillable Form
+        # 500 in the future, implement AcroForm overlay here.
         return []
 
     def form_ids(self) -> list[str]:

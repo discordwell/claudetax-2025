@@ -524,7 +524,9 @@ class TestFormIdsAndRender:
     def test_render_pdfs_returns_empty_list(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
-        """Fan-out follow-up: actual GA Form 500 PDF fill not yet implemented."""
+        """GA Form 500 is distributed as a flattened PDF inside the IT-511
+        booklet with no AcroForm widgets. render_pdfs returns [] until
+        the GA DOR publishes a standalone fillable Form 500."""
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,

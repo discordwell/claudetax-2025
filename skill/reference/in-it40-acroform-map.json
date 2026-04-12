@@ -1,0 +1,60 @@
+{
+  "source_pdf_url": "https://forms.in.gov/Download.aspx?id=16914",
+  "source_pdf_sha256": "0b5d74cffea1dc758eff500a8d74bf020b53b977b57e04b12ce344316234b785",
+  "form_year": 2025,
+  "state": "IN",
+  "form": "IT-40",
+  "total_widgets": 70,
+  "mapped_count": 7,
+  "mapping": {
+    "state_federal_agi": {
+      "widget_name": "Line 1",
+      "terminal_name": "Line 1",
+      "type": "text",
+      "page": 1,
+      "note": "Federal adjusted gross income (IT-40 Line 1)"
+    },
+    "state_addbacks": {
+      "widget_name": "Line 2",
+      "terminal_name": "Line 2",
+      "type": "text",
+      "page": 1,
+      "note": "Indiana add-backs from Schedule 1 (IT-40 Line 2)"
+    },
+    "state_deductions": {
+      "widget_name": "Line 4",
+      "terminal_name": "Line 4",
+      "type": "text",
+      "page": 1,
+      "note": "Indiana deductions from Schedule 2 (IT-40 Line 4)"
+    },
+    "state_adjusted_gross_income": {
+      "widget_name": "Line 5",
+      "terminal_name": "Line 5",
+      "type": "text",
+      "page": 1,
+      "note": "Indiana AGI = Line 3 - Line 4 (IT-40 Line 5)"
+    },
+    "state_exemptions": {
+      "widget_name": "Line 6",
+      "terminal_name": "Line 6",
+      "type": "text",
+      "page": 1,
+      "note": "Personal/dependent exemptions from Schedule 3 (IT-40 Line 6)"
+    },
+    "state_taxable_income": {
+      "widget_name": "Line 7",
+      "terminal_name": "Line 7",
+      "type": "text",
+      "page": 1,
+      "note": "Indiana taxable income = Line 5 - Line 6 (IT-40 Line 7)"
+    },
+    "state_total_tax": {
+      "widget_name": "Line 8",
+      "terminal_name": "Line 8",
+      "type": "text",
+      "page": 1,
+      "note": "State adjusted gross income tax = 3.00% * Line 7 (IT-40 Line 8)"
+    }
+  }
+}

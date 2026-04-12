@@ -502,27 +502,53 @@ class TestIdahoPluginFormIds:
     def test_form_ids(self):
         assert PLUGIN.form_ids() == ["ID Form 40"]
 
-    def test_render_pdfs_returns_empty_list(
+    def test_render_pdfs_produces_pdf(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
-        state_return = PLUGIN.compute(
-            single_65k_return,
-            federal_single_65k,
-            ResidencyStatus.RESIDENT,
-            days_in_state=365,
-        )
-        assert PLUGIN.render_pdfs(state_return, tmp_path) == []
+        """ID Form 40 AcroForm fill produces a non-empty PDF."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
 
-    def test_render_pdfs_accepts_path_object(
-        self, single_65k_return, federal_single_65k
-    ):
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert PLUGIN.render_pdfs(state_return, Path("/tmp")) == []
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        assert len(paths) == 1
+        assert paths[0].exists()
+        assert paths[0].stat().st_size > 0
+        assert paths[0].name == "ID_Form40.pdf"
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify that rendered ID Form 40 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # Widget "IncomeL7" maps to state_adjusted_gross_income (Form 40 line 7)
+        assert fields["IncomeL7"].get("/V") == "65000.00"
+        # Widget "IncomeL19" maps to state_taxable_income (Form 40 line 19)
+        assert fields["IncomeL19"].get("/V") == "49250.00"
+        # Widget "TxCompL20" maps to state_total_tax (Form 40 line 20)
+        assert fields["TxCompL20"].get("/V") == "2355.27"
 
 
 # ---------------------------------------------------------------------------

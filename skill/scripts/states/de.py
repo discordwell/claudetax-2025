@@ -468,9 +468,19 @@ class DelawarePlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(de-pdf): fan-out follow-up — fill DE Form 200-01 (and
-        # Schedule I credits, Form 200-02 for nonresidents) using
-        # pypdf against DE DOR fillable PDFs.
+        # TODO(de-pdf): DE Form 200-01 fillable PDF not obtainable
+        # via direct URL from revenue.delaware.gov or
+        # revenuefiles.delaware.gov (tested 20+ URL variations; the
+        # DE DOR server returns 200 with HTML error pages for all
+        # tried PDF paths). To implement:
+        # 1. Manually download the fillable Form 200-01 from the DE
+        #    Division of Revenue individual tax forms page
+        #    (https://revenue.delaware.gov/).
+        # 2. Place at skill/reference/state_forms/de_200-01.pdf.
+        # 3. Enumerate AcroForm widgets and build
+        #    skill/reference/de-200-01-acroform-map.json.
+        # 4. Implement Layer 1 dataclass + Layer 2 render following
+        #    the Pattern B (see AR/CO implementations).
         return []
 
     def form_ids(self) -> list[str]:

@@ -197,6 +197,47 @@ AR_PERSONAL_TAX_CREDIT_PER_EXEMPTION: Final[Decimal] = Decimal("29.00")
 AR_LOW_INCOME_CREDIT_NTI_CEILING: Final[Decimal] = Decimal("25000.00")
 
 
+# ---------------------------------------------------------------------------
+# PDF rendering paths (Layer 2 AcroForm fill)
+# ---------------------------------------------------------------------------
+
+_REF_DIR = Path(__file__).resolve().parent.parent.parent / "reference"
+_STATE_FORMS_DIR = _REF_DIR / "state_forms"
+_WIDGET_MAP_PATH = _REF_DIR / "ar-ar1000f-acroform-map.json"
+
+
+# ---------------------------------------------------------------------------
+# Layer 1: AR1000F field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class AR1000FFields:
+    """Frozen snapshot of AR AR1000F line values, ready for rendering.
+
+    Field names map to semantic names in the widget map JSON.
+    """
+
+    state_adjusted_gross_income: Decimal = Decimal("0")
+    state_taxable_income: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+
+
+def _build_ar1000f_fields(state_return: StateReturn) -> AR1000FFields:
+    """Layer 1: map StateReturn.state_specific to AR1000FFields."""
+    ss = state_return.state_specific
+    return AR1000FFields(
+        state_adjusted_gross_income=ss.get("state_adjusted_gross_income", Decimal("0")),
+        state_taxable_income=ss.get("state_taxable_income", Decimal("0")),
+        state_total_tax=ss.get("state_total_tax", Decimal("0")),
+    )
+
+
+# ---------------------------------------------------------------------------
+# V1 limitations
+# ---------------------------------------------------------------------------
+
+
 AR_V1_LIMITATIONS: tuple[str, ...] = (
     "AR personal tax credit ($29/exemption per AR DFA Form AR1000F "
     "line 33) is applied post-hoc inside ArkansasPlugin.compute() for "
@@ -438,10 +479,41 @@ class ArkansasPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(ar-pdf): fan-out follow-up — fill AR Form AR1000F (and
-        # Schedule AR1000ADJ, Schedule AR3 itemized, Form AR1000NR for
-        # nonresidents) using pypdf against the AR DFA fillable PDFs.
-        return []
+        """Fill AR Form AR1000F using the AR DFA fillable PDF.
+
+        Layer 1: build AR1000FFields via _build_ar1000f_fields factory.
+        Layer 2: overlay onto the source PDF via fill_acroform_pdf.
+        """
+        from dataclasses import asdict
+
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        fields = _build_ar1000f_fields(state_return)
+        wmap = load_widget_map(_WIDGET_MAP_PATH)
+
+        source_pdf = fetch_and_verify_source_pdf(
+            _STATE_FORMS_DIR / "ar_ar1000f.pdf",
+            wmap.source_pdf_url,
+            wmap.source_pdf_sha256,
+        )
+
+        widget_values: dict[str, str] = {}
+        for sem_name, value in asdict(fields).items():
+            widget_names = wmap.widget_names_for(sem_name)
+            if not widget_names:
+                continue
+            text = format_money(value) if isinstance(value, Decimal) else str(value) if value else ""
+            for wn in widget_names:
+                widget_values[wn] = text
+
+        out_path = Path(out_dir) / "AR_AR1000F.pdf"
+        fill_acroform_pdf(source_pdf, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["AR Form AR1000F"]

@@ -622,28 +622,47 @@ class TestColoradoFormIds:
     def test_form_ids_returns_dr_0104(self):
         assert PLUGIN.form_ids() == ["CO Form DR 0104"]
 
-    def test_render_pdfs_returns_empty_list(
+    def test_render_pdfs_produces_pdf(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
-        """Fan-out follow-up: actual DR 0104 fill is not yet implemented."""
+        """render_pdfs should produce a filled CO DR 0104 PDF."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert PLUGIN.render_pdfs(state_return, tmp_path) == []
+        pdfs = PLUGIN.render_pdfs(state_return, tmp_path)
+        assert len(pdfs) == 1
+        assert pdfs[0].name == "CO_DR0104.pdf"
+        assert pdfs[0].stat().st_size > 0
 
-    def test_render_pdfs_accepts_path(
-        self, single_65k_return, federal_single_65k
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
     ):
+        """Verify rendered CO DR 0104 PDF contains correct state_total_tax."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        assert PLUGIN.render_pdfs(state_return, Path("/tmp")) == []
+        pdfs = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(pdfs[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+        # Widget "Form Question 7" maps to state_total_tax (DR 0104 line 7)
+        from skill.scripts.output._acroform_overlay import format_money
+        expected_formatted = format_money(state_return.state_specific["state_total_tax"])
+        assert fields["Form Question 7"].get("/V") == expected_formatted
 
 
 # ---------------------------------------------------------------------------

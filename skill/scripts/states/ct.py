@@ -1017,12 +1017,14 @@ class ConnecticutPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(ct-pdf): fan-out follow-up — fill CT Form CT-1040 (and
-        # CT-1040NR/PY for nonresidents, Schedule CT-SI, Schedule 1
-        # additions/subtractions, Schedule 3 property tax credit) using
-        # pypdf against the CT DRS's fillable PDFs. The output renderer
-        # suite is the right home for this; this plugin returns
-        # structured TCS line data that the renderer will consume.
+        # TODO(ct-pdf): CT Form CT-1040 PDF from CT DRS
+        # (https://portal.ct.gov/-/media/drs/forms/2025/income/ct-1040_1225.pdf)
+        # is FLATTENED — it has 4 pages but 0 AcroForm widgets (verified
+        # via pypdf PdfReader.get_fields()). The CT DRS does not
+        # currently publish a fill-in version of CT-1040 for TY2025.
+        # To implement: wait for CT DRS to release a fillable version,
+        # or use a reportlab scaffold approach. This plugin returns
+        # structured TCS line data that a future renderer can consume.
         return []
 
     def form_ids(self) -> list[str]:

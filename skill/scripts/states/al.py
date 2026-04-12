@@ -546,10 +546,17 @@ class AlabamaPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO(al-pdf): fan-out follow-up — fill AL Form 40 (and Schedule
-        # A/B/D/E, Form 40NR for nonresidents, Schedule CR for credit-
-        # for-taxes-paid). Output renderer is the right home for this;
-        # this plugin returns structured state_specific data.
+        # TODO(al-pdf): AL Form 40 fillable PDF not obtainable via direct
+        # URL from revenue.alabama.gov (dynamic download system behind
+        # My Alabama Taxes portal). The DOR does not host a stable public
+        # URL for the fillable PDF. To implement:
+        # 1. Manually download the fillable Form 40 from the AL DOR
+        #    forms archive (https://www.revenue.alabama.gov/forms/).
+        # 2. Place at skill/reference/state_forms/al_form40.pdf.
+        # 3. Enumerate AcroForm widgets and build
+        #    skill/reference/al-form40-acroform-map.json.
+        # 4. Implement Layer 1 dataclass + Layer 2 render following
+        #    the Pattern B (see AR/CO implementations).
         return []
 
     def form_ids(self) -> list[str]:

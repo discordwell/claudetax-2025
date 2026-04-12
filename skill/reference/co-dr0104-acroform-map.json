@@ -1,0 +1,58 @@
+{
+  "source_pdf_url": "https://tax.colorado.gov/sites/tax/files/documents/DR0104_2025.pdf",
+  "source_pdf_sha256": "6deb6c181848797505c80ffc351ee973778cbb834ba18ea7007f78fa26ecb49c",
+  "form_year": 2025,
+  "state": "CO",
+  "form": "DR0104",
+  "total_widgets": 152,
+  "mapped_count": 5,
+  "notes": [
+    "CO DR 0104 Individual Income Tax Return from CO DOR.",
+    "Pages: 1=identity, 2=dependents, 3=income (lines 1-10), 4=tax (lines 11-23), 5=payments (lines 24-33), 6=TABOR (lines 34-42), 7=bank/third-party, 8=signature.",
+    "Widget names use human-readable names like 'Form Question N' for tax line N.",
+    "Filing status checkboxes: RB1=Single, RB2=MFJ, RB3=MFS (radio buttons on page 1).",
+    "Key line mappings: 'Form Question 1'=Line 1 (federal taxable income), 'Form Question 5'=Line 5 (CO taxable income), 'Form Question 7'=Line 7 (CO tax = line 5 * rate), 'Form Question 10'=Line 10 (net CO tax)."
+  ],
+  "mapping": {
+    "state_federal_taxable_income": {
+      "widget_name": "Form Question 1",
+      "terminal_name": "Form Question 1",
+      "type": "text",
+      "page": 3,
+      "rect": null,
+      "note": "Federal taxable income (DR 0104 line 1)"
+    },
+    "state_additions_total": {
+      "widget_name": "Form Question 3",
+      "terminal_name": "Form Question 3",
+      "type": "text",
+      "page": 3,
+      "rect": null,
+      "note": "Total additions (DR 0104 line 3)"
+    },
+    "state_subtractions_total": {
+      "widget_name": "Form Question 4",
+      "terminal_name": "Form Question 4",
+      "type": "text",
+      "page": 3,
+      "rect": null,
+      "note": "Total subtractions (DR 0104 line 4)"
+    },
+    "state_taxable_income": {
+      "widget_name": "Form Question 5",
+      "terminal_name": "Form Question 5",
+      "type": "text",
+      "page": 3,
+      "rect": null,
+      "note": "CO taxable income (DR 0104 line 5)"
+    },
+    "state_total_tax": {
+      "widget_name": "Form Question 7",
+      "terminal_name": "Form Question 7",
+      "type": "text",
+      "page": 3,
+      "rect": null,
+      "note": "CO income tax (DR 0104 line 7 = line 5 * 4.40%) — state_total_tax from plugin"
+    }
+  }
+}

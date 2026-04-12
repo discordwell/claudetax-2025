@@ -455,6 +455,70 @@ class Form1098T(_StrictModel):
     box10_insurance_contract_reimbursement: Money = Decimal("0")
 
 
+class Form1099MISC(_StrictModel):
+    """Form 1099-MISC, Miscellaneous Information.
+
+    Reports rents, royalties, other income, medical/healthcare payments,
+    crop insurance, and other miscellaneous income. Flows to Schedule E
+    (rents/royalties), Schedule 1 line 8z (other income), or Schedule C
+    if applicable.
+    """
+
+    payer_name: str
+    payer_tin: str | None = None
+    recipient_is_taxpayer: bool = True
+    recipient_tin: str | None = None
+    box1_rents: Money = Decimal("0")
+    box2_royalties: Money = Decimal("0")
+    box3_other_income: Money = Decimal("0")
+    box4_federal_tax_withheld: Money = Decimal("0")
+    box5_fishing_boat_proceeds: Money = Decimal("0")
+    box6_medical_healthcare_payments: Money = Decimal("0")
+    box7_payer_direct_sales: bool = False
+    """True if payer made direct sales totaling $5,000+ of consumer
+    products to recipient for resale (checkbox on the form)."""
+    box8_substitute_payments: Money = Decimal("0")
+    box9_crop_insurance: Money = Decimal("0")
+    box10_gross_proceeds_attorney: Money = Decimal("0")
+    box11_fish_purchased_for_resale: Money = Decimal("0")
+    box12_section_409a_deferrals: Money = Decimal("0")
+    box14_nonqualified_deferred_compensation: Money = Decimal("0")
+    box15_state_tax_withheld: Money = Decimal("0")
+
+
+class Form1099K(_StrictModel):
+    """Form 1099-K, Payment Card and Third Party Network Transactions.
+
+    Reports gross amount of payment card / third-party network
+    transactions. For TY2025 the reporting threshold is $5,000.
+    Flows to Schedule C (business income) or Schedule 1 (other income).
+    """
+
+    payer_name: str
+    """Filer's name (PSE or EPF/other third party)."""
+    payer_tin: str | None = None
+    recipient_is_taxpayer: bool = True
+    settlement_entity_name: str | None = None
+    """PSE's name if different from the filer."""
+    box1a_gross_amount: Money = Decimal("0")
+    box1b_card_not_present: Money = Decimal("0")
+    box2_merchant_category_code: str | None = None
+    box3_number_of_payment_transactions: int | None = None
+    box4_federal_tax_withheld: Money = Decimal("0")
+    box5a_january: Money = Decimal("0")
+    box5b_february: Money = Decimal("0")
+    box5c_march: Money = Decimal("0")
+    box5d_april: Money = Decimal("0")
+    box5e_may: Money = Decimal("0")
+    box5f_june: Money = Decimal("0")
+    box5g_july: Money = Decimal("0")
+    box5h_august: Money = Decimal("0")
+    box5i_september: Money = Decimal("0")
+    box5j_october: Money = Decimal("0")
+    box5k_november: Money = Decimal("0")
+    box5l_december: Money = Decimal("0")
+
+
 class ScheduleK1(_StrictModel):
     """Schedule K-1 (Form 1065 for partnerships, 1120-S for S-corps).
 
@@ -1083,6 +1147,8 @@ class CanonicalReturn(_StrictModel):
     forms_1099_nec: list[Form1099NEC] = Field(default_factory=list)
     forms_1099_r: list[Form1099R] = Field(default_factory=list)
     forms_1099_g: list[Form1099G] = Field(default_factory=list)
+    forms_1099_misc: list[Form1099MISC] = Field(default_factory=list)
+    forms_1099_k: list[Form1099K] = Field(default_factory=list)
     forms_ssa_1099: list[FormSSA1099] = Field(default_factory=list)
     forms_1098: list[Form1098] = Field(default_factory=list)
     forms_1098_e: list[Form1098E] = Field(default_factory=list)

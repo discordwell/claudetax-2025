@@ -6,6 +6,35 @@ Session memory for this project. Top section = most recent session summaries (ne
 
 ## Session Summaries
 
+### 2026-04-12 09:00 UTC — Wave 7B + 7D: state PDF renderers + wet test + version bump
+
+**PR #2 reviewed and merged** (wave 7A — 8 federal forms, 158 tests, tenforty pin). Fast-forward merge, 3763 passed.
+
+**32 stale worktrees pruned** from the remote session's parallel fan-out.
+
+**Serial fixes #2 and #3** already resolved in prior waves (verified — Form 8829 docstring and graph-wrap cross-refs both present).
+
+**Wave 7B dispatched** in 3-agent parallel fan-out (worktree-isolated):
+- **Agent A** (AZ/CA/OR/VA): All 4 implemented — AcroForm fill via state DOR fillable PDFs (406/169/146/148 widgets respectively)
+- **Agent B** (NY/NJ/PA/MA): 2 implemented (NY IT-201, MA Form 1). NJ deferred (digit-by-digit widget layout unusable), PA deferred (DOR site requires JS navigation)
+- **Agent C** (NC/OH/MI): 2 implemented (NC D-400, MI MI-1040). OH deferred (fully flattened PDF, 0 AcroForm widgets)
+
+**8 of 11 priority states now render filled PDFs**. 3 deferred with documentation.
+
+**Wave 7D completed**:
+- Hard wet test: complex multi-form return (W-2 $120K + 1099-INT $2.5K + 1099-DIV $5K + Schedule C $45K + Schedule E rental $24K + education credits + CA state). Pipeline produced 10 artifacts, all correct. AGI $163,931, total tax $33,688, CA state tax $11,001.
+- SKILL.md updated with all 8 new federal forms (phases 3, 4b, 8, reference index)
+- Version bump 0.1.0 → 0.2.0
+
+**Code review findings** (non-blocking):
+1. Dead dataclass factory functions in 5 state renderers (defined but not called in render path) — establishes pattern for future use
+2. Three distinct render patterns across agents (direct ss.get loop vs dataclass+asdict vs inline construct) — cosmetic inconsistency
+3. Render tests check file existence/size only, not field values — consistent with federal renderer tests
+
+**Suite**: 3764 passed, 3 skipped.
+
+---
+
 ### 2026-04-12 07:45 UTC — Wave 7A kickoff: 8 new federal forms via parallel fan-out
 
 **Wave 7A dispatched and landed** — 8 parallel worktree agents implementing missing federal forms. Two agents (Schedule E, Form 8863) timed out on first attempt; retries succeeded. Cherry-pick merge choreography on pipeline.py was the main friction point (every agent adds a render gate to the same function signature + render section).

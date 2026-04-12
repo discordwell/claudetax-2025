@@ -1,6 +1,6 @@
 ---
 name: tax-prep
-description: Use when a user wants help preparing their US individual income tax return (federal or federal + state) for tax year 2025 or later. Handles W-2 wages, 1099 interest/dividends/broker/NEC/R/G/SSA, Schedule C self-employment, Schedule E rental, Schedule K-1 passthroughs, OBBBA Schedule 1-A tips and overtime, Form 4547 Trump Account, the OBBBA senior deduction, itemized deductions, and 30 state plugins as of wave 4 (more landing in wave 5). Outputs filled IRS PDFs, Free File Fillable Forms entries, per-state artifacts, and a paper-file bundle.
+description: Use when a user wants help preparing their US individual income tax return (federal or federal + state) for tax year 2025 or later. Handles W-2 wages, 1099 interest/dividends/broker/NEC/R/G/SSA, Schedule C self-employment, Schedule E rental, Schedule K-1 passthroughs, OBBBA Schedule 1-A tips and overtime, Form 4547 Trump Account, the OBBBA senior deduction, itemized deductions, Schedule 1 (Additional Income and Adjustments), Schedule 2 (Additional Taxes), Schedule 3 (Additional Credits and Payments), Form 2441 (Child and Dependent Care), Form 8606 (Nondeductible IRA Contributions), Form 8863 (Education Credits), Form 8962 (Premium Tax Credit), and 30 state plugins as of wave 4 (more landing in wave 5). Outputs filled IRS PDFs, Free File Fillable Forms entries, per-state artifacts, and a paper-file bundle.
 ---
 
 # Tax Prep Skill — Interview Flow
@@ -168,6 +168,8 @@ This is the longest phase. Open with: "Now let's walk through your income for TY
 
 For each "yes," route into the matching sub-flow below.
 
+**Note:** Several of these income sources flow through **Schedule 1** (Additional Income and Adjustments to Income). The calc engine populates Schedule 1 Part I (additional income) and Part II (adjustments) automatically from the collected data — unemployment compensation (1099-G box 1), state tax refunds (1099-G box 2), rental income (Schedule E), self-employment deduction (half of SE tax), educator expenses, HSA deduction, IRA deduction, student loan interest, and the OBBBA Schedule 1-A items all land on Schedule 1 before flowing to Form 1040 line 8.
+
 ### 3a. W-2 wages
 
 Tell the user: "I can ingest W-2 PDFs automatically if you have them as PDFs. Drop them into a folder and I'll point the pipeline at it. Otherwise I can ask you the box-by-box numbers."
@@ -309,6 +311,12 @@ Per payer:
 
 If you see code 1 (early distribution), warn about the 10% penalty and note that Form 5329 may need an exception.
 
+**Form 8606 — Nondeductible IRA Contributions:** If the taxpayer made nondeductible traditional IRA contributions, took a distribution from a traditional IRA that had basis (prior nondeductible contributions), or converted a traditional IRA to Roth, ask for:
+- Prior-year basis in traditional IRAs (`ira_basis_prior_year` — from last year's Form 8606 line 14).
+- Current-year nondeductible contributions (`ira_nondeductible_contributions`).
+- Value of all traditional IRAs at year-end (`ira_year_end_value`).
+The engine uses Form 8606 to compute the nontaxable portion of any distribution using the pro-rata rule. Without this, 100% of a distribution from an IRA with basis would be treated as taxable.
+
 Set: `forms_1099_r[]`.
 
 ### 3i. SSA-1099 — Social Security
@@ -390,6 +398,76 @@ When the user reports any **nonzero** medical expense, you MUST warn them in pla
 The engine code path is `_itemized_total_capped()` in `skill/scripts/calc/engine.py` — it applies `max(0, raw_medical - 0.075 * AGI)` before summing Schedule A. The fix is load-bearing: do not let the user pre-subtract the floor themselves, and do not silently swallow this prompt.
 
 Set: `itemize_deductions`, `itemized` (ItemizedDeductions block).
+
+---
+
+## Phase 4b — Credits, additional taxes, and payments
+
+After deductions, walk the taxpayer through credits and additional taxes. These populate `credits`, `other_taxes`, and `payments` in the CanonicalReturn, and flow through **Schedule 2** (Additional Taxes) and **Schedule 3** (Additional Credits and Payments) before landing on Form 1040 lines 23 and 31.
+
+### Child and Dependent Care — Form 2441
+
+Ask: "Did you pay someone to care for a qualifying child (under 13) or a disabled dependent so that you — and your spouse, if filing jointly — could work or look for work?"
+
+If yes, collect per care provider:
+- Provider name, address, TIN (SSN or EIN).
+- Amount paid to this provider during TY2025.
+- Qualifying person(s) this provider cared for (must be a dependent listed in Phase 2c).
+
+Also collect:
+- Taxpayer earned income, spouse earned income (the credit is limited to the lower earner's income).
+- Employer-provided dependent care benefits (W-2 Box 10) — already captured in Phase 3a; cross-reference here.
+
+The engine computes the credit rate (20%–35% of up to $3,000 for one qualifying person / $6,000 for two or more, minus employer benefits) on Form 2441.
+
+Set: `credits.child_dependent_care` (Form2441 block).
+
+### Education Credits — Form 8863
+
+Ask: "Did you, your spouse, or a dependent pay qualified tuition and related expenses to an eligible postsecondary institution in TY2025?"
+
+If yes, collect per student:
+- Student name, SSN (must be taxpayer, spouse, or a listed dependent).
+- Institution name, EIN, address.
+- Qualified expenses paid (tuition and required fees; not room and board).
+- Was the student at least half-time for at least one academic period.
+- Was the student in the first four years of postsecondary education (for AOTC eligibility).
+- Has the AOTC been claimed for this student in four or more prior tax years.
+- Was Form 1098-T received.
+
+Explain the two credits:
+- **American Opportunity Tax Credit (AOTC):** Up to $2,500 per student, first four years only, 40% refundable. Phases out at MAGI $80K–$90K single / $160K–$180K MFJ.
+- **Lifetime Learning Credit (LLC):** Up to $2,000 per return (not per student), no year limit, nonrefundable. Phases out at MAGI $80K–$90K single / $160K–$180K MFJ.
+
+The engine picks the better credit per student on Form 8863. AOTC flows to Schedule 3 Part I (refundable portion on 1040 line 29) and Schedule 2 (nonrefundable portion).
+
+Set: `credits.education` (Form8863 block).
+
+### Premium Tax Credit — Form 8962
+
+Ask: "Did you or anyone in your household enroll in a health insurance plan through the Health Insurance Marketplace (healthcare.gov or a state exchange) and receive advance premium tax credits (APTC) in TY2025?"
+
+If yes, collect:
+- Form 1095-A data per covered month: enrollment premium, SLCSP (second-lowest-cost silver plan) premium, and advance payment of PTC.
+- If multiple 1095-A forms, collect each.
+
+The engine reconciles the advance payments against the actual PTC on Form 8962. This can result in either an additional credit (Schedule 3) or a repayment (Schedule 2). Warn the user: "If your actual income was higher than the estimate you gave the Marketplace, you may owe back some of the advance credit."
+
+Set: `credits.premium_tax_credit` (Form8962 block).
+
+### Additional taxes — Schedule 2
+
+The engine automatically populates Schedule 2 from collected data:
+- AMT (Form 6251) — computed automatically from the return data.
+- Excess advance PTC repayment (Form 8962) — from the PTC reconciliation above.
+- Self-employment tax (Schedule SE) — already computed from Schedule C.
+- Additional tax on early IRA/retirement distributions (Form 5329) — triggered by 1099-R code 1.
+- Net investment income tax (Form 8960) — 3.8% on NII above $200K single / $250K MFJ, computed automatically.
+- Additional Medicare tax (Form 8959) — 0.9% on earnings above $200K single / $250K MFJ, computed automatically.
+
+You do not need to ask interview questions for these — they are derived. Mention them so the user is not surprised when they appear on the output.
+
+Set: `other_taxes` (populated by engine).
 
 ---
 
@@ -505,7 +583,7 @@ The pipeline does:
 2. Walks every PDF in `input_dir`, runs the ingester cascade, and patches extracted fields onto the dict.
 3. Validates the merged dict via `CanonicalReturn.model_validate`.
 4. Runs `engine.compute()` (multi-pass tenforty + OBBBA patches + CP8-A medical floor + state plugins).
-5. Renders Form 1040 PDF, Schedule A (if itemizing), Schedule B (if required), Schedule C (per business), Schedule SE (if SE earnings ≥ $400).
+5. Renders Form 1040 PDF, Schedule 1 (if additional income or adjustments), Schedule 2 (if additional taxes), Schedule 3 (if additional credits or payments), Schedule A (if itemizing), Schedule B (if required), Schedule C (per business), Schedule E (per rental property), Schedule SE (if SE earnings ≥ $400), Form 2441 (if child/dependent care credit), Form 8606 (if nondeductible IRA activity), Form 8863 (if education credits), Form 8962 (if Marketplace insurance with APTC).
 6. Writes `result.json` and the rendered PDFs into `output_dir`.
 7. Returns a `PipelineResult` dataclass with `canonical_return`, `ingest_results`, `rendered_paths`, `warnings`, and a `validation_report` view.
 
@@ -544,6 +622,13 @@ See `skill/reference/skill-interview-examples.md` for several end-to-end transcr
 - `skill/scripts/calc/engine.py` — calculation engine (CP8-A medical floor lives here).
 - `skill/scripts/states/_registry.py` — state plugin registry.
 - `skill/scripts/states/md.py` — Maryland plugin (CP8-D `address.county` consumer).
+- `skill/scripts/calc/schedule_1.py` — Schedule 1 (Additional Income and Adjustments) aggregator.
+- `skill/scripts/calc/schedule_2.py` — Schedule 2 (Additional Taxes) aggregator.
+- `skill/scripts/calc/schedule_3.py` — Schedule 3 (Additional Credits and Payments) aggregator.
+- `skill/scripts/calc/form_2441.py` — Form 2441 (Child and Dependent Care Expenses).
+- `skill/scripts/calc/form_8606.py` — Form 8606 (Nondeductible IRA Contributions).
+- `skill/scripts/calc/form_8863.py` — Form 8863 (Education Credits — AOTC and LLC).
+- `skill/scripts/calc/form_8962.py` — Form 8962 (Premium Tax Credit — ACA reconciliation).
 - `skill/scripts/validate/ffff_limits.py` — FFFF compatibility checker.
 - `skill/reference/tenforty-ty2025-gap.md` — state coverage matrix.
 - `skill/reference/ffff-limits.md` — FFFF hard caps and unsupported forms.

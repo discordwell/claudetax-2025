@@ -62,6 +62,7 @@ __all__ = [
     "state_has_w2_state_rows",
     "state_source_schedule_c",
     "state_source_rental",
+    "state_source_rental_from_schedule_e",
     "sourced_or_prorated_wages",
     "sourced_or_prorated_schedule_c",
 ]
@@ -408,4 +409,26 @@ def state_source_schedule_c(
     for sc in canonical.schedules_c:
         if sc.business_location_state == state_code:
             total += schedule_c_net_profit(sc)
+    return cents(total)
+
+
+def state_source_rental_from_schedule_e(
+    canonical: "CanonicalReturn", state_code: str
+) -> Decimal:
+    """Sum Schedule E property net income for properties located in ``state_code``.
+
+    Rental income is sourced to the state where the property is physically
+    located — this is the universal rule across all states. A property's
+    location is determined by its ``address.state`` field on the
+    ScheduleEProperty model.
+
+    Returns Decimal("0.00") when no Schedule E properties match.
+    """
+    from skill.scripts.calc.engine import schedule_e_property_net
+
+    total = Decimal("0")
+    for sched_e in canonical.schedules_e:
+        for prop in sched_e.properties:
+            if prop.address.state == state_code:
+                total += schedule_e_property_net(prop)
     return cents(total)

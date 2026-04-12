@@ -6,12 +6,18 @@ canonical return via the shared `_to_tenforty_input` helper, call
 `tenforty.evaluate_return(..., state='NY')`, and unpack the `state_*` floats
 into Decimal on `StateReturn.state_specific`.
 
-Scope (v0.1):
-- Resident full-year NY taxpayers get an authoritative state tax via OTS.
-- Nonresidents and part-year residents get a days-based proration of the
-  full-year-equivalent state tax. This is a stopgap — the correct treatment
-  is Form IT-203 (Nonresident / Part-Year) which uses NY-source income ratios
-  rather than day counts. See the TODO in compute() and form_ids().
+Scope:
+- Resident full-year NY taxpayers get an authoritative state tax via OTS
+  (IT-201).
+- Nonresidents and part-year residents use the IT-203 / IT-203-B sourcing
+  method: tax = (tax on total income) x (NY-source income / total income).
+  Income categories are sourced per NY rules:
+    * Wages: IT-203-B workday allocation (NY workdays / 260), or W-2 state
+      rows, or day-proration fallback.
+    * Interest / Dividends / Capital gains: NOT NY-source for nonresidents
+      (sourced to domicile state).
+    * Business income (Schedule C): NY-source if business is in NY.
+    * Rental income (Schedule E): NY-source if property is in NY.
 - PDF rendering fills the IT-201 fillable PDF via pypdf AcroForm overlay.
 
 Reciprocity: NY has NO bilateral reciprocity agreements with any state
@@ -41,6 +47,7 @@ from skill.scripts.output._acroform_overlay import (
 )
 from skill.scripts.states._hand_rolled_base import (
     state_has_w2_state_rows,
+    state_source_rental_from_schedule_e,
     state_source_schedule_c,
     state_source_wages_from_w2s,
 )
@@ -173,11 +180,16 @@ class NewYorkPlugin:
           1. Marshal the canonical return into tenforty kwargs using the same
              `_to_tenforty_input` the federal calc engine uses — keeps NY's
              inputs byte-identical with the federal side.
-          2. Call `tenforty.evaluate_return(..., state='NY')`.
+          2. Call `tenforty.evaluate_return(..., state='NY')` to get the
+             full-year tax on total income.
           3. Wrap the `state_*` floats as Decimals on state_specific.
-          4. For NONRESIDENT / PART_YEAR, prorate the state tax by
-             days_in_state/365 as a v0.1 approximation. TODO: replace with
-             IT-203 NY-source income ratio for correctness.
+          4. For NONRESIDENT / PART_YEAR, apply the IT-203 ratio method:
+             tax = (tax on total income) x (NY-source income / total income).
+             NY-source income is computed per category:
+               - Wages: IT-203-B workday allocation > W-2 state rows > day-proration
+               - Interest/Dividends/Capital gains: $0 (sourced to domicile)
+               - Business income: NY-source if business is in NY
+               - Rental: NY-source if property is in NY
         """
         tf_input = _to_tenforty_input(return_)
         tf_result = tenforty.evaluate_return(
@@ -204,22 +216,19 @@ class NewYorkPlugin:
         state_bracket = _d(getattr(tf_result, "state_tax_bracket", 0))
         state_effective_rate = _d(getattr(tf_result, "state_effective_tax_rate", 0))
 
-        # Wave 6: real IT-203 allocation scaffolding. For NONRESIDENT /
-        # PART_YEAR, prefer (in priority order):
+        # --- IT-203 nonresident sourcing ---
+        # For NONRESIDENT / PART_YEAR, compute NY-source income per category
+        # and apply the IT-203 ratio method:
+        #   tax = (tax on total income) x (NY-source / total income)
         #
-        #   1. IT-203-B workday apportionment when the filer supplied
-        #      ``taxpayer.ny_workdays_in_ny`` — allocate wages by the
-        #      NY_workdays / 260 ratio.
-        #   2. W-2 state_rows[state=NY].state_wages sum — the employer-
-        #      reported sourcing on Copy 2 box 16.
-        #   3. Day-proration fallback when neither signal is present.
-        #
-        # Paths 1 and 2 recompute NY tax on the sourced wage amount via
-        # a second tenforty call; path 3 prorates the full-year tax by
-        # days_in_state/365 (legacy behavior, tests still lock this).
+        # Wage sourcing priority:
+        #   1. IT-203-B workday apportionment (ny_workdays_in_ny / 260)
+        #   2. W-2 state_rows[state=NY].state_wages sum
+        #   3. Day-proration fallback (legacy)
         ny_state_rows_present = state_has_w2_state_rows(return_, "NY")
-        ny_sourced_wages = state_source_wages_from_w2s(return_, "NY")
+        ny_sourced_wages_w2 = state_source_wages_from_w2s(return_, "NY")
         ny_sourced_se = state_source_schedule_c(return_, "NY")
+        ny_sourced_rental = state_source_rental_from_schedule_e(return_, "NY")
         ny_workdays_in_ny = return_.taxpayer.ny_workdays_in_ny
         used_it203_workdays = False
         used_w2_state_rows = False
@@ -228,53 +237,37 @@ class NewYorkPlugin:
             state_tax = full_year_state_tax.quantize(Decimal("0.01"))
         elif ny_workdays_in_ny is not None and ny_workdays_in_ny > 0:
             # IT-203-B: allocate total wages by the workday ratio.
-            # Standard NY IT-203-B denominator is 260 (5-day workweek)
-            # unless the taxpayer overrides — we accept the raw
-            # numerator against 260 as the v1 implementation.
+            # Standard IT-203-B denominator is 260 (5-day workweek).
             total_wages = Decimal(str(tf_input.w2_income or 0))
             workdays_denom = Decimal("260")
             ratio = Decimal(ny_workdays_in_ny) / workdays_denom
             if ratio > Decimal("1"):
                 ratio = Decimal("1")
             allocated_wages = (total_wages * ratio).quantize(Decimal("0.01"))
-            tf_sourced = tenforty.evaluate_return(
-                year=tf_input.year,
-                state="NY",
-                filing_status=tf_input.filing_status,
-                w2_income=float(allocated_wages),
-                taxable_interest=0.0,
-                qualified_dividends=0.0,
-                ordinary_dividends=0.0,
-                short_term_capital_gains=0.0,
-                long_term_capital_gains=0.0,
-                self_employment_income=float(ny_sourced_se),
-                rental_income=0.0,
-                schedule_1_income=0.0,
-                standard_or_itemized=tf_input.standard_or_itemized,
-                itemized_deductions=tf_input.itemized_deductions,
-                num_dependents=tf_input.num_dependents,
-            )
-            state_tax = _d(tf_sourced.state_total_tax).quantize(Decimal("0.01"))
+
+            # IT-203 ratio method: NY-source = wages + SE + rental (no
+            # interest/dividends/cap-gains for nonresidents)
+            ny_source_total = allocated_wages + ny_sourced_se + ny_sourced_rental
+            total_income = state_agi if state_agi > _ZERO else Decimal("1")
+            if total_income > _ZERO and ny_source_total > _ZERO:
+                it203_ratio = ny_source_total / total_income
+                if it203_ratio > Decimal("1"):
+                    it203_ratio = Decimal("1")
+                state_tax = (full_year_state_tax * it203_ratio).quantize(Decimal("0.01"))
+            else:
+                state_tax = Decimal("0.00")
             used_it203_workdays = True
         elif ny_state_rows_present:
-            tf_sourced = tenforty.evaluate_return(
-                year=tf_input.year,
-                state="NY",
-                filing_status=tf_input.filing_status,
-                w2_income=float(ny_sourced_wages),
-                taxable_interest=0.0,
-                qualified_dividends=0.0,
-                ordinary_dividends=0.0,
-                short_term_capital_gains=0.0,
-                long_term_capital_gains=0.0,
-                self_employment_income=float(ny_sourced_se),
-                rental_income=0.0,
-                schedule_1_income=0.0,
-                standard_or_itemized=tf_input.standard_or_itemized,
-                itemized_deductions=tf_input.itemized_deductions,
-                num_dependents=tf_input.num_dependents,
-            )
-            state_tax = _d(tf_sourced.state_total_tax).quantize(Decimal("0.01"))
+            # W-2 state rows: employer-reported NY wages
+            ny_source_total = ny_sourced_wages_w2 + ny_sourced_se + ny_sourced_rental
+            total_income = state_agi if state_agi > _ZERO else Decimal("1")
+            if total_income > _ZERO and ny_source_total > _ZERO:
+                it203_ratio = ny_source_total / total_income
+                if it203_ratio > Decimal("1"):
+                    it203_ratio = Decimal("1")
+                state_tax = (full_year_state_tax * it203_ratio).quantize(Decimal("0.01"))
+            else:
+                state_tax = Decimal("0.00")
             used_w2_state_rows = True
         else:
             # Legacy day-proration fallback. Tests that cover nonresident
@@ -295,8 +288,9 @@ class NewYorkPlugin:
                 "state_effective_tax_rate": state_effective_rate,
                 "full_year_state_tax": full_year_state_tax,
                 "engine": "tenforty/OpenTaxSolver",
-                "ny_sourced_wages_from_w2_state_rows": ny_sourced_wages,
+                "ny_sourced_wages_from_w2_state_rows": ny_sourced_wages_w2,
                 "ny_sourced_schedule_c_net": ny_sourced_se,
+                "ny_sourced_rental": ny_sourced_rental,
                 "ny_state_rows_present": ny_state_rows_present,
                 "ny_workdays_in_ny": ny_workdays_in_ny,
                 "used_it203_workdays": used_it203_workdays,
@@ -310,20 +304,22 @@ class NewYorkPlugin:
         residency: ResidencyStatus,
         days_in_state: int,
     ) -> IncomeApportionment:
-        """Days-based income apportionment.
+        """IT-203-compliant income apportionment for New York.
 
-        For RESIDENT, 100% of every income category is NY-source. For
-        NONRESIDENT / PART_YEAR, each category is prorated by
-        days_in_state/365.
+        For RESIDENT, 100% of every income category is NY-source.
 
-        TODO(ny-it203): swap days-based proration for proper NY-source
-        sourcing (wages sourced by work location, investment income sourced
-        by domicile, etc.) to match IT-203 expectations.
+        For NONRESIDENT / PART_YEAR, each income category is sourced per
+        NY IT-203 rules:
+          - Wages: IT-203-B workday allocation (priority), then W-2 state
+            rows, then day-proration fallback.
+          - Interest / Dividends / Capital gains: $0 — not NY-source for
+            nonresidents (sourced to domicile state).
+          - Business income (Schedule C): NY-source if the business is
+            located in NY (``business_location_state == "NY"``).
+          - Rental income (Schedule E): NY-source if the property is in NY
+            (``property.address.state == "NY"``).
         """
-        if residency == ResidencyStatus.RESIDENT:
-            factor = Decimal("1")
-        else:
-            factor = Decimal(days_in_state) / Decimal("365")
+        from skill.scripts.calc.engine import schedule_c_net_profit, schedule_e_total_net
 
         wages = sum((w2.box1_wages for w2 in return_.w2s), start=Decimal("0"))
         interest = sum(
@@ -350,13 +346,6 @@ class NewYorkPlugin:
         )
         capital_gains = st_gains + lt_gains + cap_gain_distr
 
-        # Schedule C net profit sum — done the long way to avoid pulling in
-        # schedule_c_net_profit (which lives in calc.engine) twice; we let
-        # the calc engine own that math. For apportionment we approximate by
-        # summing gross receipts minus the top-level total. If schedules_c
-        # is empty, this contributes zero.
-        from skill.scripts.calc.engine import schedule_c_net_profit, schedule_e_total_net
-
         se_income = sum(
             (schedule_c_net_profit(sc) for sc in return_.schedules_c),
             start=Decimal("0"),
@@ -366,26 +355,51 @@ class NewYorkPlugin:
             start=Decimal("0"),
         )
 
-        # Wave 6: prefer W-2 state-row sourcing for wages / Schedule C
-        # when non-resident. Other categories stay on days-proration
-        # until a real IT-203 Schedule B is wired up.
         if residency == ResidencyStatus.RESIDENT:
-            ny_wages = wages
-            ny_se = se_income
+            # Full-year resident: 100% of all income is NY-source.
+            return IncomeApportionment(
+                state_source_wages=wages,
+                state_source_interest=interest,
+                state_source_dividends=ord_div,
+                state_source_capital_gains=capital_gains,
+                state_source_self_employment=se_income,
+                state_source_rental=rental,
+            )
+
+        # --- Nonresident / Part-Year: IT-203 sourcing ---
+
+        # Wages: workday allocation > W-2 state rows > day-proration
+        ny_workdays_in_ny = return_.taxpayer.ny_workdays_in_ny
+        if ny_workdays_in_ny is not None and ny_workdays_in_ny > 0:
+            workdays_denom = Decimal("260")
+            ratio = Decimal(ny_workdays_in_ny) / workdays_denom
+            if ratio > Decimal("1"):
+                ratio = Decimal("1")
+            ny_wages = (wages * ratio).quantize(Decimal("0.01"))
         elif state_has_w2_state_rows(return_, "NY"):
             ny_wages = state_source_wages_from_w2s(return_, "NY")
-            ny_se = state_source_schedule_c(return_, "NY")
         else:
-            ny_wages = wages * factor
-            ny_se = se_income * factor
+            factor = Decimal(days_in_state) / Decimal("365")
+            ny_wages = (wages * factor).quantize(Decimal("0.01"))
+
+        # Interest / Dividends / Capital gains: NOT NY-source for nonresidents
+        ny_interest = Decimal("0")
+        ny_dividends = Decimal("0")
+        ny_capital_gains = Decimal("0")
+
+        # Business income: sourced by business location
+        ny_se = state_source_schedule_c(return_, "NY")
+
+        # Rental: sourced by property location
+        ny_rental = state_source_rental_from_schedule_e(return_, "NY")
 
         return IncomeApportionment(
             state_source_wages=ny_wages,
-            state_source_interest=interest * factor,
-            state_source_dividends=ord_div * factor,
-            state_source_capital_gains=capital_gains * factor,
+            state_source_interest=ny_interest,
+            state_source_dividends=ny_dividends,
+            state_source_capital_gains=ny_capital_gains,
             state_source_self_employment=ny_se,
-            state_source_rental=rental * factor,
+            state_source_rental=ny_rental,
         )
 
     def render_pdfs(self, state_return: StateReturn, out_dir: Path) -> list[Path]:

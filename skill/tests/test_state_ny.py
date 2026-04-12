@@ -12,6 +12,13 @@ Coverage:
 - compute() on a Single $80k W-2 resident returns a positive state_tax
 - compute() NONRESIDENT returns a smaller amount than RESIDENT (days-proration)
 - form_ids() returns the resident IT-201 form id
+- IT-203 nonresident apportionment:
+  - Resident: unchanged behavior (all income is NY-source)
+  - Nonresident with workday allocation: 130/260 days = 50% of wages
+  - Nonresident with W-2 state rows only: existing behavior
+  - Nonresident with NY rental property: rental sourced to NY
+  - Mixed: wages (workday) + rental (property in NY) + interest (not sourced)
+  - Interest/dividends/cap gains: $0 for nonresidents
 """
 from __future__ import annotations
 
@@ -27,6 +34,9 @@ from skill.scripts.models import (
     FilingStatus,
     Person,
     ResidencyStatus,
+    ScheduleC,
+    ScheduleE,
+    ScheduleEProperty,
     W2,
     W2StateRow,
 )
@@ -475,3 +485,491 @@ class TestNewYorkPluginNonresidentSourcing:
         assert ss["ny_state_rows_present"] is False
         # Legacy day-prorate: state_tax < full_year_state_tax strictly.
         assert ss["state_total_tax"] < ss["full_year_state_tax"]
+
+
+# ---------------------------------------------------------------------------
+# Wave 8C-2 — IT-203 real nonresident income apportionment
+# ---------------------------------------------------------------------------
+
+
+class TestIT203Apportionment:
+    """Comprehensive tests for the IT-203 nonresident apportionment logic.
+
+    Validates that apportion_income() and compute() correctly implement
+    NY-source income rules:
+      - Wages: workday allocation > W-2 state rows > day-proration
+      - Interest / Dividends / Capital gains: $0 for nonresidents
+      - Business income: sourced by business location
+      - Rental: sourced by property location
+      - compute() uses IT-203 ratio method for tax calculation
+    """
+
+    @pytest.fixture
+    def federal_80k(self) -> FederalTotals:
+        return FederalTotals(
+            filing_status=FilingStatus.SINGLE,
+            num_dependents=0,
+            adjusted_gross_income=Decimal("80000"),
+            taxable_income=Decimal("64250"),
+            total_federal_tax=Decimal("9055"),
+            federal_income_tax=Decimal("9055"),
+            federal_standard_deduction=Decimal("15750"),
+            federal_itemized_deductions_total=Decimal("0"),
+            deduction_taken=Decimal("15750"),
+            federal_withholding_from_w2s=Decimal("0"),
+        )
+
+    # ---- Resident: unchanged behavior ----
+
+    def test_resident_apportion_all_income_full(self):
+        """Resident: all income categories at 100%."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=Address(street1="1 Main", city="NY", state="NY", zip="10001"),
+            w2s=[W2(employer_name="X", box1_wages=Decimal("80000"))],
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.RESIDENT, 365)
+        assert app.state_source_wages == Decimal("80000")
+        assert app.state_source_interest == Decimal("0")
+        assert app.state_source_dividends == Decimal("0")
+
+    # ---- Nonresident with workday allocation (IT-203-B) ----
+
+    def test_nonresident_workday_130_of_260_wages_50pct(self):
+        """Nonresident with 130 of 260 workdays in NY: 50% of wages."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+                ny_workdays_in_ny=130,
+            ),
+            address=Address(street1="1 Hudson", city="JC", state="NJ", zip="07302"),
+            w2s=[W2(employer_name="X", box1_wages=Decimal("100000"))],
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, 0)
+        assert app.state_source_wages == Decimal("50000.00")
+
+    def test_nonresident_workday_260_of_260_wages_100pct(self):
+        """Nonresident with 260/260 workdays: capped at 100%."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+                ny_workdays_in_ny=260,
+            ),
+            address=Address(street1="1 Hudson", city="JC", state="NJ", zip="07302"),
+            w2s=[W2(employer_name="X", box1_wages=Decimal("100000"))],
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, 0)
+        assert app.state_source_wages == Decimal("100000.00")
+
+    def test_nonresident_workday_exceeds_260_capped(self):
+        """Workdays > 260 should be capped at 100%."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+                ny_workdays_in_ny=300,
+            ),
+            address=Address(street1="1 Hudson", city="JC", state="NJ", zip="07302"),
+            w2s=[W2(employer_name="X", box1_wages=Decimal("100000"))],
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, 0)
+        assert app.state_source_wages == Decimal("100000.00")
+
+    # ---- Nonresident: interest/dividends/cap gains = $0 ----
+
+    def test_nonresident_interest_not_ny_source(self):
+        """Interest income is NOT NY-source for nonresidents."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+                ny_workdays_in_ny=130,
+            ),
+            address=Address(street1="1 Hudson", city="JC", state="NJ", zip="07302"),
+            w2s=[W2(employer_name="X", box1_wages=Decimal("80000"))],
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, 0)
+        assert app.state_source_interest == Decimal("0")
+        assert app.state_source_dividends == Decimal("0")
+        assert app.state_source_capital_gains == Decimal("0")
+
+    # ---- Nonresident with W-2 state rows only (no workday data) ----
+
+    def test_nonresident_w2_state_rows_apportion(self):
+        """W-2 state rows: use employer-reported NY wages."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=Address(street1="1 Hudson", city="JC", state="NJ", zip="07302"),
+            w2s=[
+                W2(
+                    employer_name="X",
+                    box1_wages=Decimal("100000"),
+                    state_rows=[
+                        W2StateRow(state="NY", state_wages=Decimal("60000")),
+                    ],
+                ),
+            ],
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, 0)
+        assert app.state_source_wages == Decimal("60000.00")
+        # Investment income still $0 for nonresident
+        assert app.state_source_interest == Decimal("0")
+
+    # ---- Nonresident with NY rental property ----
+
+    def test_nonresident_rental_sourced_to_ny(self):
+        """Rental income from NY property is NY-source."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+                ny_workdays_in_ny=130,
+            ),
+            address=Address(street1="1 Hudson", city="JC", state="NJ", zip="07302"),
+            w2s=[W2(employer_name="X", box1_wages=Decimal("80000"))],
+            schedules_e=[
+                ScheduleE(properties=[
+                    ScheduleEProperty(
+                        address=Address(
+                            street1="123 Broadway",
+                            city="New York",
+                            state="NY",
+                            zip="10007",
+                        ),
+                        rents_received=Decimal("24000"),
+                        taxes=Decimal("4000"),
+                    ),
+                ]),
+            ],
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, 0)
+        # Net rental = 24000 - 4000 = 20000
+        assert app.state_source_rental == Decimal("20000.00")
+
+    def test_nonresident_rental_not_in_ny(self):
+        """Rental income from non-NY property is NOT NY-source."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+                ny_workdays_in_ny=130,
+            ),
+            address=Address(street1="1 Hudson", city="JC", state="NJ", zip="07302"),
+            w2s=[W2(employer_name="X", box1_wages=Decimal("80000"))],
+            schedules_e=[
+                ScheduleE(properties=[
+                    ScheduleEProperty(
+                        address=Address(
+                            street1="456 Broad St",
+                            city="Newark",
+                            state="NJ",
+                            zip="07102",
+                        ),
+                        rents_received=Decimal("24000"),
+                        taxes=Decimal("4000"),
+                    ),
+                ]),
+            ],
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, 0)
+        assert app.state_source_rental == Decimal("0.00")
+
+    # ---- Mixed: wages (workday) + rental (NY) + interest (not sourced) ----
+
+    def test_nonresident_mixed_income_apportionment(self):
+        """Mixed income: wages via workday, rental via property, interest $0."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+                ny_workdays_in_ny=130,  # 50% of 260
+            ),
+            address=Address(street1="1 Hudson", city="JC", state="NJ", zip="07302"),
+            w2s=[W2(employer_name="X", box1_wages=Decimal("100000"))],
+            schedules_e=[
+                ScheduleE(properties=[
+                    ScheduleEProperty(
+                        address=Address(
+                            street1="123 Broadway",
+                            city="New York",
+                            state="NY",
+                            zip="10007",
+                        ),
+                        rents_received=Decimal("30000"),
+                        taxes=Decimal("5000"),
+                    ),
+                ]),
+            ],
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, 0)
+        assert app.state_source_wages == Decimal("50000.00")
+        assert app.state_source_rental == Decimal("25000.00")
+        assert app.state_source_interest == Decimal("0")
+        assert app.state_source_dividends == Decimal("0")
+        assert app.state_source_capital_gains == Decimal("0")
+        # Total NY-source = 50000 + 25000 = 75000
+        assert app.state_source_total == Decimal("75000.00")
+
+    # ---- compute() with IT-203 ratio method ----
+
+    def test_compute_workday_uses_it203_ratio(self, federal_80k):
+        """compute() with workday allocation uses ratio method, not re-eval."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+                ny_workdays_in_ny=130,  # 50% of 260
+            ),
+            address=Address(street1="1 Hudson", city="JC", state="NJ", zip="07302"),
+            w2s=[W2(employer_name="X", box1_wages=Decimal("80000"))],
+        )
+        result = PLUGIN.compute(ret, federal_80k, ResidencyStatus.NONRESIDENT, 0)
+        ss = result.state_specific
+        assert ss["used_it203_workdays"] is True
+        # The tax should be less than full-year tax (50% of wages is NY-source)
+        assert ss["state_total_tax"] < ss["full_year_state_tax"]
+        assert ss["state_total_tax"] > Decimal("0")
+
+    def test_compute_rental_included_in_ny_source(self, federal_80k):
+        """compute() includes NY rental in the IT-203 NY-source calculation."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+                ny_workdays_in_ny=130,
+            ),
+            address=Address(street1="1 Hudson", city="JC", state="NJ", zip="07302"),
+            w2s=[W2(employer_name="X", box1_wages=Decimal("80000"))],
+            schedules_e=[
+                ScheduleE(properties=[
+                    ScheduleEProperty(
+                        address=Address(
+                            street1="123 Broadway",
+                            city="New York",
+                            state="NY",
+                            zip="10007",
+                        ),
+                        rents_received=Decimal("20000"),
+                        taxes=Decimal("2000"),
+                    ),
+                ]),
+            ],
+        )
+        result = PLUGIN.compute(ret, federal_80k, ResidencyStatus.NONRESIDENT, 0)
+        ss = result.state_specific
+        assert ss["ny_sourced_rental"] == Decimal("18000.00")
+        assert ss["state_total_tax"] > Decimal("0")
+
+    def test_compute_w2_state_rows_uses_it203_ratio(self, federal_80k):
+        """compute() with W-2 state rows also uses ratio method."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=Address(street1="1 Hudson", city="JC", state="NJ", zip="07302"),
+            w2s=[
+                W2(
+                    employer_name="X",
+                    box1_wages=Decimal("80000"),
+                    state_rows=[
+                        W2StateRow(state="NY", state_wages=Decimal("80000")),
+                    ],
+                ),
+            ],
+        )
+        result = PLUGIN.compute(ret, federal_80k, ResidencyStatus.NONRESIDENT, 0)
+        ss = result.state_specific
+        assert ss["used_w2_state_rows"] is True
+        # Full wages are NY-source via state rows, so ratio = 80000/80000 = 1.0
+        # Tax should equal or be close to full-year tax
+        assert ss["state_total_tax"] > Decimal("0")
+        assert ss["state_total_tax"] <= ss["full_year_state_tax"]
+
+    def test_compute_with_wages_plus_rental_higher_than_wages_alone(
+        self, federal_80k
+    ):
+        """Adding NY rental on top of wages should increase the IT-203 ratio
+        and thus the tax owed."""
+        base_ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+                ny_workdays_in_ny=130,
+            ),
+            address=Address(street1="1 Hudson", city="JC", state="NJ", zip="07302"),
+            w2s=[W2(employer_name="X", box1_wages=Decimal("80000"))],
+        )
+        rental_ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+                ny_workdays_in_ny=130,
+            ),
+            address=Address(street1="1 Hudson", city="JC", state="NJ", zip="07302"),
+            w2s=[W2(employer_name="X", box1_wages=Decimal("80000"))],
+            schedules_e=[
+                ScheduleE(properties=[
+                    ScheduleEProperty(
+                        address=Address(
+                            street1="123 Broadway", city="New York",
+                            state="NY", zip="10007",
+                        ),
+                        rents_received=Decimal("20000"),
+                    ),
+                ]),
+            ],
+        )
+        # Need separate federal totals for the rental case (higher AGI)
+        federal_with_rental = FederalTotals(
+            filing_status=FilingStatus.SINGLE,
+            num_dependents=0,
+            adjusted_gross_income=Decimal("100000"),
+            taxable_income=Decimal("84250"),
+            total_federal_tax=Decimal("13855"),
+            federal_income_tax=Decimal("13855"),
+            federal_standard_deduction=Decimal("15750"),
+            federal_itemized_deductions_total=Decimal("0"),
+            deduction_taken=Decimal("15750"),
+            federal_withholding_from_w2s=Decimal("0"),
+        )
+        base_result = PLUGIN.compute(
+            base_ret, federal_80k, ResidencyStatus.NONRESIDENT, 0
+        )
+        rental_result = PLUGIN.compute(
+            rental_ret, federal_with_rental, ResidencyStatus.NONRESIDENT, 0
+        )
+        # More NY-source income => higher tax
+        assert (
+            rental_result.state_specific["state_total_tax"]
+            > base_result.state_specific["state_total_tax"]
+        )
+
+    # ---- Schedule C business income sourcing ----
+
+    def test_nonresident_schedule_c_ny_business(self):
+        """Schedule C with NY business location is NY-source."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+                ny_workdays_in_ny=130,
+            ),
+            address=Address(street1="1 Hudson", city="JC", state="NJ", zip="07302"),
+            w2s=[W2(employer_name="X", box1_wages=Decimal("80000"))],
+            schedules_c=[
+                ScheduleC(
+                    business_name="NYC Consulting",
+                    principal_business_or_profession="Consulting",
+                    business_location_state="NY",
+                    line1_gross_receipts=Decimal("50000"),
+                ),
+            ],
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, 0)
+        assert app.state_source_self_employment == Decimal("50000.00")
+
+    def test_nonresident_schedule_c_non_ny_business(self):
+        """Schedule C with NJ business location is NOT NY-source."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+                ny_workdays_in_ny=130,
+            ),
+            address=Address(street1="1 Hudson", city="JC", state="NJ", zip="07302"),
+            w2s=[W2(employer_name="X", box1_wages=Decimal("80000"))],
+            schedules_c=[
+                ScheduleC(
+                    business_name="NJ Consulting",
+                    principal_business_or_profession="Consulting",
+                    business_location_state="NJ",
+                    line1_gross_receipts=Decimal("50000"),
+                ),
+            ],
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, 0)
+        assert app.state_source_self_employment == Decimal("0.00")
+
+    # ---- Day-proration fallback for wages ----
+
+    def test_nonresident_no_signals_wages_day_prorated(self):
+        """Without workday count or W-2 state rows, wages are day-prorated."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=Address(street1="1 Hudson", city="JC", state="NJ", zip="07302"),
+            w2s=[W2(employer_name="X", box1_wages=Decimal("100000"))],
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, 182)
+        expected = (Decimal("100000") * Decimal("182") / Decimal("365")).quantize(
+            Decimal("0.01")
+        )
+        assert app.state_source_wages == expected
+        # But interest is still $0 for nonresidents
+        assert app.state_source_interest == Decimal("0")
+
+    # ---- Part-year same as nonresident ----
+
+    def test_part_year_uses_nonresident_sourcing(self):
+        """Part-year residents use the same IT-203 sourcing as nonresidents."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="A", last_name="B", ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+                ny_workdays_in_ny=130,
+            ),
+            address=Address(street1="1 Hudson", city="JC", state="NJ", zip="07302"),
+            w2s=[W2(employer_name="X", box1_wages=Decimal("100000"))],
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.PART_YEAR, 180)
+        # Should use workday allocation, not day proration
+        assert app.state_source_wages == Decimal("50000.00")
+        # Interest still $0
+        assert app.state_source_interest == Decimal("0")

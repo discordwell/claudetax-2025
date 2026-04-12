@@ -1,5 +1,5 @@
 {
-  "description": "Multi-state part-year fixture: Single filer moves PA -> IL mid-year TY2025. PA resident Jan 1 - Jun 30 (181 days), IL resident Jul 1 - Dec 31 (184 days). Two W-2s: Philly Corp ($30k, $2,500 fed wh, $921 PA wh) and Chicago LLC ($35k, $4,000 fed wh, $1,732.50 IL wh). Standard deduction, no dependents, no OBBBA triggers, no itemized, no Schedule C/E. This is the FIRST golden fixture that exercises the state plugin dispatch layer end-to-end. WAVE 6 UPGRADE: PA and IL now source wages from W-2 state_rows[] (box 16) instead of day-proration of the resident-basis tax. PA taxes only the $30k Philly-sourced wages at 3.07% = $921 exactly; IL taxes only the $35k Chicago-sourced wages, less the $2,850 personal exemption, at 4.95% = $1,591.43.",
+  "description": "Multi-state part-year fixture: Single filer moves PA -> IL mid-year TY2025. PA resident Jan 1 - Jun 30 (181 days), IL resident Jul 1 - Dec 31 (184 days). Two W-2s: Philly Corp ($30k, $2,500 fed wh, $921 PA wh) and Chicago LLC ($35k, $4,000 fed wh, $1,732.50 IL wh). Standard deduction, no dependents, no OBBBA triggers, no itemized, no Schedule C/E. This is the FIRST golden fixture that exercises the state plugin dispatch layer end-to-end. WAVE 6 UPGRADE: PA and IL now source wages from W-2 state_rows[] (box 16) instead of day-proration of the resident-basis tax. PA taxes only the $30k Philly-sourced wages at 3.07% = $921 exactly. WAVE 8C IL Schedule NR: IL taxes $35k Chicago-sourced wages with prorated exemption (ratio 35k/65k * $2,850 = $1,534.62), yielding ($35,000 - $1,534.62) * 4.95% = $1,656.54.",
   "scenario": {
     "filing_status": "single",
     "tax_year": 2025,
@@ -79,7 +79,7 @@
       "state_exemption_total": "2850.00",
       "state_taxable_income": "62150.00",
       "state_total_tax_resident_basis": "3076.43",
-      "state_total_tax": "1591.43",
+      "state_total_tax": "1656.54",
       "flat_rate": "0.0495",
       "il_sourced_wages_from_w2_state_rows": "35000.00",
       "il_state_rows_present": true
@@ -93,15 +93,16 @@
     "il_resident_taxable_calc": "65000 - 2850 = 62150 (resident hypothetical)",
     "il_resident_basis_tax_calc": "62150 * 0.0495 = 3076.4250 -> 3076.43 (ROUND_HALF_UP) — stamped in state_total_tax_resident_basis",
     "il_sourced_wages": "35000 — sum of state_rows[IL].state_wages across all W-2s",
-    "il_sourced_taxable_calc": "35000 - 2850 = 32150",
-    "il_sourced_tax_calc": "32150 * 0.0495 = 1591.4250 -> 1591.43 (ROUND_HALF_UP at the cent)",
+    "il_exemption_proration": "Schedule NR ratio = 35000 / 65000 = 0.538461...; prorated exemption = 2850 * 0.538461... = 1534.6153... -> 1534.62 (ROUND_HALF_UP)",
+    "il_sourced_taxable_calc": "35000 - 1534.62 = 33465.38",
+    "il_sourced_tax_calc": "33465.38 * 0.0495 = 1656.53631 -> 1656.54 (ROUND_HALF_UP at the cent)",
     "il_withheld": "1732.50 (Chicago LLC box 17)",
-    "il_refund": "1732.50 withheld - 1591.43 owed = 141.07 refund"
+    "il_refund": "1732.50 withheld - 1656.54 owed = 75.96 refund"
   },
   "WAVE_6_SOURCING_DELIVERY": {
     "scope": "Wave 6 delivered real W-2 state-row sourcing for the wage side of nonresident / part-year PA and IL returns. The plugins now inspect W2.state_rows[] and, when a row matches the plugin's state code, compute the state tax on the sourced wage amount directly instead of day-prorating the resident-basis tax.",
     "pa_sourced_logic": "PA plugin: when at least one W-2 state row has state_code='PA', PA tax = sum(state_rows[PA].state_wages) * 0.0307. For this fixture that's 30000 * 0.0307 = 921.00 exactly, which matches the Philly Corp box 17 withholding and produces a zero-owed / zero-refund position.",
-    "il_sourced_logic": "IL plugin: when at least one W-2 state row has state_code='IL', IL sourced base = sum(state_rows[IL].state_wages) + sum(Schedule C net for business_location_state='IL'), IL sourced taxable = max(0, sourced_base - exemption_total), IL tax = sourced_taxable * 0.0495. For this fixture that's (35000 - 2850) * 0.0495 = 1591.4250 -> 1591.43 with ROUND_HALF_UP.",
+    "il_sourced_logic": "IL plugin (Wave 8C Schedule NR): when at least one W-2 state row has state_code='IL', IL sourced base = sum(state_rows[IL].state_wages) + sum(Schedule C net for business_location_state='IL') + sum(Schedule E properties in IL). Exemption is prorated by (IL sourced base / total base income). IL sourced taxable = max(0, sourced_base - prorated_exemption), IL tax = sourced_taxable * 0.0495. For this fixture: ratio = 35000/65000 = 0.5385, prorated_exemption = 2850 * ratio = 1534.62, (35000 - 1534.62) * 0.0495 = 1656.54 with ROUND_HALF_UP.",
     "still_open": "IL additions/subtractions (Line 2 muni addback, Line 5 SS/retirement, Sch M Line 22 Treasury) are NOT applied on the sourced path in v1 — they only affect the resident-basis hypothetical stamped as state_total_tax_resident_basis. A follow-up can fold the sourced line items through those adds/subs once a per-state 1099 sourcing rule lands.",
     "resident_basis_preserved": "The resident-basis tax is still stamped under state_total_tax_resident_basis so regression tests can compare the Wave 6 sourced answer against the Wave 5 day-prorated hypothetical."
   },

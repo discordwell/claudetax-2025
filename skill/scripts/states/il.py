@@ -148,10 +148,11 @@ v1 LIMITATIONS STILL OPEN — loud and proud (locked by tests):
   "What's New" — up from 20% in TY2024), and all other IL
   credits — not modeled.
 
-- Nonresident / part-year returns use day-proration of resident-basis tax.
-  The real IL Schedule NR allocates income item-by-item (wages to work
-  location, interest/dividends to domicile, property gains to situs, etc).
-  Day-based proration is the shared first-cut across fan-out state plugins.
+- Nonresident / part-year returns now implement real Schedule NR income
+  sourcing: wages from W-2 state rows, rental by property situs, business
+  income by location, interest/dividends excluded for nonresidents.
+  Exemption is prorated by (IL income / total income). Day-proration is
+  the fallback only when no W-2 state rows are present.
 
 Every one of the above is listed in the returned state_specific
 "v1_limitations" field so downstream consumers and tests can see, not
@@ -212,6 +213,7 @@ def _build_il1040_fields(state_return: "StateReturn") -> IL1040Fields:
     )
 from skill.scripts.states._hand_rolled_base import (
     state_has_w2_state_rows,
+    state_source_rental_by_property_state,
     state_source_schedule_c,
     state_source_wages_from_w2s,
 )
@@ -270,8 +272,10 @@ _V1_LIMITATIONS: tuple[str, ...] = (
     "IL property tax credit, K-12 education expense credit, earned income "
     "credit (40% of federal EITC for TY2025), and all other IL "
     "nonrefundable / refundable credits NOT modeled.",
-    "Nonresident / part-year apportionment uses day-based proration, not "
-    "IL Schedule NR line-item income sourcing.",
+    "Nonresident / part-year Schedule NR: wages sourced via W-2 state rows, "
+    "rental sourced by property situs, business income by location, "
+    "interest/dividends excluded. Exemption prorated by IL-source ratio. "
+    "Day-proration fallback used only when no W-2 state rows are present.",
 )
 
 
@@ -468,40 +472,63 @@ class IllinoisPlugin:
         # Step 4: flat-rate tax. ROUND_HALF_UP to the cent.
         tax_full = _cents(taxable * IL_FLAT_RATE)
 
-        # Wave 6: real IL Schedule NR scaffolding. When at least one W-2
-        # state row carries IL AND the filer is not an IL resident, the
-        # plugin computes a state-sourced IL tax directly instead of
-        # day-prorating the resident-basis tax:
+        # Real IL Schedule NR income sourcing for nonresidents.
         #
-        #   il_sourced_base = sum(state_rows[IL].state_wages)
-        #                    + sum(Schedule C net for business_location_state=IL)
-        #   il_sourced_taxable = max(0, il_sourced_base - exemption_total)
-        #   il_sourced_tax = il_sourced_taxable * 0.0495
+        # Schedule NR sources each income item individually:
+        #   - Wages: W-2 state rows with state="IL"
+        #   - Business income (Schedule C): business_location_state="IL"
+        #   - Rental income (Schedule E): property address.state="IL"
+        #   - Interest / Dividends: NOT IL-source for nonresidents
         #
-        # This matches the Schedule NR pattern of taxing only income
-        # sourced to IL. When no state rows are present the plugin falls
-        # back to day-proration of the resident-basis tax (legacy path).
+        # The exemption is prorated by the ratio of IL-source income to
+        # total income (Column B / Column A on Schedule NR). Tax is
+        # computed on (IL base income - prorated exemption) * 4.95%.
+        #
+        # Fallback: when no W-2 state rows are present, day-proration of
+        # the resident-basis tax is used (legacy path for W-2s ingested
+        # before state-row tracking).
         il_state_rows_present = state_has_w2_state_rows(return_, "IL")
         il_sourced_wages = state_source_wages_from_w2s(return_, "IL")
         il_sourced_se = state_source_schedule_c(return_, "IL")
+        il_sourced_rental = state_source_rental_by_property_state(
+            return_, "IL"
+        )
 
         if residency == ResidencyStatus.RESIDENT:
             fraction = Decimal("1")
             tax_apportioned = tax_full
+            prorated_exemption = exemption_total
         elif il_state_rows_present:
-            il_sourced_base = il_sourced_wages + il_sourced_se
-            # IL-1040 additions/subtractions on top of the sourced base:
-            # in v1 we keep it simple and skip the adds/subs on the
-            # sourced path (they live under state_specific for audit),
-            # because the brief is strictly about W-2 wage sourcing.
-            il_sourced_after_exemption = il_sourced_base - exemption_total
-            if il_sourced_after_exemption < 0:
-                il_sourced_after_exemption = Decimal("0")
-            tax_apportioned = _cents(il_sourced_after_exemption * IL_FLAT_RATE)
+            # Schedule NR path: real income sourcing.
+            # Column B: IL-source income only.
+            il_sourced_base = (
+                il_sourced_wages + il_sourced_se + il_sourced_rental
+            )
+            # Interest/dividends are NOT IL-source for nonresidents.
+
+            # Prorate the exemption: (IL income / total income) * full exemption.
+            # "Total income" here is the resident-basis base income after
+            # adjustments (Column A on Schedule NR).
+            if base_income_after_adjustments > 0:
+                il_ratio = il_sourced_base / base_income_after_adjustments
+                if il_ratio > 1:
+                    il_ratio = Decimal("1")
+                if il_ratio < 0:
+                    il_ratio = Decimal("0")
+            else:
+                il_ratio = Decimal("0")
+            prorated_exemption = _cents(exemption_total * il_ratio)
+
+            il_sourced_taxable = il_sourced_base - prorated_exemption
+            if il_sourced_taxable < 0:
+                il_sourced_taxable = Decimal("0")
+            tax_apportioned = _cents(il_sourced_taxable * IL_FLAT_RATE)
             fraction = Decimal("1")  # no day-proration under sourcing
         else:
+            # Fallback: day-proration when no W-2 state rows present.
             fraction = _apportionment_fraction(residency, days_in_state)
             tax_apportioned = _cents(tax_full * fraction)
+            prorated_exemption = exemption_total
 
         state_specific: dict[str, Any] = {
             # NOTE: "state_base_income_approx" is preserved for backward
@@ -528,6 +555,7 @@ class IllinoisPlugin:
             "state_exemption_count": exemption_count,
             "state_exemption_per_person": IL_PERSONAL_EXEMPTION_TY2025,
             "state_exemption_total": exemption_total,
+            "state_exemption_prorated": prorated_exemption,
             "state_taxable_income": taxable,
             "state_total_tax": tax_apportioned,
             "state_total_tax_resident_basis": tax_full,
@@ -535,6 +563,7 @@ class IllinoisPlugin:
             "apportionment_fraction": fraction,
             "il_sourced_wages_from_w2_state_rows": il_sourced_wages,
             "il_sourced_schedule_c_net": il_sourced_se,
+            "il_sourced_rental_net": il_sourced_rental,
             "il_state_rows_present": il_state_rows_present,
             "v1_limitations": list(_V1_LIMITATIONS),
         }
@@ -554,14 +583,15 @@ class IllinoisPlugin:
     ) -> IncomeApportionment:
         """Split canonical income into IL-source vs non-IL-source.
 
-        Residents: everything is IL-source. Nonresident / part-year: prorate
-        each category by days_in_state / 365.
+        Residents: everything is IL-source.
 
-        TODO(il-sched-nr): IL Schedule NR sources each income item
-        individually — wages to the work location, interest/dividends to
-        domicile, property gains to situs, distributive share from
-        pass-throughs to the K-1's IL apportionment, etc. Day-based
-        proration is the shared fan-out first cut.
+        Nonresidents / part-year (Schedule NR income sourcing):
+        - Wages: W-2 state rows with state="IL" (fallback: day-proration)
+        - Interest/Dividends: $0 (not IL-source for nonresidents)
+        - Business income: Schedule C with business_location_state="IL"
+        - Rental income: Schedule E properties with address.state="IL"
+        - Capital gains: $0 for nonresidents (real-property gains would
+          need situs analysis — deferred)
         """
         wages = sum(
             (w2.box1_wages for w2 in return_.w2s), start=Decimal("0")
@@ -602,25 +632,41 @@ class IllinoisPlugin:
             start=Decimal("0"),
         )
 
-        fraction = _apportionment_fraction(residency, days_in_state)
-
-        # Wave 6: prefer W-2 state-row sourcing for wages / Schedule C.
         if residency == ResidencyStatus.RESIDENT:
-            il_wages = _cents(wages)
-            il_se = _cents(se_net)
-        elif state_has_w2_state_rows(return_, "IL"):
+            # Residents: all income is IL-source.
+            return IncomeApportionment(
+                state_source_wages=_cents(wages),
+                state_source_interest=_cents(interest),
+                state_source_dividends=_cents(ord_div),
+                state_source_capital_gains=_cents(capital_gains),
+                state_source_self_employment=_cents(se_net),
+                state_source_rental=_cents(rental_net),
+            )
+
+        # Nonresident / part-year: real Schedule NR sourcing.
+        if state_has_w2_state_rows(return_, "IL"):
             il_wages = state_source_wages_from_w2s(return_, "IL")
             il_se = state_source_schedule_c(return_, "IL")
-        else:
-            il_wages = _cents(wages * fraction)
-            il_se = _cents(se_net * fraction)
+            il_rental = state_source_rental_by_property_state(return_, "IL")
+            # Interest, dividends, capital gains are NOT IL-source
+            # for nonresidents.
+            return IncomeApportionment(
+                state_source_wages=il_wages,
+                state_source_interest=Decimal("0"),
+                state_source_dividends=Decimal("0"),
+                state_source_capital_gains=Decimal("0"),
+                state_source_self_employment=il_se,
+                state_source_rental=il_rental,
+            )
 
+        # Fallback: day-proration when no W-2 state rows present.
+        fraction = _apportionment_fraction(residency, days_in_state)
         return IncomeApportionment(
-            state_source_wages=il_wages,
+            state_source_wages=_cents(wages * fraction),
             state_source_interest=_cents(interest * fraction),
             state_source_dividends=_cents(ord_div * fraction),
             state_source_capital_gains=_cents(capital_gains * fraction),
-            state_source_self_employment=il_se,
+            state_source_self_employment=_cents(se_net * fraction),
             state_source_rental=_cents(rental_net * fraction),
         )
 

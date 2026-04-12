@@ -63,6 +63,7 @@ __all__ = [
     "state_source_schedule_c",
     "state_source_rental",
     "state_source_rental_from_schedule_e",
+    "state_source_rental_by_property_state",
     "sourced_or_prorated_wages",
     "sourced_or_prorated_schedule_c",
 ]
@@ -432,3 +433,7 @@ def state_source_rental_from_schedule_e(
             if prop.address.state == state_code:
                 total += schedule_e_property_net(prop)
     return cents(total)
+
+
+# Alias — IL agent named this state_source_rental_by_property_state
+state_source_rental_by_property_state = state_source_rental_from_schedule_e

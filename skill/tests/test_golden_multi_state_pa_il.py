@@ -567,9 +567,10 @@ class TestIllinoisPluginDispatch:
         federal_totals: FederalTotals,
         expected: dict,
     ):
-        """Wave 6: IL plugin sources wages from W-2 state_rows[IL].state_wages,
-        applies the personal exemption, and multiplies by 4.95%.
-        ($35,000 - $2,850) * 0.0495 = $1,591.4250 -> $1,591.43 ROUND_HALF_UP.
+        """Wave 8C Schedule NR: IL plugin sources wages from W-2 state rows
+        and prorates the exemption by the IL-source ratio.
+        ratio = 35000/65000 = 0.5385...; prorated exemption = 2850 * ratio = 1534.62
+        ($35,000 - $1,534.62) * 0.0495 = $1,656.5363... -> $1,656.54 ROUND_HALF_UP.
         """
         plugin = registry.get("IL")
         result = plugin.compute(
@@ -582,7 +583,7 @@ class TestIllinoisPluginDispatch:
         assert result.state_specific["state_total_tax"] == _d(
             exp["state_total_tax"]
         )
-        assert result.state_specific["state_total_tax"] == Decimal("1591.43")
+        assert result.state_specific["state_total_tax"] == Decimal("1656.54")
 
     def test_il_sourced_wages_from_w2_state_rows(
         self, input_return: CanonicalReturn, federal_totals: FederalTotals

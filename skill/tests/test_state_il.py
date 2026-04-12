@@ -45,8 +45,12 @@ from skill.scripts.models import (
     FormSSA1099,
     Person,
     ResidencyStatus,
+    ScheduleC,
+    ScheduleE,
+    ScheduleEProperty,
     StateReturn,
     W2,
+    W2StateRow,
 )
 from skill.scripts.states._plugin_api import (
     FederalTotals,
@@ -61,6 +65,15 @@ from skill.scripts.states.il import (
     PLUGIN,
     IllinoisPlugin,
 )
+
+from decimal import ROUND_HALF_UP
+
+_CENTS = Decimal("0.01")
+
+
+def _rhu(v: Decimal) -> Decimal:
+    """Round to cents using ROUND_HALF_UP (matching the plugin)."""
+    return v.quantize(_CENTS, rounding=ROUND_HALF_UP)
 
 
 # ---------------------------------------------------------------------------
@@ -399,7 +412,7 @@ class TestIllinoisPluginComputeNonresident:
         full = result.state_specific["state_total_tax_resident_basis"]
         apportioned = result.state_specific["state_total_tax"]
         assert full == Decimal("3076.43")
-        expected = (full * Decimal(182) / Decimal(365)).quantize(Decimal("0.01"))
+        expected = (full * Decimal(182) / Decimal(365)).quantize(_CENTS, rounding=ROUND_HALF_UP)
         assert apportioned == expected
         # Sanity: roughly half.
         assert Decimal("1500.00") < apportioned < Decimal("1600.00")
@@ -918,3 +931,589 @@ class TestIllinoisPluginAddsAndSubsWave4:
         assert "in-state muni" in joined or "in-state" in joined
         assert "distribution-code" in joined or "distribution code" in joined
         assert "phase-out" in joined or "phase out" in joined
+
+
+# ---------------------------------------------------------------------------
+# Schedule NR nonresident income apportionment (replaces day-proration)
+# ---------------------------------------------------------------------------
+#
+# IL nonresident taxation follows Schedule NR:
+#   Column A = total income from all sources (federal amounts)
+#   Column B = Illinois-source income
+#
+# IL-source rules:
+#   - Wages: IL-source if work performed in IL (W-2 state rows with state="IL")
+#   - Interest/Dividends: NOT IL-source for nonresidents
+#   - Business income: IL-source if business operated in IL
+#   - Rental income: IL-source if property located in IL
+#
+# Exemption is prorated: (IL income / total income) * full exemption
+# Tax = (IL base income - prorated exemption) * 4.95%
+
+
+def _nonresident_return_with_il_w2(
+    wages: str = "50000",
+    il_state_wages: str = "50000",
+) -> CanonicalReturn:
+    """Nonresident with a W-2 that has IL state rows."""
+    return CanonicalReturn(
+        tax_year=2025,
+        filing_status=FilingStatus.SINGLE,
+        taxpayer=Person(
+            first_name="Nora",
+            last_name="Nonres",
+            ssn="555-66-7777",
+            date_of_birth=dt.date(1988, 5, 15),
+        ),
+        address=Address(
+            street1="100 Main St", city="Indianapolis", state="IN", zip="46204"
+        ),
+        w2s=[
+            W2(
+                employer_name="IL Employer Inc",
+                box1_wages=Decimal(wages),
+                box2_federal_income_tax_withheld=Decimal("0"),
+                state_rows=[
+                    W2StateRow(
+                        state="IL",
+                        state_wages=Decimal(il_state_wages),
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def _federal_for_agi(agi: str, filing_status: FilingStatus = FilingStatus.SINGLE,
+                     num_deps: int = 0) -> FederalTotals:
+    """Quick FederalTotals helper."""
+    return FederalTotals(
+        filing_status=filing_status,
+        num_dependents=num_deps,
+        adjusted_gross_income=Decimal(agi),
+        taxable_income=Decimal(agi),
+        total_federal_tax=Decimal("0"),
+        federal_income_tax=Decimal("0"),
+        federal_standard_deduction=Decimal("15750"),
+        federal_itemized_deductions_total=Decimal("0"),
+        deduction_taken=Decimal("15750"),
+        federal_withholding_from_w2s=Decimal("0"),
+    )
+
+
+class TestIllinoisScheduleNRNonresidentCompute:
+    """Real Schedule NR nonresident tax computation tests."""
+
+    def test_nonresident_il_w2_only_taxes_il_wages(self):
+        """Nonresident with $50k total wages, all IL-source.
+
+        IL base = $50,000 (all IL wages)
+        Ratio = 50000/50000 = 1.0
+        Prorated exemption = 1.0 * $2,850 = $2,850
+        Taxable = $50,000 - $2,850 = $47,150
+        Tax = $47,150 * 0.0495 = $2,333.925 -> $2,333.93
+        """
+        ret = _nonresident_return_with_il_w2("50000", "50000")
+        fed = _federal_for_agi("50000")
+        result = PLUGIN.compute(ret, fed, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        ss = result.state_specific
+        assert ss["il_sourced_wages_from_w2_state_rows"] == Decimal("50000.00")
+        assert ss["state_total_tax"] == Decimal("2333.93")
+
+    def test_nonresident_partial_il_wages(self):
+        """Nonresident with $80k total wages but only $30k IL-source.
+
+        IL base = $30,000 (IL wages only)
+        Ratio = 30000/80000 = 0.375
+        Prorated exemption = 0.375 * $2,850 = $1,068.75
+        Taxable = $30,000 - $1,068.75 = $28,931.25
+        Tax = $28,931.25 * 0.0495 = $1,432.096875 -> $1,432.10
+        """
+        ret = _nonresident_return_with_il_w2("80000", "30000")
+        fed = _federal_for_agi("80000")
+        result = PLUGIN.compute(ret, fed, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        ss = result.state_specific
+        assert ss["il_sourced_wages_from_w2_state_rows"] == Decimal("30000.00")
+        # Verify exemption proration
+        il_ratio = Decimal("30000") / Decimal("80000")
+        expected_exemption = (Decimal("2850") * il_ratio).quantize(_CENTS, rounding=ROUND_HALF_UP)
+        assert ss["state_exemption_prorated"] == expected_exemption
+        assert ss["state_total_tax"] == Decimal("1432.10")
+
+    def test_nonresident_interest_not_il_source(self):
+        """Interest income should NOT be IL-source for nonresidents.
+
+        A nonresident with $50k IL wages + $10k interest should only
+        pay IL tax on the $50k wages, not the interest. The interest
+        does appear in Column A (total) for exemption proration though.
+        """
+        ret = _nonresident_return_with_il_w2("50000", "50000")
+        ret.forms_1099_int.append(
+            Form1099INT(
+                payer_name="Big Bank",
+                box1_interest_income=Decimal("10000"),
+            )
+        )
+        fed = _federal_for_agi("60000")  # AGI includes $10k interest
+        result = PLUGIN.compute(ret, fed, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        ss = result.state_specific
+        # IL-source base is only $50k (wages), not $60k
+        assert ss["il_sourced_wages_from_w2_state_rows"] == Decimal("50000.00")
+        # Ratio = 50000/60000 for exemption proration
+        il_ratio = Decimal("50000") / Decimal("60000")
+        expected_exemption = (Decimal("2850") * il_ratio).quantize(_CENTS, rounding=ROUND_HALF_UP)
+        assert ss["state_exemption_prorated"] == expected_exemption
+        # Tax on wages minus prorated exemption
+        taxable = Decimal("50000") - expected_exemption
+        expected_tax = (taxable * Decimal("0.0495")).quantize(_CENTS, rounding=ROUND_HALF_UP)
+        assert ss["state_total_tax"] == expected_tax
+
+    def test_nonresident_dividends_not_il_source(self):
+        """Dividends should NOT be IL-source for nonresidents."""
+        ret = _nonresident_return_with_il_w2("50000", "50000")
+        ret.forms_1099_div.append(
+            Form1099DIV(
+                payer_name="Mutual Fund Co",
+                box1a_ordinary_dividends=Decimal("5000"),
+            )
+        )
+        fed = _federal_for_agi("55000")
+        result = PLUGIN.compute(ret, fed, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        ss = result.state_specific
+        # IL-source base is only $50k wages
+        il_ratio = Decimal("50000") / Decimal("55000")
+        expected_exemption = (Decimal("2850") * il_ratio).quantize(_CENTS, rounding=ROUND_HALF_UP)
+        taxable = Decimal("50000") - expected_exemption
+        expected_tax = (taxable * Decimal("0.0495")).quantize(_CENTS, rounding=ROUND_HALF_UP)
+        assert ss["state_total_tax"] == expected_tax
+
+    def test_nonresident_with_il_rental_property(self):
+        """Rental income from IL property IS IL-source.
+
+        Nonresident with $50k IL wages + $12k IL rental income.
+        IL base = $50,000 + $12,000 = $62,000
+        Total AGI = $62,000
+        Ratio = 62000/62000 = 1.0
+        Prorated exemption = $2,850
+        Taxable = $62,000 - $2,850 = $59,150
+        Tax = $59,150 * 0.0495 = $2,927.925 -> $2,927.93
+        """
+        ret = _nonresident_return_with_il_w2("50000", "50000")
+        ret.schedules_e.append(
+            ScheduleE(
+                properties=[
+                    ScheduleEProperty(
+                        address=Address(
+                            street1="456 Lake Shore Dr",
+                            city="Chicago",
+                            state="IL",
+                            zip="60611",
+                        ),
+                        rents_received=Decimal("18000"),
+                        insurance=Decimal("2000"),
+                        taxes=Decimal("3000"),
+                        repairs=Decimal("1000"),
+                    ),
+                ]
+            )
+        )
+        # Rental net = 18000 - 2000 - 3000 - 1000 = 12000
+        fed = _federal_for_agi("62000")
+        result = PLUGIN.compute(ret, fed, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        ss = result.state_specific
+        assert ss["il_sourced_rental_net"] == Decimal("12000.00")
+        assert ss["il_sourced_wages_from_w2_state_rows"] == Decimal("50000.00")
+        assert ss["state_total_tax"] == Decimal("2927.93")
+
+    def test_nonresident_non_il_rental_excluded(self):
+        """Rental income from non-IL property is NOT IL-source.
+
+        Nonresident with $50k IL wages + $12k IN rental (not IL).
+        IL base = $50k (wages only), rental excluded.
+        """
+        ret = _nonresident_return_with_il_w2("50000", "50000")
+        ret.schedules_e.append(
+            ScheduleE(
+                properties=[
+                    ScheduleEProperty(
+                        address=Address(
+                            street1="789 Meridian St",
+                            city="Indianapolis",
+                            state="IN",
+                            zip="46204",
+                        ),
+                        rents_received=Decimal("18000"),
+                        insurance=Decimal("2000"),
+                        taxes=Decimal("3000"),
+                        repairs=Decimal("1000"),
+                    ),
+                ]
+            )
+        )
+        fed = _federal_for_agi("62000")  # AGI includes rental
+        result = PLUGIN.compute(ret, fed, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        ss = result.state_specific
+        assert ss["il_sourced_rental_net"] == Decimal("0.00")
+        # Only IL wages count
+        il_ratio = Decimal("50000") / Decimal("62000")
+        expected_exemption = (Decimal("2850") * il_ratio).quantize(_CENTS, rounding=ROUND_HALF_UP)
+        taxable = Decimal("50000") - expected_exemption
+        expected_tax = (taxable * Decimal("0.0495")).quantize(_CENTS, rounding=ROUND_HALF_UP)
+        assert ss["state_total_tax"] == expected_tax
+
+    def test_nonresident_mixed_sources_il_w2_non_il_rental_interest(self):
+        """Nonresident with IL W-2 + non-IL rental + interest.
+
+        $40k total wages ($40k IL), $10k interest, $15k IN rental.
+        Total AGI = $65k.
+        IL-source = $40k (wages only; interest and IN rental excluded).
+        Ratio = 40000/65000
+        Prorated exemption = (40000/65000) * $2,850
+        Taxable = $40,000 - prorated exemption
+        Tax = taxable * 0.0495
+        """
+        ret = _nonresident_return_with_il_w2("40000", "40000")
+        ret.forms_1099_int.append(
+            Form1099INT(
+                payer_name="Savings Bank",
+                box1_interest_income=Decimal("10000"),
+            )
+        )
+        ret.schedules_e.append(
+            ScheduleE(
+                properties=[
+                    ScheduleEProperty(
+                        address=Address(
+                            street1="100 Market St",
+                            city="Indianapolis",
+                            state="IN",
+                            zip="46204",
+                        ),
+                        rents_received=Decimal("15000"),
+                    ),
+                ]
+            )
+        )
+        fed = _federal_for_agi("65000")
+        result = PLUGIN.compute(ret, fed, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        ss = result.state_specific
+        # IL-source: only wages
+        il_base = Decimal("40000")
+        il_ratio = il_base / Decimal("65000")
+        expected_exemption = (Decimal("2850") * il_ratio).quantize(_CENTS, rounding=ROUND_HALF_UP)
+        taxable = il_base - expected_exemption
+        expected_tax = (taxable * Decimal("0.0495")).quantize(_CENTS, rounding=ROUND_HALF_UP)
+        assert ss["state_total_tax"] == expected_tax
+        assert ss["il_sourced_rental_net"] == Decimal("0.00")
+
+    def test_nonresident_il_business_income_sourced(self):
+        """Schedule C business in IL is IL-source for nonresidents."""
+        ret = _nonresident_return_with_il_w2("50000", "50000")
+        ret.schedules_c.append(
+            ScheduleC(
+                business_name="IL Consulting",
+                principal_business_or_profession="Consulting",
+                business_location_state="IL",
+                line1_gross_receipts=Decimal("25000"),
+            )
+        )
+        fed = _federal_for_agi("75000")
+        result = PLUGIN.compute(ret, fed, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        ss = result.state_specific
+        assert ss["il_sourced_schedule_c_net"] == Decimal("25000.00")
+        # IL base = 50k wages + 25k business = 75k
+        il_base = Decimal("75000")
+        il_ratio = il_base / Decimal("75000")  # = 1.0
+        expected_exemption = (Decimal("2850") * il_ratio).quantize(_CENTS, rounding=ROUND_HALF_UP)
+        taxable = il_base - expected_exemption
+        expected_tax = (taxable * Decimal("0.0495")).quantize(_CENTS, rounding=ROUND_HALF_UP)
+        assert ss["state_total_tax"] == expected_tax
+
+    def test_nonresident_exemption_prorated_less_than_full(self):
+        """Verify exemption proration when IL ratio < 1.
+
+        MFJ with 2 deps: full exemption = 4 * $2,850 = $11,400
+        $100k total income, $40k IL wages.
+        Ratio = 0.4
+        Prorated exemption = 0.4 * $11,400 = $4,560
+        Taxable = $40,000 - $4,560 = $35,440
+        Tax = $35,440 * 0.0495 = $1,754.28
+        """
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.MFJ,
+            taxpayer=Person(
+                first_name="Pat",
+                last_name="Nonres",
+                ssn="666-77-8888",
+                date_of_birth=dt.date(1985, 3, 15),
+            ),
+            spouse=Person(
+                first_name="Sam",
+                last_name="Nonres",
+                ssn="777-88-9999",
+                date_of_birth=dt.date(1986, 7, 20),
+            ),
+            address=Address(
+                street1="200 Monument Circle",
+                city="Indianapolis",
+                state="IN",
+                zip="46204",
+            ),
+            w2s=[
+                W2(
+                    employer_name="IL Corp",
+                    box1_wages=Decimal("100000"),
+                    box2_federal_income_tax_withheld=Decimal("0"),
+                    state_rows=[
+                        W2StateRow(state="IL", state_wages=Decimal("40000")),
+                    ],
+                ),
+            ],
+        )
+        fed = _federal_for_agi("100000", FilingStatus.MFJ, num_deps=2)
+        result = PLUGIN.compute(ret, fed, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        ss = result.state_specific
+        assert ss["state_exemption_count"] == 4
+        assert ss["state_exemption_total"] == Decimal("11400.00")
+        # Prorated exemption = 0.4 * 11400 = 4560
+        assert ss["state_exemption_prorated"] == Decimal("4560.00")
+        # Tax = (40000 - 4560) * 0.0495 = 35440 * 0.0495 = 1754.28
+        assert ss["state_total_tax"] == Decimal("1754.28")
+
+    def test_resident_unchanged_by_schedule_nr_logic(self):
+        """Resident computation should be unchanged -- exemption is NOT prorated."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="Res",
+                last_name="Ident",
+                ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=Address(
+                street1="100 N State St", city="Chicago", state="IL", zip="60602"
+            ),
+            w2s=[
+                W2(
+                    employer_name="IL Corp",
+                    box1_wages=Decimal("65000"),
+                    box2_federal_income_tax_withheld=Decimal("0"),
+                ),
+            ],
+        )
+        fed = _federal_for_agi("65000")
+        result = PLUGIN.compute(ret, fed, ResidencyStatus.RESIDENT, days_in_state=365)
+        ss = result.state_specific
+        assert ss["state_exemption_total"] == Decimal("2850.00")
+        assert ss["state_exemption_prorated"] == Decimal("2850.00")
+        assert ss["state_total_tax"] == Decimal("3076.43")
+        assert ss["state_total_tax"] == ss["state_total_tax_resident_basis"]
+
+    def test_nonresident_zero_il_income_yields_zero_tax(self):
+        """Nonresident with no IL-source income should pay $0."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="Nora",
+                last_name="NoIL",
+                ssn="888-99-0000",
+                date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=Address(
+                street1="100 Main St", city="Indianapolis", state="IN", zip="46204"
+            ),
+            w2s=[
+                W2(
+                    employer_name="Indiana Corp",
+                    box1_wages=Decimal("60000"),
+                    box2_federal_income_tax_withheld=Decimal("0"),
+                    state_rows=[
+                        W2StateRow(state="IN", state_wages=Decimal("60000")),
+                    ],
+                ),
+            ],
+        )
+        fed = _federal_for_agi("60000")
+        result = PLUGIN.compute(ret, fed, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        ss = result.state_specific
+        assert ss["il_sourced_wages_from_w2_state_rows"] == Decimal("0.00")
+        assert ss["state_total_tax"] == Decimal("0.00")
+
+
+class TestIllinoisScheduleNRApportionIncome:
+    """Test apportion_income() with real Schedule NR sourcing."""
+
+    def test_nonresident_apportion_wages_from_w2_state_rows(self):
+        """Wages sourced from W-2 state rows, not day-prorated."""
+        ret = _nonresident_return_with_il_w2("80000", "30000")
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        assert app.state_source_wages == Decimal("30000.00")
+
+    def test_nonresident_apportion_interest_zero(self):
+        """Interest is NOT IL-source for nonresidents."""
+        ret = _nonresident_return_with_il_w2("50000", "50000")
+        ret.forms_1099_int.append(
+            Form1099INT(
+                payer_name="Big Bank",
+                box1_interest_income=Decimal("10000"),
+            )
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        assert app.state_source_interest == Decimal("0")
+
+    def test_nonresident_apportion_dividends_zero(self):
+        """Dividends are NOT IL-source for nonresidents."""
+        ret = _nonresident_return_with_il_w2("50000", "50000")
+        ret.forms_1099_div.append(
+            Form1099DIV(
+                payer_name="Fund Co",
+                box1a_ordinary_dividends=Decimal("5000"),
+            )
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        assert app.state_source_dividends == Decimal("0")
+
+    def test_nonresident_apportion_capital_gains_zero(self):
+        """Capital gains are NOT IL-source for nonresidents (simplified)."""
+        ret = _nonresident_return_with_il_w2("50000", "50000")
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        assert app.state_source_capital_gains == Decimal("0")
+
+    def test_nonresident_apportion_rental_by_property_state(self):
+        """Rental sourced by property address state."""
+        ret = _nonresident_return_with_il_w2("50000", "50000")
+        ret.schedules_e.append(
+            ScheduleE(
+                properties=[
+                    ScheduleEProperty(
+                        address=Address(
+                            street1="123 IL St",
+                            city="Chicago",
+                            state="IL",
+                            zip="60601",
+                        ),
+                        rents_received=Decimal("20000"),
+                        taxes=Decimal("5000"),
+                    ),
+                    ScheduleEProperty(
+                        address=Address(
+                            street1="456 IN St",
+                            city="Indianapolis",
+                            state="IN",
+                            zip="46204",
+                        ),
+                        rents_received=Decimal("15000"),
+                        taxes=Decimal("3000"),
+                    ),
+                ]
+            )
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        # Only IL property: 20000 - 5000 = 15000
+        assert app.state_source_rental == Decimal("15000.00")
+
+    def test_nonresident_apportion_business_by_location(self):
+        """Schedule C business sourced by business_location_state."""
+        ret = _nonresident_return_with_il_w2("50000", "50000")
+        ret.schedules_c.append(
+            ScheduleC(
+                business_name="IL Biz",
+                principal_business_or_profession="Consulting",
+                business_location_state="IL",
+                line1_gross_receipts=Decimal("20000"),
+            )
+        )
+        ret.schedules_c.append(
+            ScheduleC(
+                business_name="IN Biz",
+                principal_business_or_profession="Freelance",
+                business_location_state="IN",
+                line1_gross_receipts=Decimal("10000"),
+            )
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        assert app.state_source_self_employment == Decimal("20000.00")
+
+    def test_resident_apportion_all_income_il_source(self):
+        """Resident: all income categories are IL-source."""
+        ret = CanonicalReturn(
+            tax_year=2025,
+            filing_status=FilingStatus.SINGLE,
+            taxpayer=Person(
+                first_name="Res",
+                last_name="Ident",
+                ssn="111-22-3333",
+                date_of_birth=dt.date(1990, 1, 1),
+            ),
+            address=Address(
+                street1="100 N State St", city="Chicago", state="IL", zip="60602"
+            ),
+            w2s=[
+                W2(
+                    employer_name="Corp",
+                    box1_wages=Decimal("50000"),
+                    box2_federal_income_tax_withheld=Decimal("0"),
+                ),
+            ],
+        )
+        ret.forms_1099_int.append(
+            Form1099INT(
+                payer_name="Bank",
+                box1_interest_income=Decimal("2000"),
+            )
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.RESIDENT, days_in_state=365)
+        assert app.state_source_wages == Decimal("50000.00")
+        assert app.state_source_interest == Decimal("2000.00")
+        assert app.state_source_total == Decimal("52000.00")
+
+    def test_nonresident_apportion_total_is_il_only(self):
+        """Nonresident total should reflect only IL-source income."""
+        ret = _nonresident_return_with_il_w2("80000", "30000")
+        ret.forms_1099_int.append(
+            Form1099INT(
+                payer_name="Bank",
+                box1_interest_income=Decimal("10000"),
+            )
+        )
+        ret.schedules_e.append(
+            ScheduleE(
+                properties=[
+                    ScheduleEProperty(
+                        address=Address(
+                            street1="100 IL Rd",
+                            city="Springfield",
+                            state="IL",
+                            zip="62701",
+                        ),
+                        rents_received=Decimal("10000"),
+                        taxes=Decimal("2000"),
+                    ),
+                ]
+            )
+        )
+        app = PLUGIN.apportion_income(ret, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        # Wages: 30000, Interest: 0, Rental: 8000
+        assert app.state_source_wages == Decimal("30000.00")
+        assert app.state_source_interest == Decimal("0")
+        assert app.state_source_rental == Decimal("8000.00")
+        assert app.state_source_total == Decimal("38000.00")
+
+
+class TestIllinoisScheduleNRV1Limitations:
+    """Verify the v1_limitations text reflects Schedule NR implementation."""
+
+    def test_v1_limitations_mention_schedule_nr_sourcing(self):
+        """v1_limitations should describe the Schedule NR sourcing that IS
+        implemented, not the old day-proration stub."""
+        ret = _nonresident_return_with_il_w2("50000", "50000")
+        fed = _federal_for_agi("50000")
+        result = PLUGIN.compute(ret, fed, ResidencyStatus.NONRESIDENT, days_in_state=0)
+        joined = " ".join(result.state_specific["v1_limitations"]).lower()
+        # Should mention the sourcing rules that are now implemented
+        assert "w-2 state rows" in joined or "wages sourced" in joined
+        assert "rental" in joined or "property situs" in joined
+        assert "exemption prorated" in joined or "prorated" in joined

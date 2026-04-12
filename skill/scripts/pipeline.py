@@ -453,6 +453,7 @@ def run_pipeline(
     render_form_8606: bool = True,
     render_form_8962: bool = True,
     render_schedule_2: bool = True,
+    render_schedule_3: bool = True,
     render_state_returns: bool = True,
     build_paper_bundle: bool = True,
     emit_ffff_map: bool = True,
@@ -631,6 +632,19 @@ def run_pipeline(
 
         f8829_paths = render_form_8829_pdfs_all(canonical, output_dir)
         rendered.extend(f8829_paths)
+
+    if render_schedule_3:
+        from skill.scripts.output.schedule_3 import (
+            compute_schedule_3_fields,
+            render_schedule_3_pdf,
+            schedule_3_required,
+        )
+
+        if schedule_3_required(canonical):
+            fields_3 = compute_schedule_3_fields(canonical)
+            out_path_3 = output_dir / "schedule_3.pdf"
+            render_schedule_3_pdf(fields_3, out_path_3)
+            rendered.append(out_path_3)
 
     if render_schedule_d:
         from skill.scripts.output.schedule_d import (

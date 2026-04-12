@@ -431,6 +431,33 @@ class TestCaliforniaPluginFormIds:
         reader = PdfReader(str(paths[0]))
         assert len(reader.pages) >= 1
 
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify that rendered CA 540 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # Widget "540_form_2013" maps to state_total_tax (line 31)
+        assert fields["540_form_2013"].get("/V") == "1975.00"
+        # Widget "540_form_1046" maps to state_taxable_income (line 18)
+        assert fields["540_form_1046"].get("/V") == "59294.00"
+        # Widget "540_form_1038" maps to state_adjusted_gross_income (line 11)
+        assert fields["540_form_1038"].get("/V") == "65000.00"
+
 
 # ---------------------------------------------------------------------------
 # Wave 6 — Schedule CA (540NR) sourcing scaffolding

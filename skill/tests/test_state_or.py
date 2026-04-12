@@ -387,6 +387,33 @@ class TestOregonPluginFormIds:
         reader = PdfReader(str(paths[0]))
         assert len(reader.pages) >= 1
 
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify that rendered OR-40 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # Widget "or-40-p1-30a" maps to state_total_tax (line 18)
+        assert fields["or-40-p1-30a"].get("/V") == "4370.00"
+        # Widget "or-40-p1-29" maps to state_taxable_income (line 17)
+        assert fields["or-40-p1-29"].get("/V") == "56410.00"
+        # Widget "or-40-p1-23" maps to state_adjusted_gross_income (line 11)
+        assert fields["or-40-p1-23"].get("/V") == "65000.00"
+
 
 # ---------------------------------------------------------------------------
 # Filename-underscore convention

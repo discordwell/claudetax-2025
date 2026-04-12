@@ -471,3 +471,30 @@ class TestMichiganPluginFormIds:
         reader = PdfReader(str(pdfs[0]))
         # MI-1040 source has 3 pages
         assert len(reader.pages) >= 2
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify that rendered MI-1040 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        pdfs = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(pdfs[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # Widget "Line 17" maps to tax (4.25% of taxable income)
+        assert fields["Line 17"].get("/V") == "2762.50"
+        # Widget "Line 16" maps to taxable income
+        assert fields["Line 16"].get("/V") == "65000.00"
+        # Widget "Line 10" maps to AGI from federal 1040
+        assert fields["Line 10"].get("/V") == "65000.00"

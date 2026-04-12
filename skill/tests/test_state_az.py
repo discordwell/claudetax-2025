@@ -439,3 +439,30 @@ class TestArizonaPluginFormIds:
         paths = PLUGIN.render_pdfs(state_return, tmp_path)
         reader = PdfReader(str(paths[0]))
         assert len(reader.pages) >= 1
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify that rendered AZ 140 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # Widget "25" maps to state_total_tax (line 25)
+        assert fields["25"].get("/V") == "1231.25"
+        # Widget "24" maps to state_taxable_income (line 24)
+        assert fields["24"].get("/V") == "49250.00"
+        # Widget "19" maps to state_adjusted_gross_income (line 19)
+        assert fields["19"].get("/V") == "65000.00"

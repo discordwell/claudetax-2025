@@ -79,6 +79,42 @@ from skill.scripts.output.schedule_se import (
     compute_schedule_se_fields,
     schedule_se_required,
 )
+from skill.scripts.output.schedule_e import (
+    ScheduleEFields,
+    ScheduleEPropertyFields,
+    compute_schedule_e_fields,
+)
+from skill.scripts.output.schedule_1 import (
+    Schedule1Fields,
+    compute_schedule_1_fields,
+    schedule_1_required,
+)
+from skill.scripts.output.schedule_2 import (
+    Schedule2Fields,
+    compute_schedule_2_fields,
+    schedule_2_required,
+)
+from skill.scripts.output.schedule_3 import (
+    Schedule3Fields,
+    compute_schedule_3_fields,
+    schedule_3_required,
+)
+from skill.scripts.output.form_2441 import (
+    Form2441Fields,
+    compute_form_2441_fields,
+)
+from skill.scripts.output.form_8863 import (
+    Form8863Fields,
+    compute_form_8863_fields,
+)
+from skill.scripts.output.form_8962 import (
+    Form8962Fields,
+    compute_form_8962_fields,
+)
+from skill.scripts.output.form_8606 import (
+    Form8606Fields,
+    compute_form_8606_fields,
+)
 
 
 _ZERO = Decimal("0")
@@ -268,6 +304,23 @@ class FFFFEntryMap:
         if form.startswith("1040-SSE-"):
             idx = form.rsplit("-", 1)[-1]
             return f"Schedule SE #{idx} (Self-Employment Tax)"
+        if form.startswith("1040-SE-"):
+            idx = form.rsplit("-", 1)[-1]
+            return f"Schedule E #{idx} (Supplemental Income and Loss)"
+        if form == "1040-S1":
+            return "Schedule 1 (Additional Income and Adjustments)"
+        if form == "1040-S2":
+            return "Schedule 2 (Additional Taxes)"
+        if form == "1040-S3":
+            return "Schedule 3 (Additional Credits and Payments)"
+        if form == "2441":
+            return "Form 2441 (Child and Dependent Care Expenses)"
+        if form == "8863":
+            return "Form 8863 (Education Credits)"
+        if form == "8962":
+            return "Form 8962 (Premium Tax Credit)"
+        if form == "8606":
+            return "Form 8606 (Nondeductible IRAs)"
         return form
 
 
@@ -808,6 +861,395 @@ def _schedule_se_entries(
     ]
 
 
+def _schedule_e_entries(
+    fields: ScheduleEFields, idx: int
+) -> list[FFFFEntry]:
+    """Emit Schedule E entries for a single schedule page (1-based index).
+
+    Covers per-property rents/expenses/net and Part I totals.
+    """
+    form = f"1040-SE-{idx}"
+    entries: list[FFFFEntry] = []
+
+    for pi, prop in enumerate(fields.properties, start=1):
+        col = chr(64 + pi)  # A, B, C
+        entries.append(
+            FFFFEntry(
+                form=form,
+                line=f"1{col.lower()}",
+                value=prop.address,
+                description=f"Property {col} address",
+            )
+        )
+        entries.append(
+            FFFFEntry(
+                form=form,
+                line=f"1{col.lower()}.type",
+                value=prop.property_type,
+                description=f"Property {col} type",
+            )
+        )
+        entries.append(
+            FFFFEntry(
+                form=form,
+                line=f"3{col.lower()}",
+                value=_format_money(prop.line_3_rents_received),
+                description=f"Property {col} rents received",
+            )
+        )
+        # Key expense lines
+        expense_rows: list[tuple[str, Decimal, str]] = [
+            (f"5{col.lower()}", prop.line_5_advertising, "Advertising"),
+            (f"7{col.lower()}", prop.line_7_cleaning_and_maintenance, "Cleaning and maintenance"),
+            (f"9{col.lower()}", prop.line_9_insurance, "Insurance"),
+            (f"12{col.lower()}", prop.line_12_mortgage_interest_to_banks, "Mortgage interest"),
+            (f"14{col.lower()}", prop.line_14_repairs, "Repairs"),
+            (f"16{col.lower()}", prop.line_16_taxes, "Taxes"),
+            (f"17{col.lower()}", prop.line_17_utilities, "Utilities"),
+            (f"18{col.lower()}", prop.line_18_depreciation, "Depreciation"),
+            (f"19{col.lower()}", prop.line_19_other_expenses, "Other expenses"),
+            (f"20{col.lower()}", prop.line_20_total_expenses, "Total expenses"),
+            (f"21{col.lower()}", prop.line_21_net_income_or_loss, "Net income or (loss)"),
+        ]
+        for line, value, desc in expense_rows:
+            entries.append(
+                FFFFEntry(
+                    form=form,
+                    line=line,
+                    value=_format_money(value),
+                    description=f"Property {col} {desc}",
+                )
+            )
+
+    # Part I summary
+    summary_rows: list[tuple[str, Decimal, str]] = [
+        ("23a", fields.line_23a_total_rental_income, "Total rental/real estate income"),
+        ("23b", fields.line_23b_total_rental_losses, "Total rental/real estate losses"),
+        ("24", fields.line_24_income, "Income"),
+        ("25", fields.line_25_losses, "Losses"),
+        ("26", fields.line_26_total_rental_royalty_income_or_loss,
+         "Total rental real estate and royalty income or (loss)"),
+    ]
+    for line, value, desc in summary_rows:
+        entries.append(
+            FFFFEntry(
+                form=form,
+                line=line,
+                value=_format_money(value),
+                description=desc,
+            )
+        )
+
+    return entries
+
+
+def _schedule_1_entries(fields: Schedule1Fields) -> list[FFFFEntry]:
+    """Emit Schedule 1 entries for key lines a human would type into FFFF."""
+    form = "1040-S1"
+    rows: list[tuple[str, Decimal, str, str | None]] = [
+        ("3", fields.line_3_business_income,
+         "Business income or (loss) from Schedule C", None),
+        ("5", fields.line_5_rental_real_estate,
+         "Rental real estate, royalties, partnerships, S corps", None),
+        ("7", fields.line_7_unemployment,
+         "Unemployment compensation", None),
+        ("10", fields.line_10_total_additional_income,
+         "Total additional income", None),
+        ("15", fields.line_15_deductible_se_tax,
+         "Deductible part of self-employment tax", None),
+        ("25", fields.line_25_obbba_adjustments,
+         "OBBBA adjustments (senior deduction)", None),
+        ("26", fields.line_26_total_adjustments,
+         "Total adjustments to income", None),
+        ("net", fields.schedule_1_net,
+         "Schedule 1 net (line 10 - line 26) -> Form 1040 line 8", None),
+    ]
+    return [
+        FFFFEntry(
+            form=form,
+            line=line,
+            value=_format_money(value),
+            description=desc,
+            note=note,
+        )
+        for line, value, desc, note in rows
+    ]
+
+
+def _schedule_2_entries(fields: Schedule2Fields) -> list[FFFFEntry]:
+    """Emit Schedule 2 entries (AMT, SE tax, total)."""
+    form = "1040-S2"
+    rows: list[tuple[str, Decimal, str]] = [
+        ("1", fields.line_1_amt, "AMT (Form 6251)"),
+        ("2", fields.line_2_excess_aptc,
+         "Excess advance premium tax credit repayment"),
+        ("3", fields.line_3_part_i_total,
+         "Part I total (lines 1 + 2) -> Form 1040 line 17"),
+        ("6", fields.line_6_se_tax,
+         "Self-employment tax (Schedule SE)"),
+        ("10", fields.line_10_additional_medicare,
+         "Additional Medicare tax"),
+        ("11", fields.line_11_niit,
+         "Net investment income tax"),
+        ("21", fields.line_21_part_ii_total,
+         "Total additional taxes -> Form 1040 line 23"),
+    ]
+    return [
+        FFFFEntry(
+            form=form,
+            line=line,
+            value=_format_money(value),
+            description=desc,
+        )
+        for line, value, desc in rows
+    ]
+
+
+def _schedule_3_entries(fields: Schedule3Fields) -> list[FFFFEntry]:
+    """Emit Schedule 3 entries (education credits, child care, totals)."""
+    form = "1040-S3"
+    rows: list[tuple[str, Decimal, str]] = [
+        ("1", fields.line_1_foreign_tax_credit, "Foreign tax credit"),
+        ("2", fields.line_2_dependent_care_credit,
+         "Child and dependent care credit (Form 2441)"),
+        ("3", fields.line_3_education_credits,
+         "Education credits (Form 8863, nonrefundable)"),
+        ("7", fields.line_7_total_other_credits,
+         "Total other credits (sum of lines 1-6)"),
+        ("8", fields.line_8_total_nonrefundable_credits,
+         "Total nonrefundable credits -> Form 1040 line 20"),
+        ("9", fields.line_9_net_premium_tax_credit,
+         "Net premium tax credit (Form 8962)"),
+        ("14", fields.line_14_aotc_refundable,
+         "AOTC refundable portion (Form 8863)"),
+        ("15", fields.line_15_total_other_payments_and_refundable,
+         "Total other payments and refundable credits -> Form 1040 line 31"),
+    ]
+    return [
+        FFFFEntry(
+            form=form,
+            line=line,
+            value=_format_money(value),
+            description=desc,
+        )
+        for line, value, desc in rows
+    ]
+
+
+def _form_2441_entries(fields: Form2441Fields) -> list[FFFFEntry]:
+    """Emit Form 2441 entries (qualifying expenses, credit rate, credit)."""
+    form = "2441"
+    entries: list[FFFFEntry] = []
+
+    entries.append(
+        FFFFEntry(
+            form=form,
+            line="3",
+            value=str(fields.line_3_num_qualifying_persons),
+            description="Number of qualifying persons",
+        )
+    )
+    rows: list[tuple[str, Decimal, str]] = [
+        ("4", fields.line_4_qualified_expenses,
+         "Qualified expenses (after $3k/$6k cap)"),
+        ("5", fields.line_5_earned_income_taxpayer,
+         "Earned income - taxpayer"),
+        ("6", fields.line_6_earned_income_spouse,
+         "Earned income - spouse"),
+        ("7", fields.line_7_smallest_of_4_5_6,
+         "Smallest of lines 4, 5, 6"),
+    ]
+    for line, value, desc in rows:
+        entries.append(
+            FFFFEntry(form=form, line=line,
+                      value=_format_money(value), description=desc)
+        )
+    entries.append(
+        FFFFEntry(
+            form=form,
+            line="9",
+            value=f"{fields.line_9_credit_rate_pct}%",
+            description="Credit rate percentage",
+        )
+    )
+    entries.append(
+        FFFFEntry(
+            form=form,
+            line="10",
+            value=_format_money(fields.line_10_credit),
+            description="Credit amount -> Schedule 3 line 2",
+        )
+    )
+    return entries
+
+
+def _form_8863_entries(fields: Form8863Fields) -> list[FFFFEntry]:
+    """Emit Form 8863 entries (per-student AOTC/LLC, totals)."""
+    form = "8863"
+    entries: list[FFFFEntry] = []
+
+    for i, stu in enumerate(fields.students, start=1):
+        entries.append(
+            FFFFEntry(
+                form=form,
+                line=f"stu.{i}.name",
+                value=stu.name,
+                description=f"Student {i} name",
+            )
+        )
+        entries.append(
+            FFFFEntry(
+                form=form,
+                line=f"stu.{i}.ssn",
+                value=stu.ssn,
+                description=f"Student {i} SSN",
+            )
+        )
+        entries.append(
+            FFFFEntry(
+                form=form,
+                line=f"stu.{i}.expenses",
+                value=_format_money(stu.qualified_expenses),
+                description=f"Student {i} qualified expenses",
+            )
+        )
+        entries.append(
+            FFFFEntry(
+                form=form,
+                line=f"stu.{i}.type",
+                value=stu.credit_type,
+                description=f"Student {i} credit type (AOTC or LLC)",
+            )
+        )
+        if stu.credit_type == "AOTC":
+            entries.append(
+                FFFFEntry(
+                    form=form,
+                    line=f"stu.{i}.credit",
+                    value=_format_money(stu.phased_credit),
+                    description=f"Student {i} AOTC (after phase-out)",
+                )
+            )
+
+    # Totals
+    total_rows: list[tuple[str, Decimal, str]] = [
+        ("nonref", fields.total_nonrefundable,
+         "Total nonrefundable credits (AOTC 60% + LLC) -> Schedule 3 line 3"),
+        ("ref", fields.total_refundable,
+         "Total refundable credits (AOTC 40%) -> Schedule 3 line 14"),
+    ]
+    for line, value, desc in total_rows:
+        entries.append(
+            FFFFEntry(form=form, line=line,
+                      value=_format_money(value), description=desc)
+        )
+    return entries
+
+
+def _form_8962_entries(fields: Form8962Fields) -> list[FFFFEntry]:
+    """Emit Form 8962 entries (monthly PTC, net PTC, excess repayment)."""
+    form = "8962"
+    entries: list[FFFFEntry] = []
+
+    # Part I key lines
+    entries.append(
+        FFFFEntry(
+            form=form,
+            line="1",
+            value=str(fields.line_1_tax_family_size),
+            description="Tax family size",
+        )
+    )
+    part_i_rows: list[tuple[str, Decimal, str]] = [
+        ("4", fields.line_4_household_income, "Household income"),
+        ("5", fields.line_5_fpl, "Federal poverty level"),
+        ("8a", fields.line_8a_annual_contribution, "Annual contribution amount"),
+    ]
+    for line, value, desc in part_i_rows:
+        entries.append(
+            FFFFEntry(form=form, line=line,
+                      value=_format_money(value), description=desc)
+        )
+
+    # Monthly rows
+    month_names = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ]
+    for row in fields.monthly_rows:
+        m = month_names[row.month - 1] if 1 <= row.month <= 12 else f"M{row.month}"
+        entries.append(
+            FFFFEntry(
+                form=form,
+                line=f"{m}.ptc",
+                value=_format_money(row.max_ptc),
+                description=f"{m} max premium tax credit",
+            )
+        )
+        entries.append(
+            FFFFEntry(
+                form=form,
+                line=f"{m}.adv",
+                value=_format_money(row.advance_ptc),
+                description=f"{m} advance PTC received",
+            )
+        )
+
+    # Part IV key lines
+    part_iv_rows: list[tuple[str, Decimal, str]] = [
+        ("24", fields.line_24_net_ptc,
+         "Net premium tax credit (refundable)"),
+        ("27", fields.line_27_excess_advance_ptc,
+         "Excess advance PTC"),
+        ("29", fields.line_29_repayment,
+         "Repayment of excess advance PTC (additional tax)"),
+    ]
+    for line, value, desc in part_iv_rows:
+        entries.append(
+            FFFFEntry(form=form, line=line,
+                      value=_format_money(value), description=desc)
+        )
+    return entries
+
+
+def _form_8606_entries(fields: Form8606Fields) -> list[FFFFEntry]:
+    """Emit Form 8606 entries (nondeductible contributions, basis, nontaxable)."""
+    form = "8606"
+    rows: list[tuple[str, Decimal, str]] = [
+        ("1", fields.line_1_nondeductible_contributions,
+         "Nondeductible contributions for the year"),
+        ("2", fields.line_2_prior_year_basis,
+         "Prior year basis (from last year's 8606 line 14)"),
+        ("3", fields.line_3_add_1_and_2,
+         "Add lines 1 and 2"),
+        ("5", fields.line_5_subtract_4_from_3,
+         "Subtract line 4 from line 3"),
+        ("6", fields.line_6_ira_value_year_end,
+         "Value of all traditional IRAs at year end"),
+        ("7", fields.line_7_distributions,
+         "Distributions from traditional IRAs"),
+        ("8", fields.line_8_roth_conversions,
+         "Net conversions to Roth IRA"),
+        ("11", fields.line_11_nontaxable_distributions,
+         "Nontaxable portion of distributions"),
+        ("13", fields.line_13_taxable_distributions,
+         "Taxable portion of distributions"),
+        ("14", fields.line_14_remaining_basis,
+         "Remaining basis carryforward"),
+        ("16", fields.line_16_taxable_conversion,
+         "Taxable conversion amount (Part II)"),
+    ]
+    return [
+        FFFFEntry(
+            form=form,
+            line=line,
+            value=_format_money(value),
+            description=desc,
+        )
+        for line, value, desc in rows
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
@@ -863,6 +1305,47 @@ def build_ffff_entry_map(canonical_return: CanonicalReturn) -> FFFFEntryMap:
     if schedule_se_required(canonical_return):
         sse = compute_schedule_se_fields(canonical_return)
         entries.extend(_schedule_se_entries(sse, idx=1))
+
+    # -- Schedule E (per schedule page) --------------------------------
+    for idx_e, _se in enumerate(canonical_return.schedules_e, start=1):
+        se_fields = compute_schedule_e_fields(canonical_return, schedule_idx=idx_e - 1)
+        entries.extend(_schedule_e_entries(se_fields, idx_e))
+
+    # -- Schedule 1 (Additional Income and Adjustments) ----------------
+    if schedule_1_required(canonical_return):
+        s1 = compute_schedule_1_fields(canonical_return)
+        entries.extend(_schedule_1_entries(s1))
+
+    # -- Schedule 2 (Additional Taxes) ---------------------------------
+    if schedule_2_required(canonical_return):
+        s2 = compute_schedule_2_fields(canonical_return)
+        entries.extend(_schedule_2_entries(s2))
+
+    # -- Schedule 3 (Additional Credits and Payments) ------------------
+    if schedule_3_required(canonical_return):
+        s3 = compute_schedule_3_fields(canonical_return)
+        entries.extend(_schedule_3_entries(s3))
+
+    # -- Form 2441 (Child and Dependent Care Expenses) -----------------
+    if canonical_return.dependent_care is not None:
+        f2441 = compute_form_2441_fields(canonical_return)
+        if f2441.line_10_credit > _ZERO or f2441.line_4_qualified_expenses > _ZERO:
+            entries.extend(_form_2441_entries(f2441))
+
+    # -- Form 8863 (Education Credits) ---------------------------------
+    if canonical_return.education is not None and canonical_return.education.students:
+        f8863 = compute_form_8863_fields(canonical_return)
+        entries.extend(_form_8863_entries(f8863))
+
+    # -- Form 8962 (Premium Tax Credit) --------------------------------
+    if canonical_return.forms_1095_a:
+        f8962 = compute_form_8962_fields(canonical_return)
+        entries.extend(_form_8962_entries(f8962))
+
+    # -- Form 8606 (Nondeductible IRAs) --------------------------------
+    if canonical_return.ira_info is not None:
+        f8606 = compute_form_8606_fields(canonical_return)
+        entries.extend(_form_8606_entries(f8606))
 
     # -- Optional wave-6 forms (Schedule D, Form 6251) -----------------
     # Wave-6 agents 2 and 3 are building these renderers in parallel.

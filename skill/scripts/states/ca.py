@@ -326,6 +326,8 @@ class CaliforniaPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
+        from dataclasses import asdict
+
         from skill.scripts.output._acroform_overlay import (
             fill_acroform_pdf,
             format_money,
@@ -337,20 +339,20 @@ class CaliforniaPlugin:
         _WIDGET_MAP = _REF / "ca-540-acroform-map.json"
         _SOURCE_PDF = _REF / "state_forms" / "ca_540.pdf"
 
-        widget_map = load_widget_map(_WIDGET_MAP)
+        wmap = load_widget_map(_WIDGET_MAP)
         fetch_and_verify_source_pdf(
-            _SOURCE_PDF, widget_map.source_pdf_url, widget_map.source_pdf_sha256
+            _SOURCE_PDF, wmap.source_pdf_url, wmap.source_pdf_sha256
         )
 
-        ss = state_return.state_specific
+        fields = compute_ca540_fields(state_return)
         widget_values: dict[str, str] = {}
-        for sem_name, widget_name in widget_map.semantic_to_widget.items():
-            value = ss.get(sem_name)
-            if value is not None:
-                if isinstance(value, (Decimal, int, float)):
-                    widget_values[widget_name] = format_money(value)
-                else:
-                    widget_values[widget_name] = str(value)
+        for sem_name, value in asdict(fields).items():
+            widget_names = wmap.widget_names_for(sem_name)
+            if not widget_names:
+                continue
+            text = format_money(value) if isinstance(value, Decimal) else str(value) if value else ""
+            for wn in widget_names:
+                widget_values[wn] = text
 
         out_path = out_dir / "ca_540.pdf"
         fill_acroform_pdf(_SOURCE_PDF, widget_values, out_path)

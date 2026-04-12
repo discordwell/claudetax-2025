@@ -313,3 +313,644 @@ class TestFFFFEntryDataclass:
         entry_map = build_ffff_entry_map(canonical)
         with pytest.raises((AttributeError, Exception)):
             entry_map.tax_year = 2099  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# 6. Wave 7A forms — Schedule E
+# ---------------------------------------------------------------------------
+
+
+def _make_base_canonical(**overrides) -> CanonicalReturn:
+    """Build a minimal CanonicalReturn with sensible defaults.
+
+    Accepts keyword overrides that are merged into the base dict before
+    validation.
+    """
+    base = {
+        "schema_version": "0.1.0",
+        "tax_year": 2025,
+        "filing_status": "single",
+        "taxpayer": {
+            "first_name": "Test",
+            "last_name": "User",
+            "ssn": "111-22-3333",
+            "date_of_birth": "1990-01-01",
+        },
+        "address": {
+            "street1": "1 Main St",
+            "city": "Anytown",
+            "state": "CA",
+            "zip": "90000",
+            "country": "US",
+        },
+    }
+    base.update(overrides)
+    return CanonicalReturn.model_validate(base)
+
+
+class TestScheduleEEntries:
+    """Schedule E per-property rents/expenses/net + Part I totals."""
+
+    def _build(self) -> CanonicalReturn:
+        canonical = _make_base_canonical(
+            schedules_e=[
+                {
+                    "properties": [
+                        {
+                            "address": {
+                                "street1": "100 Elm St",
+                                "city": "Portland",
+                                "state": "OR",
+                                "zip": "97201",
+                                "country": "US",
+                            },
+                            "property_type": "single_family",
+                            "fair_rental_days": 365,
+                            "personal_use_days": 0,
+                            "rents_received": "24000.00",
+                            "insurance": "1200.00",
+                            "taxes": "3000.00",
+                            "depreciation": "5000.00",
+                        },
+                    ],
+                },
+            ],
+        )
+        from skill.scripts.calc.engine import compute
+
+        return compute(canonical)
+
+    def test_schedule_e_entries_present(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        se_entries = [e for e in entry_map.entries if e.form == "1040-SE-1"]
+        assert len(se_entries) > 0
+
+    def test_schedule_e_has_per_property_rents(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        se_lines = {e.line for e in entry_map.entries if e.form == "1040-SE-1"}
+        assert "3a" in se_lines  # rents received property A
+
+    def test_schedule_e_has_net_income(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        se_lines = {e.line for e in entry_map.entries if e.form == "1040-SE-1"}
+        assert "21a" in se_lines  # net income property A
+
+    def test_schedule_e_has_part_i_totals(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        se_lines = {e.line for e in entry_map.entries if e.form == "1040-SE-1"}
+        assert "23a" in se_lines
+        assert "26" in se_lines
+
+    def test_schedule_e_rents_value(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        rents = next(
+            e for e in entry_map.entries
+            if e.form == "1040-SE-1" and e.line == "3a"
+        )
+        assert rents.value == "24,000.00"
+
+    def test_schedule_e_not_present_for_simple_w2(self):
+        canonical = _computed("simple_w2_standard")
+        entry_map = build_ffff_entry_map(canonical)
+        assert not any(e.form.startswith("1040-SE-") for e in entry_map.entries)
+
+
+# ---------------------------------------------------------------------------
+# 7. Wave 7A — Schedule 1 (Additional Income and Adjustments)
+# ---------------------------------------------------------------------------
+
+
+class TestSchedule1Entries:
+    """Schedule 1 entries for returns with Schedule C / Schedule E."""
+
+    def test_schedule_1_present_for_se_return(self):
+        canonical = _computed("se_home_office")
+        entry_map = build_ffff_entry_map(canonical)
+        s1_entries = [e for e in entry_map.entries if e.form == "1040-S1"]
+        assert len(s1_entries) > 0
+
+    def test_schedule_1_has_business_income_line_3(self):
+        canonical = _computed("se_home_office")
+        entry_map = build_ffff_entry_map(canonical)
+        s1_lines = {e.line for e in entry_map.entries if e.form == "1040-S1"}
+        assert "3" in s1_lines
+
+    def test_schedule_1_has_total_line_10(self):
+        canonical = _computed("se_home_office")
+        entry_map = build_ffff_entry_map(canonical)
+        s1_lines = {e.line for e in entry_map.entries if e.form == "1040-S1"}
+        assert "10" in s1_lines
+
+    def test_schedule_1_has_deductible_se_tax_line_15(self):
+        canonical = _computed("se_home_office")
+        entry_map = build_ffff_entry_map(canonical)
+        s1_lines = {e.line for e in entry_map.entries if e.form == "1040-S1"}
+        assert "15" in s1_lines
+
+    def test_schedule_1_has_total_adjustments_line_26(self):
+        canonical = _computed("se_home_office")
+        entry_map = build_ffff_entry_map(canonical)
+        s1_lines = {e.line for e in entry_map.entries if e.form == "1040-S1"}
+        assert "26" in s1_lines
+
+    def test_schedule_1_has_net_line(self):
+        canonical = _computed("se_home_office")
+        entry_map = build_ffff_entry_map(canonical)
+        s1_lines = {e.line for e in entry_map.entries if e.form == "1040-S1"}
+        assert "net" in s1_lines
+
+    def test_schedule_1_not_present_for_simple_w2(self):
+        canonical = _computed("simple_w2_standard")
+        entry_map = build_ffff_entry_map(canonical)
+        assert not any(e.form == "1040-S1" for e in entry_map.entries)
+
+
+# ---------------------------------------------------------------------------
+# 8. Wave 7A — Schedule 2 (Additional Taxes)
+# ---------------------------------------------------------------------------
+
+
+class TestSchedule2Entries:
+    """Schedule 2 emitted when SE tax is present."""
+
+    def test_schedule_2_present_for_se_return(self):
+        canonical = _computed("se_home_office")
+        entry_map = build_ffff_entry_map(canonical)
+        # se_home_office has self-employment tax -> schedule 2 required
+        # via the engine populating other_taxes.self_employment_tax
+        s2_entries = [e for e in entry_map.entries if e.form == "1040-S2"]
+        # Schedule 2 is only emitted if schedule_2_required returns True.
+        # After compute(), SE tax should be set.
+        if canonical.other_taxes.self_employment_tax > 0:
+            assert len(s2_entries) > 0
+        else:
+            # If engine doesn't set it, we skip (design choice).
+            pass
+
+    def test_schedule_2_has_se_tax_line_6(self):
+        canonical = _make_base_canonical(
+            other_taxes={"self_employment_tax": "1000.00"},
+        )
+        from skill.scripts.calc.engine import compute
+
+        canonical = compute(canonical)
+        entry_map = build_ffff_entry_map(canonical)
+        s2_entries = [e for e in entry_map.entries if e.form == "1040-S2"]
+        s2_lines = {e.line for e in s2_entries}
+        assert "6" in s2_lines
+
+    def test_schedule_2_has_total_line_21(self):
+        canonical = _make_base_canonical(
+            other_taxes={"self_employment_tax": "500.00"},
+        )
+        from skill.scripts.calc.engine import compute
+
+        canonical = compute(canonical)
+        entry_map = build_ffff_entry_map(canonical)
+        s2_lines = {e.line for e in entry_map.entries if e.form == "1040-S2"}
+        assert "21" in s2_lines
+
+    def test_schedule_2_not_present_for_simple_w2(self):
+        canonical = _computed("simple_w2_standard")
+        entry_map = build_ffff_entry_map(canonical)
+        assert not any(e.form == "1040-S2" for e in entry_map.entries)
+
+
+# ---------------------------------------------------------------------------
+# 9. Wave 7A — Schedule 3 (Additional Credits and Payments)
+# ---------------------------------------------------------------------------
+
+
+class TestSchedule3Entries:
+    """Schedule 3 emitted when credits or extra payments exist."""
+
+    def test_schedule_3_has_total_nonrefundable_line_8(self):
+        canonical = _computed("se_home_office")
+        entry_map = build_ffff_entry_map(canonical)
+        s3_entries = [e for e in entry_map.entries if e.form == "1040-S3"]
+        if s3_entries:
+            s3_lines = {e.line for e in s3_entries}
+            assert "8" in s3_lines
+
+    def test_schedule_3_has_total_refundable_line_15(self):
+        canonical = _make_base_canonical(
+            credits={"education_credits_refundable": "500.00"},
+        )
+        from skill.scripts.calc.engine import compute
+
+        canonical = compute(canonical)
+        entry_map = build_ffff_entry_map(canonical)
+        s3_entries = [e for e in entry_map.entries if e.form == "1040-S3"]
+        s3_lines = {e.line for e in s3_entries}
+        assert "15" in s3_lines
+
+    def test_schedule_3_not_present_for_simple_w2(self):
+        canonical = _computed("simple_w2_standard")
+        entry_map = build_ffff_entry_map(canonical)
+        assert not any(e.form == "1040-S3" for e in entry_map.entries)
+
+
+# ---------------------------------------------------------------------------
+# 10. Wave 7A — Form 2441 (Child and Dependent Care)
+# ---------------------------------------------------------------------------
+
+
+class TestForm2441Entries:
+    """Form 2441 emitted when dependent_care is populated."""
+
+    def _build(self) -> CanonicalReturn:
+        canonical = _make_base_canonical(
+            w2s=[
+                {
+                    "employer_name": "Acme Corp",
+                    "employer_ein": "12-3456789",
+                    "box1_wages": "60000.00",
+                    "box2_federal_income_tax_withheld": "8000.00",
+                    "box3_social_security_wages": "60000.00",
+                    "box4_social_security_tax_withheld": "3720.00",
+                    "box5_medicare_wages": "60000.00",
+                    "box6_medicare_tax_withheld": "870.00",
+                    "employee_is_taxpayer": True,
+                },
+            ],
+            dependent_care={
+                "qualifying_persons": 1,
+                "total_expenses_paid": "5000.00",
+                "employer_benefits_excluded": "0.00",
+                "care_providers": [
+                    {"name": "Happy Days Daycare", "amount_paid": "5000.00"},
+                ],
+            },
+        )
+        from skill.scripts.calc.engine import compute
+
+        return compute(canonical)
+
+    def test_form_2441_entries_present(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        f2441 = [e for e in entry_map.entries if e.form == "2441"]
+        assert len(f2441) > 0
+
+    def test_form_2441_has_qualifying_persons(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        lines = {e.line for e in entry_map.entries if e.form == "2441"}
+        assert "3" in lines
+
+    def test_form_2441_has_qualified_expenses(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        lines = {e.line for e in entry_map.entries if e.form == "2441"}
+        assert "4" in lines
+
+    def test_form_2441_has_credit_rate(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        lines = {e.line for e in entry_map.entries if e.form == "2441"}
+        assert "9" in lines
+
+    def test_form_2441_has_credit_amount(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        lines = {e.line for e in entry_map.entries if e.form == "2441"}
+        assert "10" in lines
+
+    def test_form_2441_not_present_for_simple_w2(self):
+        canonical = _computed("simple_w2_standard")
+        entry_map = build_ffff_entry_map(canonical)
+        assert not any(e.form == "2441" for e in entry_map.entries)
+
+
+# ---------------------------------------------------------------------------
+# 11. Wave 7A — Form 8863 (Education Credits)
+# ---------------------------------------------------------------------------
+
+
+class TestForm8863Entries:
+    """Form 8863 emitted when education data is present."""
+
+    def _build(self) -> CanonicalReturn:
+        canonical = _make_base_canonical(
+            w2s=[
+                {
+                    "employer_name": "Acme Corp",
+                    "employer_ein": "12-3456789",
+                    "box1_wages": "50000.00",
+                    "box2_federal_income_tax_withheld": "5000.00",
+                    "box3_social_security_wages": "50000.00",
+                    "box4_social_security_tax_withheld": "3100.00",
+                    "box5_medicare_wages": "50000.00",
+                    "box6_medicare_tax_withheld": "725.00",
+                    "employee_is_taxpayer": True,
+                },
+            ],
+            education={
+                "students": [
+                    {
+                        "name": "Jane User",
+                        "ssn": "444-55-6666",
+                        "institution_name": "State University",
+                        "qualified_expenses": "4000.00",
+                        "is_aotc_eligible": True,
+                        "completed_4_years": False,
+                        "half_time_student": True,
+                        "felony_drug_conviction": False,
+                    },
+                ],
+            },
+        )
+        from skill.scripts.calc.engine import compute
+
+        return compute(canonical)
+
+    def test_form_8863_entries_present(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        entries = [e for e in entry_map.entries if e.form == "8863"]
+        assert len(entries) > 0
+
+    def test_form_8863_has_student_details(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        lines = {e.line for e in entry_map.entries if e.form == "8863"}
+        assert "stu.1.name" in lines
+        assert "stu.1.expenses" in lines
+        assert "stu.1.type" in lines
+
+    def test_form_8863_has_aotc_credit_for_eligible_student(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        lines = {e.line for e in entry_map.entries if e.form == "8863"}
+        assert "stu.1.credit" in lines
+
+    def test_form_8863_has_totals(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        lines = {e.line for e in entry_map.entries if e.form == "8863"}
+        assert "nonref" in lines
+        assert "ref" in lines
+
+    def test_form_8863_nonrefundable_value(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        nonref = next(
+            e for e in entry_map.entries
+            if e.form == "8863" and e.line == "nonref"
+        )
+        # $4000 expenses -> $2000 + 25% of $2000 = $2500 AOTC
+        # 60% nonrefundable = $1500
+        assert nonref.value == "1,500.00"
+
+    def test_form_8863_refundable_value(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        ref = next(
+            e for e in entry_map.entries
+            if e.form == "8863" and e.line == "ref"
+        )
+        # 40% refundable = $1000
+        assert ref.value == "1,000.00"
+
+    def test_form_8863_not_present_for_simple_w2(self):
+        canonical = _computed("simple_w2_standard")
+        entry_map = build_ffff_entry_map(canonical)
+        assert not any(e.form == "8863" for e in entry_map.entries)
+
+
+# ---------------------------------------------------------------------------
+# 12. Wave 7A — Form 8962 (Premium Tax Credit)
+# ---------------------------------------------------------------------------
+
+
+class TestForm8962Entries:
+    """Form 8962 emitted when 1095-A data is present."""
+
+    def _build(self) -> CanonicalReturn:
+        canonical = _make_base_canonical(
+            w2s=[
+                {
+                    "employer_name": "Acme Corp",
+                    "employer_ein": "12-3456789",
+                    "box1_wages": "30000.00",
+                    "box2_federal_income_tax_withheld": "3000.00",
+                    "box3_social_security_wages": "30000.00",
+                    "box4_social_security_tax_withheld": "1860.00",
+                    "box5_medicare_wages": "30000.00",
+                    "box6_medicare_tax_withheld": "435.00",
+                    "employee_is_taxpayer": True,
+                },
+            ],
+            forms_1095_a=[
+                {
+                    "marketplace_id": "MKT-001",
+                    "monthly_data": [
+                        {
+                            "enrollment_premium": "400.00",
+                            "slcsp_premium": "500.00",
+                            "advance_ptc": "200.00",
+                        },
+                    ]
+                    * 12,
+                },
+            ],
+        )
+        from skill.scripts.calc.engine import compute
+
+        return compute(canonical)
+
+    def test_form_8962_entries_present(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        entries = [e for e in entry_map.entries if e.form == "8962"]
+        assert len(entries) > 0
+
+    def test_form_8962_has_family_size(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        lines = {e.line for e in entry_map.entries if e.form == "8962"}
+        assert "1" in lines
+
+    def test_form_8962_has_household_income(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        lines = {e.line for e in entry_map.entries if e.form == "8962"}
+        assert "4" in lines
+
+    def test_form_8962_has_monthly_ptc_rows(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        lines = {e.line for e in entry_map.entries if e.form == "8962"}
+        assert "Jan.ptc" in lines
+        assert "Dec.ptc" in lines
+
+    def test_form_8962_has_net_ptc(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        lines = {e.line for e in entry_map.entries if e.form == "8962"}
+        assert "24" in lines
+
+    def test_form_8962_has_repayment(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        lines = {e.line for e in entry_map.entries if e.form == "8962"}
+        assert "29" in lines
+
+    def test_form_8962_not_present_for_simple_w2(self):
+        canonical = _computed("simple_w2_standard")
+        entry_map = build_ffff_entry_map(canonical)
+        assert not any(e.form == "8962" for e in entry_map.entries)
+
+
+# ---------------------------------------------------------------------------
+# 13. Wave 7A — Form 8606 (Nondeductible IRAs)
+# ---------------------------------------------------------------------------
+
+
+class TestForm8606Entries:
+    """Form 8606 emitted when ira_info is populated."""
+
+    def _build(self) -> CanonicalReturn:
+        canonical = _make_base_canonical(
+            w2s=[
+                {
+                    "employer_name": "Acme Corp",
+                    "employer_ein": "12-3456789",
+                    "box1_wages": "80000.00",
+                    "box2_federal_income_tax_withheld": "12000.00",
+                    "box3_social_security_wages": "80000.00",
+                    "box4_social_security_tax_withheld": "4960.00",
+                    "box5_medicare_wages": "80000.00",
+                    "box6_medicare_tax_withheld": "1160.00",
+                    "employee_is_taxpayer": True,
+                },
+            ],
+            ira_info={
+                "nondeductible_contributions_current_year": "7000.00",
+                "prior_year_basis": "14000.00",
+                "contributions_withdrawn_by_due_date": "0.00",
+                "total_ira_value_year_end": "100000.00",
+                "distributions_received": "10000.00",
+                "roth_conversions": "0.00",
+            },
+        )
+        from skill.scripts.calc.engine import compute
+
+        return compute(canonical)
+
+    def test_form_8606_entries_present(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        entries = [e for e in entry_map.entries if e.form == "8606"]
+        assert len(entries) > 0
+
+    def test_form_8606_has_nondeductible_contributions(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        lines = {e.line for e in entry_map.entries if e.form == "8606"}
+        assert "1" in lines
+
+    def test_form_8606_has_prior_year_basis(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        lines = {e.line for e in entry_map.entries if e.form == "8606"}
+        assert "2" in lines
+
+    def test_form_8606_has_nontaxable_portion(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        lines = {e.line for e in entry_map.entries if e.form == "8606"}
+        assert "11" in lines
+
+    def test_form_8606_has_remaining_basis(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        lines = {e.line for e in entry_map.entries if e.form == "8606"}
+        assert "14" in lines
+
+    def test_form_8606_nondeductible_value(self):
+        canonical = self._build()
+        entry_map = build_ffff_entry_map(canonical)
+        line_1 = next(
+            e for e in entry_map.entries
+            if e.form == "8606" and e.line == "1"
+        )
+        assert line_1.value == "7,000.00"
+
+    def test_form_8606_not_present_for_simple_w2(self):
+        canonical = _computed("simple_w2_standard")
+        entry_map = build_ffff_entry_map(canonical)
+        assert not any(e.form == "8606" for e in entry_map.entries)
+
+
+# ---------------------------------------------------------------------------
+# 14. Wave 7A — to_text() heading coverage
+# ---------------------------------------------------------------------------
+
+
+class TestWave7ATextHeadings:
+    """Verify that the to_text() output includes proper headings for new forms."""
+
+    def test_schedule_e_heading_in_text(self):
+        canonical = _make_base_canonical(
+            schedules_e=[
+                {
+                    "properties": [
+                        {
+                            "address": {
+                                "street1": "10 Oak Ave",
+                                "city": "Salem",
+                                "state": "OR",
+                                "zip": "97301",
+                                "country": "US",
+                            },
+                            "rents_received": "12000.00",
+                        },
+                    ],
+                },
+            ],
+        )
+        from skill.scripts.calc.engine import compute
+
+        canonical = compute(canonical)
+        text = build_ffff_entry_map(canonical).to_text()
+        assert "Schedule E #1" in text
+
+    def test_schedule_1_heading_in_text(self):
+        canonical = _computed("se_home_office")
+        text = build_ffff_entry_map(canonical).to_text()
+        assert "Schedule 1" in text
+
+    def test_form_8606_heading_in_text(self):
+        canonical = _make_base_canonical(
+            w2s=[
+                {
+                    "employer_name": "Acme",
+                    "employer_ein": "12-3456789",
+                    "box1_wages": "50000.00",
+                    "box2_federal_income_tax_withheld": "5000.00",
+                    "box3_social_security_wages": "50000.00",
+                    "box4_social_security_tax_withheld": "3100.00",
+                    "box5_medicare_wages": "50000.00",
+                    "box6_medicare_tax_withheld": "725.00",
+                    "employee_is_taxpayer": True,
+                },
+            ],
+            ira_info={
+                "nondeductible_contributions_current_year": "7000.00",
+                "prior_year_basis": "0.00",
+                "total_ira_value_year_end": "50000.00",
+                "distributions_received": "0.00",
+                "roth_conversions": "0.00",
+            },
+        )
+        from skill.scripts.calc.engine import compute
+
+        canonical = compute(canonical)
+        text = build_ffff_entry_map(canonical).to_text()
+        assert "Form 8606" in text

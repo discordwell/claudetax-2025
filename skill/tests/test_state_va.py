@@ -461,3 +461,30 @@ class TestVirginiaPluginFormIds:
         paths = PLUGIN.render_pdfs(state_return, tmp_path)
         reader = PdfReader(str(paths[0]))
         assert len(reader.pages) >= 1
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify that rendered VA 760 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # Widget "16. Amount of tax" maps to state_total_tax (line 16)
+        assert fields["16. Amount of tax"].get("/V") == "2366.80"
+        # Widget "15. Virginia Taxable income" maps to state_taxable_income
+        assert fields["15. Virginia Taxable income"].get("/V") == "45640.00"
+        # Widget "9. Virginia Adjusted Gross Income" maps to state_agi
+        assert fields["9. Virginia Adjusted Gross Income"].get("/V") == "65000.00"

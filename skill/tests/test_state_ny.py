@@ -280,6 +280,39 @@ class TestOtherProtocolMethods:
         assert fields is not None
         assert len(fields) > 0
 
+    def test_render_pdfs_field_values(
+        self, canonical_return_single_80k, federal_single_80k, tmp_path
+    ):
+        """Verify that rendered NY IT-201 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            canonical_return_single_80k,
+            federal_single_80k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # Derive expected values from the computed state_return
+        ss = state_return.state_specific
+        expected_tax = f"{ss['state_total_tax']:.2f}"
+        expected_ti = f"{ss['state_taxable_income']:.2f}"
+        expected_agi = f"{ss['state_adjusted_gross_income']:.2f}"
+
+        # Widget "Line59" maps to total NYS tax
+        assert fields["Line59"].get("/V") == expected_tax
+        # Widget "Line35" maps to NYS taxable income
+        assert fields["Line35"].get("/V") == expected_ti
+        # Widget "Line25" maps to NYS AGI
+        assert fields["Line25"].get("/V") == expected_agi
+
     def test_form_ids_resident(self):
         """Resident form is IT-201."""
         assert PLUGIN.form_ids() == ["NY Form IT-201"]

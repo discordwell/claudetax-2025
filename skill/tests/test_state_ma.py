@@ -432,3 +432,30 @@ class TestMassachusettsPluginFormIds:
         fields = reader.get_fields()
         assert fields is not None
         assert len(fields) > 0
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify that rendered MA Form 1 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        result = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(result[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # Widget for line 28 total tax maps to state_total_tax
+        assert fields["line 28. Total tax. Add lines 28a and 28b"].get("/V") == "3030.00"
+        # Widget for line 21 total taxable 5.0% income maps to state_taxable_income
+        assert fields["line 21. Total Taxable 5.0% Income. Add lines 19 and 20"].get("/V") == "60600.00"
+        # Widget for line 10 total 5.0% income maps to state_adjusted_gross_income
+        assert fields["line 10. Total 5.0% income. Add lines 3 through 9. Be sure to subtract any losses in lines 6 or 7"].get("/V") == "65000.00"

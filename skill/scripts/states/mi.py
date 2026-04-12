@@ -38,7 +38,7 @@ Reciprocity:
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, fields as dc_fields
+from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
@@ -136,6 +136,68 @@ class MI1040Fields:
     line_30_refund: Decimal = _ZERO
     line_31_amount_owed: Decimal = _ZERO
     line_34_total_amount_due: Decimal = _ZERO
+
+
+def _build_mi1040_fields(state_return: "StateReturn") -> MI1040Fields:
+    """Layer 1: map StateReturn.state_specific to MI1040Fields."""
+    ss = state_return.state_specific
+    agi = ss.get("state_adjusted_gross_income", _ZERO)
+    ti = ss.get("state_taxable_income", _ZERO)
+    tax = ss.get("state_total_tax", _ZERO)
+
+    ssn = ss.get("_taxpayer_ssn", "").replace("-", "")
+    ssn1 = ssn[:3] if len(ssn) >= 3 else ssn
+    ssn2 = ssn[3:5] if len(ssn) >= 5 else ""
+    ssn3 = ssn[5:9] if len(ssn) >= 9 else ""
+
+    fs_raw = ss.get("_filing_status", "single")
+    if fs_raw in ("hoh", "qss"):
+        fs_raw = "single"
+
+    res_map = {
+        ResidencyStatus.RESIDENT: "resident",
+        ResidencyStatus.NONRESIDENT: "nonresident",
+        ResidencyStatus.PART_YEAR: "part_year",
+    }
+    residency_label = res_map.get(state_return.residency, "resident")
+
+    num_exemptions = 2 if fs_raw == "mfj" else 1
+    exemption_amount = _MI_PERSONAL_EXEMPTION_TY2025 * num_exemptions
+
+    mi_withholding = ss.get("mi_withholding", _ZERO)
+    total_payments = mi_withholding
+    tax_due = max(tax - total_payments, _ZERO) if tax > total_payments else _ZERO
+    overpayment = max(total_payments - tax, _ZERO) if total_payments > tax else _ZERO
+
+    return MI1040Fields(
+        filer_first_name=ss.get("_taxpayer_first_name", ""),
+        filer_last_name=ss.get("_taxpayer_last_name", ""),
+        filer_ssn_1=ssn1,
+        filer_ssn_2=ssn2,
+        filer_ssn_3=ssn3,
+        home_address=ss.get("_address", ""),
+        city=ss.get("_city", ""),
+        state=ss.get("_state", "MI"),
+        zip_code=ss.get("_zip", ""),
+        filing_status=fs_raw,
+        residency=residency_label,
+        line_9a_personal_exemptions_count=str(num_exemptions),
+        line_9a_personal_exemptions_amount=exemption_amount,
+        line_9f_total_exemption_allowance=exemption_amount,
+        line_10_agi=agi,
+        line_12_total_income=agi,
+        line_14_adjusted_income=agi,
+        line_15_exemption_allowance=exemption_amount,
+        line_16_taxable_income=ti,
+        line_17_tax=tax,
+        line_20a_income_tax_withheld=mi_withholding,
+        line_24_total_payments_credits=total_payments,
+        line_22_balance_due=tax_due,
+        line_25_overpayment=overpayment,
+        line_30_refund=overpayment,
+        line_31_amount_owed=tax_due,
+        line_34_total_amount_due=tax_due,
+    )
 
 
 def _d(v: Any) -> Decimal:
@@ -323,115 +385,40 @@ class MichiganPlugin:
     ) -> list[Path]:
         """Fill MI-1040 using the Michigan Treasury fillable PDF.
 
-        Layer 1: compute MI1040Fields from state_return.state_specific.
+        Layer 1: build MI1040Fields via _build_mi1040_fields factory.
         Layer 2: overlay onto the source PDF via fill_acroform_pdf.
         """
-        ss = state_return.state_specific
-        agi = ss.get("state_adjusted_gross_income", _ZERO)
-        ti = ss.get("state_taxable_income", _ZERO)
-        tax = ss.get("state_total_tax", _ZERO)
+        from dataclasses import asdict
 
-        # SSN parsing from state_specific (if stashed) or empty
-        ssn = ss.get("_taxpayer_ssn", "").replace("-", "")
-        ssn1 = ssn[:3] if len(ssn) >= 3 else ssn
-        ssn2 = ssn[3:5] if len(ssn) >= 5 else ""
-        ssn3 = ssn[5:9] if len(ssn) >= 9 else ""
+        mi1040 = _build_mi1040_fields(state_return)
 
-        # Filing status mapping — MI only has Single/MFJ/MFS
-        fs_raw = ss.get("_filing_status", "single")
-        # HOH and QSS map to single for MI checkbox purposes
-        if fs_raw in ("hoh", "qss"):
-            fs_raw = "single"
-
-        # Residency
-        res_map = {
-            ResidencyStatus.RESIDENT: "resident",
-            ResidencyStatus.NONRESIDENT: "nonresident",
-            ResidencyStatus.PART_YEAR: "part_year",
-        }
-        residency_label = res_map.get(state_return.residency, "resident")
-
-        # Personal exemption: 1 for single, 2 for MFJ
-        num_exemptions = 2 if fs_raw == "mfj" else 1
-        exemption_amount = _MI_PERSONAL_EXEMPTION_TY2025 * num_exemptions
-
-        # Withholding from state_specific
-        mi_withholding = ss.get("mi_withholding", _ZERO)
-        total_payments = mi_withholding
-
-        mi1040 = MI1040Fields(
-            filer_first_name=ss.get("_taxpayer_first_name", ""),
-            filer_last_name=ss.get("_taxpayer_last_name", ""),
-            filer_ssn_1=ssn1,
-            filer_ssn_2=ssn2,
-            filer_ssn_3=ssn3,
-            home_address=ss.get("_address", ""),
-            city=ss.get("_city", ""),
-            state=ss.get("_state", "MI"),
-            zip_code=ss.get("_zip", ""),
-            filing_status=fs_raw,
-            residency=residency_label,
-            line_9a_personal_exemptions_count=str(num_exemptions),
-            line_9a_personal_exemptions_amount=exemption_amount,
-            line_9f_total_exemption_allowance=exemption_amount,
-            line_10_agi=agi,
-            line_12_total_income=agi,
-            line_14_adjusted_income=agi,
-            line_15_exemption_allowance=exemption_amount,
-            line_16_taxable_income=ti,
-            line_17_tax=tax,
-            line_20a_income_tax_withheld=mi_withholding,
-            line_24_total_payments_credits=total_payments,
-            line_22_balance_due=max(tax - total_payments, _ZERO) if tax > total_payments else _ZERO,
-            line_25_overpayment=max(total_payments - tax, _ZERO) if total_payments > tax else _ZERO,
-            line_30_refund=max(total_payments - tax, _ZERO) if total_payments > tax else _ZERO,
-            line_31_amount_owed=max(tax - total_payments, _ZERO) if tax > total_payments else _ZERO,
-            line_34_total_amount_due=max(tax - total_payments, _ZERO) if tax > total_payments else _ZERO,
-        )
-
-        # Load widget map
         wmap = load_widget_map(_WIDGET_MAP_PATH)
-
-        # Fetch/verify source PDF
         source_pdf = fetch_and_verify_source_pdf(
             _STATE_FORMS_DIR / "mi-1040.pdf",
             wmap.source_pdf_url,
             wmap.source_pdf_sha256,
         )
 
-        # Build widget values
         widget_values: dict[str, str | bool] = {}
-
-        money_fields = {
-            f.name for f in dc_fields(mi1040)
-            if f.name.startswith("line_") and not f.name.endswith("_count")
-        }
-        for f in dc_fields(mi1040):
-            value = getattr(mi1040, f.name)
-            widget_names = wmap.widget_names_for(f.name)
+        for sem_name, value in asdict(mi1040).items():
+            widget_names = wmap.widget_names_for(sem_name)
             if not widget_names:
                 continue
-            if f.name in money_fields and isinstance(value, Decimal):
-                text = format_money(value)
-            else:
-                text = str(value) if value else ""
+            text = format_money(value) if isinstance(value, Decimal) else str(value) if value else ""
             for wn in widget_names:
                 widget_values[wn] = text
 
         # Filing status checkbox
-        fs_label = mi1040.filing_status
-        if fs_label in wmap.filing_status_checkboxes:
-            widget_values[wmap.filing_status_checkboxes[fs_label]] = True
+        if mi1040.filing_status in wmap.filing_status_checkboxes:
+            widget_values[wmap.filing_status_checkboxes[mi1040.filing_status]] = True
 
         # Residency checkbox — not in standard WidgetMap, load from raw JSON
         raw_map = json.loads(_WIDGET_MAP_PATH.read_text())
         residency_cbs = raw_map.get("residency_checkboxes", {})
-        if residency_label in residency_cbs:
-            widget_values[residency_cbs[residency_label]["widget_name"]] = True
+        if mi1040.residency in residency_cbs:
+            widget_values[residency_cbs[mi1040.residency]["widget_name"]] = True
 
-        # Write the filled PDF
-        out_dir = Path(out_dir)
-        out_path = out_dir / "MI_MI-1040.pdf"
+        out_path = Path(out_dir) / "MI_MI-1040.pdf"
         fill_acroform_pdf(source_pdf, widget_values, out_path)
         return [out_path]
 

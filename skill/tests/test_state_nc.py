@@ -436,3 +436,30 @@ class TestNorthCarolinaPluginFormIds:
         reader = PdfReader(str(pdfs[0]))
         # NC D-400 source has 3 pages
         assert len(reader.pages) >= 2
+
+    def test_render_pdfs_field_values(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """Verify that rendered NC D-400 PDF contains correct field values."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        pdfs = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(pdfs[0]))
+        fields = reader.get_fields()
+        assert fields is not None
+
+        # Widget "y_d400wf_li13_page1_good" maps to NC income tax (line 13)
+        assert fields["y_d400wf_li13_page1_good"].get("/V") == "2220.62"
+        # Widget "y_d400wf_li12b_pg1_good" maps to NC taxable income (line 12b)
+        assert fields["y_d400wf_li12b_pg1_good"].get("/V") == "52250.00"
+        # Widget "y_d400wf_li6_good" maps to federal AGI (line 6)
+        assert fields["y_d400wf_li6_good"].get("/V") == "65000.00"

@@ -6,6 +6,30 @@ Session memory for this project. Top section = most recent session summaries (ne
 
 ## Session Summaries
 
+### 2026-04-12 10:30 UTC — Wave 7B tech debt + Wave 8A/8B: 30 state renderers + 5 ingesters
+
+**Tech debt cleared first:**
+- Standardized all 8 wave-7B state renderers on Pattern B (factory → asdict → widget_names_for). Removed dead dataclass factories from AZ/CA/OR/VA, extracted MI factory, refactored NC.
+- Added value-level render test assertions for all 8 states (verify specific widget values in filled PDFs).
+- Expanded FFFF entry map with 8 new form helpers (Schedule E/1/2/3, Form 2441/8606/8863/8962). +58 tests.
+
+**Wave 8A dispatched in 6-agent parallel fan-out** — 34 remaining states:
+- **22 implemented** (AR, CO, HI, ID, IL, IN, KS, KY, LA, MD, ME, MN, MO, MS, MT, ND, NJ, OK, UT, VT, WI + NJ via digit-by-digit renderer)
+- **12 deferred** (AL, CT, DC, DE, GA, IA, NE, NM, OH, PA, RI, SC, WV) — all flattened or unavailable PDFs, documented
+
+**Wave 8B dispatched in 2-agent parallel fan-out** — 5 ingesters:
+- **1098** (mortgage interest), **1098-E** (student loan), **1098-T** (tuition) — 57 tests
+- **1099-MISC** (miscellaneous income), **1099-K** (payment settlement) — 56 tests
+- Cascade now has **14 Tier-1 ingesters**
+
+**Merge fixes**: models.py conflict (both ingester agents added models), ingester count assertion (9→14), bundle integration test (state renders need explicit gating).
+
+**Suite**: 3822 → **3950 passed**, 3 skipped (+128 net new tests).
+
+**Total state PDF renderers**: 30 of 43 income-tax states (70%). 12 states have flattened/unavailable DOR PDFs.
+**Total federal forms**: 18 computed + rendered.
+**Total ingesters**: 14 Tier-1.
+
 ### 2026-04-12 09:00 UTC — Wave 7B + 7D: state PDF renderers + wet test + version bump
 
 **PR #2 reviewed and merged** (wave 7A — 8 federal forms, 158 tests, tenforty pin). Fast-forward merge, 3763 passed.

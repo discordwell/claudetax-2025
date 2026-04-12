@@ -452,6 +452,7 @@ def run_pipeline(
     render_form_2441: bool = True,
     render_form_8606: bool = True,
     render_form_8962: bool = True,
+    render_schedule_1: bool = True,
     render_schedule_2: bool = True,
     render_schedule_3: bool = True,
     render_state_returns: bool = True,
@@ -680,6 +681,19 @@ def run_pipeline(
             out_path_se = output_dir / "schedule_se.pdf"
             render_schedule_se_pdf(fields_se, out_path_se)
             rendered.append(out_path_se)
+
+    if render_schedule_1:
+        from skill.scripts.output.schedule_1 import (
+            compute_schedule_1_fields,
+            render_schedule_1_pdf,
+            schedule_1_required,
+        )
+
+        if schedule_1_required(canonical):
+            fields_s1 = compute_schedule_1_fields(canonical)
+            out_path_s1 = output_dir / "schedule_1.pdf"
+            render_schedule_1_pdf(fields_s1, out_path_s1)
+            rendered.append(out_path_s1)
 
     # Form 6251 renders ONLY when the engine actually computed a
     # nonzero AMT — most returns will not. The trigger already fired

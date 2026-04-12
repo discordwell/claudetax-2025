@@ -400,26 +400,42 @@ class TestArizonaPluginFormIds:
     def test_form_ids_returns_form_140(self):
         assert PLUGIN.form_ids() == ["AZ Form 140"]
 
-    def test_render_pdfs_returns_empty_list(
+    def test_render_pdfs_produces_pdf(
         self, single_65k_return, federal_single_65k, tmp_path
     ):
-        """Fan-out follow-up: actual 140 fill is not yet implemented."""
-        state_return = PLUGIN.compute(
-            single_65k_return,
-            federal_single_65k,
-            ResidencyStatus.RESIDENT,
-            days_in_state=365,
-        )
-        assert PLUGIN.render_pdfs(state_return, tmp_path) == []
+        """AZ Form 140 AcroForm fill produces a non-empty PDF."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
 
-    def test_render_pdfs_accepts_path(
-        self, single_65k_return, federal_single_65k
-    ):
         state_return = PLUGIN.compute(
             single_65k_return,
             federal_single_65k,
             ResidencyStatus.RESIDENT,
             days_in_state=365,
         )
-        # Even with a nonexistent path, a no-op render should not raise.
-        assert PLUGIN.render_pdfs(state_return, Path("/tmp")) == []
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        assert len(paths) == 1
+        assert paths[0].exists()
+        assert paths[0].stat().st_size > 0
+        assert paths[0].name == "az_140.pdf"
+
+    def test_render_pdfs_output_is_valid_pdf(
+        self, single_65k_return, federal_single_65k, tmp_path
+    ):
+        """The rendered PDF must be openable by pypdf."""
+        try:
+            from pypdf import PdfReader
+        except BaseException:
+            pytest.skip("pypdf unavailable")
+
+        state_return = PLUGIN.compute(
+            single_65k_return,
+            federal_single_65k,
+            ResidencyStatus.RESIDENT,
+            days_in_state=365,
+        )
+        paths = PLUGIN.render_pdfs(state_return, tmp_path)
+        reader = PdfReader(str(paths[0]))
+        assert len(reader.pages) >= 1

@@ -1,0 +1,50 @@
+{
+  "source_pdf_url": "https://www.tax.virginia.gov/sites/default/files/taxforms/individual-income-tax/2025/760-2025.pdf",
+  "source_pdf_sha256": "93fa71d50ec0e06be60e2b161f46d458082c6bd1d57869bb673211d7695bfc56",
+  "form_year": 2025,
+  "state": "VA",
+  "form": "760",
+  "total_widgets": 115,
+  "mapped_count": 3,
+  "mapping": {
+    "state_adjusted_gross_income": {
+      "widget_name": "9. Virginia Adjusted Gross Income",
+      "terminal_name": "9. Virginia Adjusted Gross Income",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        423.769,
+        204.371,
+        554.502,
+        221.051
+      ],
+      "note": "Virginia AGI (line 9)"
+    },
+    "state_taxable_income": {
+      "widget_name": "15. Virginia Taxable income",
+      "terminal_name": "15. Virginia Taxable income",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        423.178,
+        58.178,
+        554.502,
+        74.8581
+      ],
+      "note": "Virginia taxable income (line 15)"
+    },
+    "state_total_tax": {
+      "widget_name": "16. Amount of tax",
+      "terminal_name": "16. Amount of tax",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        418.141,
+        708.489,
+        549.497,
+        725.289
+      ],
+      "note": "Amount of tax (line 16) \u2014 state_total_tax from plugin"
+    }
+  }
+}

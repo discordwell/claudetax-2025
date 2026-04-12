@@ -1,0 +1,50 @@
+{
+  "source_pdf_url": "https://azdor.gov/sites/default/files/document/FORMS_INDIVIDUAL_2025_140_f.pdf",
+  "source_pdf_sha256": "91722910a79a8ec544b5b4aef87a56d2d1d2151fe96039dc02b681408db55778",
+  "form_year": 2025,
+  "state": "AZ",
+  "form": "140",
+  "total_widgets": 430,
+  "mapped_count": 3,
+  "mapping": {
+    "state_adjusted_gross_income": {
+      "widget_name": "19",
+      "terminal_name": "19",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        487.574,
+        246.084,
+        558.57,
+        259.044
+      ],
+      "note": "Arizona adjusted gross income (line 19)"
+    },
+    "state_taxable_income": {
+      "widget_name": "24",
+      "terminal_name": "24",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        487.72,
+        186.375,
+        558.716,
+        199.335
+      ],
+      "note": "Arizona taxable income (line 24)"
+    },
+    "state_total_tax": {
+      "widget_name": "25",
+      "terminal_name": "25",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        488.011,
+        173.32,
+        559.007,
+        186.28
+      ],
+      "note": "Computed tax (line 25) \u2014 state_total_tax from plugin"
+    }
+  }
+}

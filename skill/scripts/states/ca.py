@@ -53,6 +53,48 @@ from skill.scripts.states._plugin_api import (
 _CENTS = Decimal("0.01")
 
 
+# ---------------------------------------------------------------------------
+# Layer 1: CA Form 540 field dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class CA540Fields:
+    """Frozen snapshot of CA Form 540 line values, ready for rendering.
+
+    Field names correspond to state_specific keys produced by
+    CaliforniaPlugin.compute().
+    """
+
+    state_adjusted_gross_income: Decimal = Decimal("0")
+    state_taxable_income: Decimal = Decimal("0")
+    state_total_tax: Decimal = Decimal("0")
+    state_total_tax_resident_basis: Decimal = Decimal("0")
+    state_tax_bracket: Decimal = Decimal("0")
+    state_effective_tax_rate: Decimal = Decimal("0")
+    apportionment_fraction: Decimal = Decimal("1")
+    ca_sourced_wages_from_w2_state_rows: Decimal = Decimal("0")
+    ca_sourced_schedule_c_net: Decimal = Decimal("0")
+    ca_state_rows_present: bool = False
+
+
+def compute_ca540_fields(state_return: StateReturn) -> CA540Fields:
+    """Map StateReturn.state_specific to CA540Fields."""
+    ss = state_return.state_specific
+    return CA540Fields(
+        state_adjusted_gross_income=ss.get("state_adjusted_gross_income", Decimal("0")),
+        state_taxable_income=ss.get("state_taxable_income", Decimal("0")),
+        state_total_tax=ss.get("state_total_tax", Decimal("0")),
+        state_total_tax_resident_basis=ss.get("state_total_tax_resident_basis", Decimal("0")),
+        state_tax_bracket=ss.get("state_tax_bracket", Decimal("0")),
+        state_effective_tax_rate=ss.get("state_effective_tax_rate", Decimal("0")),
+        apportionment_fraction=ss.get("apportionment_fraction", Decimal("1")),
+        ca_sourced_wages_from_w2_state_rows=ss.get("ca_sourced_wages_from_w2_state_rows", Decimal("0")),
+        ca_sourced_schedule_c_net=ss.get("ca_sourced_schedule_c_net", Decimal("0")),
+        ca_state_rows_present=ss.get("ca_state_rows_present", False),
+    )
+
+
 def _d(v: Any) -> Decimal:
     """Coerce a tenforty-returned float (or None) to Decimal."""
     if v is None:
@@ -284,11 +326,35 @@ class CaliforniaPlugin:
     def render_pdfs(
         self, state_return: StateReturn, out_dir: Path
     ) -> list[Path]:
-        # TODO: fan-out follow-up — fill CA Form 540 (and Schedule CA, if
-        # itemizing) using pypdf against the FTB's fillable PDF. The output
-        # renderer suite is the right home for this; this plugin returns
-        # structured state_specific data that the renderer will consume.
-        return []
+        from skill.scripts.output._acroform_overlay import (
+            fill_acroform_pdf,
+            format_money,
+            load_widget_map,
+            fetch_and_verify_source_pdf,
+        )
+
+        _REF = Path(__file__).resolve().parents[2] / "reference"
+        _WIDGET_MAP = _REF / "ca-540-acroform-map.json"
+        _SOURCE_PDF = _REF / "state_forms" / "ca_540.pdf"
+
+        widget_map = load_widget_map(_WIDGET_MAP)
+        fetch_and_verify_source_pdf(
+            _SOURCE_PDF, widget_map.source_pdf_url, widget_map.source_pdf_sha256
+        )
+
+        ss = state_return.state_specific
+        widget_values: dict[str, str] = {}
+        for sem_name, widget_name in widget_map.semantic_to_widget.items():
+            value = ss.get(sem_name)
+            if value is not None:
+                if isinstance(value, (Decimal, int, float)):
+                    widget_values[widget_name] = format_money(value)
+                else:
+                    widget_values[widget_name] = str(value)
+
+        out_path = out_dir / "ca_540.pdf"
+        fill_acroform_pdf(_SOURCE_PDF, widget_values, out_path)
+        return [out_path]
 
     def form_ids(self) -> list[str]:
         return ["CA Form 540"]

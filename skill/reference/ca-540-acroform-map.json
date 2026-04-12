@@ -1,0 +1,50 @@
+{
+  "source_pdf_url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+  "source_pdf_sha256": "3be81dcc5d2be3d303596f6fa528e8fdb7cda6644afac6ccf869fc5ebeb7bf1c",
+  "form_year": 2025,
+  "state": "CA",
+  "form": "540",
+  "total_widgets": 184,
+  "mapped_count": 3,
+  "mapping": {
+    "state_adjusted_gross_income": {
+      "widget_name": "540_form_1038",
+      "terminal_name": "540_form_1038",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        501.9,
+        237.0,
+        535.8,
+        254.4
+      ],
+      "note": "California adjusted gross income (line 11)"
+    },
+    "state_taxable_income": {
+      "widget_name": "540_form_1046",
+      "terminal_name": "540_form_1046",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        458.34,
+        68.9261,
+        571.44,
+        86.3261
+      ],
+      "note": "California taxable income (line 18)"
+    },
+    "state_total_tax": {
+      "widget_name": "540_form_2013",
+      "terminal_name": "540_form_2013",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        436.75,
+        633.6,
+        564.24,
+        650.4
+      ],
+      "note": "Total tax (line 31) \u2014 state_total_tax from plugin"
+    }
+  }
+}

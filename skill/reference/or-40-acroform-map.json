@@ -1,0 +1,50 @@
+{
+  "source_pdf_url": "https://www.oregon.gov/dor/forms/FormsPubs/form-or-40_101-040_2025.pdf",
+  "source_pdf_sha256": "eaa5ca450083c7717e46846ce69d1b71ea64bcc58ae48d7f9c25ed9c8e9a56e6",
+  "form_year": 2025,
+  "state": "OR",
+  "form": "OR-40",
+  "total_widgets": 165,
+  "mapped_count": 3,
+  "mapping": {
+    "state_taxable_income": {
+      "widget_name": "or-40-p1-29",
+      "terminal_name": "or-40-p1-29",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        375.799,
+        205.498,
+        402.878,
+        222.126
+      ],
+      "note": "Oregon taxable income (line 17)"
+    },
+    "state_total_tax": {
+      "widget_name": "or-40-p1-30a",
+      "terminal_name": "or-40-p1-30a",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        425.366,
+        205.382,
+        497.747,
+        223.537
+      ],
+      "note": "Oregon income tax (line 18) \u2014 state_total_tax from plugin"
+    },
+    "state_adjusted_gross_income": {
+      "widget_name": "or-40-p1-23",
+      "terminal_name": "or-40-p1-23",
+      "type": "text",
+      "page": 1,
+      "rect": [
+        37.733,
+        289.174,
+        195.955,
+        307.329
+      ],
+      "note": "Income after subtractions (line 11) \u2014 used as OR AGI proxy"
+    }
+  }
+}

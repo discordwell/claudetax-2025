@@ -449,7 +449,9 @@ def run_pipeline(
     render_form_6251: bool = True,
     render_form_4562: bool = True,
     render_form_8829: bool = True,
+    render_form_2441: bool = True,
     render_form_8606: bool = True,
+    render_form_8962: bool = True,
     render_state_returns: bool = True,
     build_paper_bundle: bool = True,
     emit_ffff_map: bool = True,
@@ -680,6 +682,20 @@ def run_pipeline(
             render_form_6251_pdf(fields_6251, out_path_6251)
             rendered.append(out_path_6251)
 
+    # Form 2441 renders when the taxpayer has dependent_care data.
+    # Compute the credit and store it, then render the PDF scaffold.
+    if render_form_2441 and canonical.dependent_care is not None:
+        from skill.scripts.output.form_2441 import (
+            compute_form_2441_fields,
+            render_form_2441_pdf,
+        )
+
+        fields_2441 = compute_form_2441_fields(canonical)
+        canonical.credits.dependent_care_credit = fields_2441.line_10_credit
+        out_path_2441 = output_dir / "form_2441.pdf"
+        render_form_2441_pdf(fields_2441, out_path_2441)
+        rendered.append(out_path_2441)
+
     # Form 8606 renders when the taxpayer has IRA basis info.
     if render_form_8606 and canonical.ira_info is not None:
         from skill.scripts.output.form_8606 import (
@@ -691,6 +707,18 @@ def run_pipeline(
         out_path_8606 = output_dir / "form_8606.pdf"
         render_form_8606_pdf(fields_8606, out_path_8606)
         rendered.append(out_path_8606)
+
+    # Form 8962 renders when the filer has 1095-A marketplace data.
+    if render_form_8962 and canonical.forms_1095_a:
+        from skill.scripts.output.form_8962 import (
+            compute_form_8962_fields,
+            render_form_8962_pdf,
+        )
+
+        fields_8962 = compute_form_8962_fields(canonical)
+        out_path_8962 = output_dir / "form_8962.pdf"
+        render_form_8962_pdf(fields_8962, out_path_8962)
+        rendered.append(out_path_8962)
 
     # ------------------------------------------------------------------
     # 5. Emit result.json

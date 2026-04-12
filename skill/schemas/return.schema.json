@@ -1109,6 +1109,102 @@
       "title": "FilingStatus",
       "type": "string"
     },
+    "Form1095A": {
+      "additionalProperties": false,
+      "description": "Health Insurance Marketplace Statement.",
+      "properties": {
+        "marketplace_id": {
+          "default": "",
+          "title": "Marketplace Id",
+          "type": "string"
+        },
+        "monthly_data": {
+          "items": {
+            "$ref": "#/$defs/Form1095AMonthly"
+          },
+          "title": "Monthly Data",
+          "type": "array"
+        },
+        "policy_end_date": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Policy End Date"
+        },
+        "policy_start_date": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Policy Start Date"
+        }
+      },
+      "title": "Form1095A",
+      "type": "object"
+    },
+    "Form1095AMonthly": {
+      "additionalProperties": false,
+      "description": "One month's data from Form 1095-A.",
+      "properties": {
+        "advance_ptc": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Advance Ptc"
+        },
+        "enrollment_premium": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Enrollment Premium"
+        },
+        "slcsp_premium": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Slcsp Premium"
+        }
+      },
+      "title": "Form1095AMonthly",
+      "type": "object"
+    },
     "Form1099B": {
       "additionalProperties": false,
       "description": "Form 1099-B, Proceeds From Broker and Barter Exchange Transactions.",
@@ -4839,6 +4935,13 @@
         "type": "string"
       },
       "title": "Foreign Account Countries",
+      "type": "array"
+    },
+    "forms_1095_a": {
+      "items": {
+        "$ref": "#/$defs/Form1095A"
+      },
+      "title": "Forms 1095 A",
       "type": "array"
     },
     "forms_1099_b": {

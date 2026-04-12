@@ -628,6 +628,24 @@ class ScheduleC(_StrictModel):
     8829 as a paper-bundle attachment for regular-method filers."""
 
 
+class Form1095AMonthly(_StrictModel):
+    """One month's data from Form 1095-A."""
+
+    enrollment_premium: Money = Decimal("0")
+    slcsp_premium: Money = Decimal("0")
+    advance_ptc: Money = Decimal("0")
+
+
+class Form1095A(_StrictModel):
+    """Health Insurance Marketplace Statement."""
+
+    marketplace_id: str = ""
+    policy_start_date: dt.date | None = None
+    policy_end_date: dt.date | None = None
+    monthly_data: list[Form1095AMonthly] = Field(default_factory=list)
+    """Up to 12 entries, one per covered month."""
+
+
 class ScheduleEProperty(_StrictModel):
     """A single rental real estate property on Schedule E Part I."""
 
@@ -982,6 +1000,9 @@ class CanonicalReturn(_StrictModel):
     schedules_c: list[ScheduleC] = Field(default_factory=list)
     schedules_e: list[ScheduleE] = Field(default_factory=list)
     schedules_k1: list[ScheduleK1] = Field(default_factory=list)
+
+    # ACA marketplace statements
+    forms_1095_a: list[Form1095A] = Field(default_factory=list)
 
     # Other income escape hatch (prefer typed forms above)
     other_income: dict[str, Any] = Field(default_factory=dict)

@@ -6,6 +6,38 @@ Session memory for this project. Top section = most recent session summaries (ne
 
 ## Session Summaries
 
+### 2026-04-12 07:45 UTC — Wave 7A kickoff: 8 new federal forms via parallel fan-out
+
+**Wave 7A dispatched and landed** — 8 parallel worktree agents implementing missing federal forms. Two agents (Schedule E, Form 8863) timed out on first attempt; retries succeeded. Cherry-pick merge choreography on pipeline.py was the main friction point (every agent adds a render gate to the same function signature + render section).
+
+**Serial fixes (pre-fan-out)**:
+- Pinned `tenforty==2025.8` in pyproject.toml + requirements.txt for gatekeeper stability
+- Form 8829 docstring drift (fix 2) already landed in cef36a5
+- Graph-wrap gap.md cross-refs (fix 3) already done in wave 6
+
+**New forms (8 agents, all merged)**:
+- **7A-1 Schedule E** — Rental real estate income/loss. Layer 1 compute fields per-property (up to 3), delegates to `schedule_e_property_net` from engine. Layer 2 reportlab scaffold. 10 tests.
+- **7A-2 Form 2441** — Child and dependent care credit. AGI-based rate (35% → 20%), $3k/$6k expense cap, employer benefits exclusion. Added `DependentCareExpenses` model to CanonicalReturn. 21 tests.
+- **7A-3 Form 8863** — Education credits (AOTC + LLC). Per-student AOTC ($2,500 max, 60/40 nonrefundable/refundable split), aggregate LLC ($2,000 max), MAGI phase-outs ($80k-$90k Single, $160k-$180k MFJ). Added `EducationStudent` + `EducationCredits` models. 19 tests.
+- **7A-4 Form 8962** — Premium tax credit (ACA). FPL-based applicable figure, monthly PTC computation, repayment caps (Table 5). Added `Form1095A` + `Form1095AMonthly` models. 30 tests.
+- **7A-5 Form 8606** — Nondeductible IRA basis tracking. Part I lines 1-14 (nontaxable percentage, distribution/conversion splits), Part II Roth conversion taxable amount. Added `IRAInfo` model. 13 tests.
+- **7A-6 Schedule 1** — Additional income and adjustments. Routes engine values (Sch C/E/1099-G) to Part I, AdjustmentsToIncome to Part II, OBBBA to lines 9/25. 30 tests.
+- **7A-7 Schedule 2** — Additional taxes. Pure read-and-format from ComputedTotals (AMT) and OtherTaxes (SE, Medicare, NIIT). 15 tests.
+- **7A-8 Schedule 3** — Additional credits and payments. Routes Credits + Payments to Part I/II lines. 20 tests.
+
+**Suite**: 3605 → **3605 + 158 = 3763** (158 net new tests from wave 7A, 6 skipped for pypdf env issue).
+
+**Pipeline integration**: `run_pipeline` now has render gates for all 8 new forms (render_schedule_1, render_schedule_2, render_schedule_3, render_schedule_e, render_form_2441, render_form_8606, render_form_8863, render_form_8962). Schema regenerated to include new model classes.
+
+**Agent leak pattern**: Same wave-6 issue — agents occasionally write to the main working directory instead of their worktree via path substitution errors. Cleaned up by `git checkout -- <file>` + `rm` before each cherry-pick. Two agents (Form 2441, Schedule E retry) committed directly to main branch instead of using worktree branches.
+
+**Remaining wave 7 items** (from HANDOFF.md):
+- **7B**: State PDF renderers (43 states compute but don't render PDFs yet)
+- **7C**: Real nonresident apportionment (CA 540NR, NY IT-203-B)
+- **7D**: Hard wet test, SKILL.md update, FFFF map extension, version bump to 0.2.0
+
+---
+
 ### 2026-04-11 22:30 UTC — Wave 6 complete: D/8949 + 6251 + 4562 + 8829 + state dispatch + FFFF + packaging
 
 **Wave 6 dispatched and landed** in one 9-agent fan-out (8 parallel worktrees + 1 serial cleanup). The skill is now functionally complete end-to-end: every federal form a common filer needs, every state, every output channel.

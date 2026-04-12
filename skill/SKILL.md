@@ -1,6 +1,6 @@
 ---
 name: tax-prep
-description: Use when a user wants help preparing their US individual income tax return (federal or federal + state) for tax year 2025 or later. Handles W-2 wages, 1099 interest/dividends/broker/NEC/R/G/SSA, Schedule C self-employment, Schedule E rental, Schedule K-1 passthroughs, OBBBA Schedule 1-A tips and overtime, Form 4547 Trump Account, the OBBBA senior deduction, itemized deductions, Schedule 1 (Additional Income and Adjustments), Schedule 2 (Additional Taxes), Schedule 3 (Additional Credits and Payments), Form 2441 (Child and Dependent Care), Form 8606 (Nondeductible IRA Contributions), Form 8863 (Education Credits), Form 8962 (Premium Tax Credit), and 30 state plugins as of wave 4 (more landing in wave 5). Outputs filled IRS PDFs, Free File Fillable Forms entries, per-state artifacts, and a paper-file bundle.
+description: Use when a user wants help preparing their US individual income tax return (federal or federal + state) for tax year 2025 or later. Handles W-2 wages, 1099 interest/dividends/broker/NEC/R/G/SSA/MISC/K, Schedule C self-employment, Schedule E rental, Schedule K-1 passthroughs, Form 4797 (Sales of Business Property), Form 8995 (QBI Deduction), OBBBA Schedule 1-A tips and overtime, Form 4547 Trump Account, the OBBBA senior deduction, itemized deductions, Schedule 1 (Additional Income and Adjustments), Schedule 2 (Additional Taxes), Schedule 3 (Additional Credits and Payments), Form 2441 (Child and Dependent Care), Form 8606 (Nondeductible IRA Contributions), Form 8863 (Education Credits), Form 8962 (Premium Tax Credit), and 30 state plugins with filled AcroForm PDF renderers. 14 Tier-1 PDF ingesters. Real nonresident apportionment for CA/NY/IL. Outputs filled IRS PDFs, Free File Fillable Forms entries, per-state artifacts, and a paper-file bundle.
 ---
 
 # Tax Prep Skill — Interview Flow
@@ -165,10 +165,13 @@ This is the longest phase. Open with: "Now let's walk through your income for TY
 - Social Security benefits (Form SSA-1099)
 - Unemployment compensation or state tax refund (Form 1099-G)
 - Schedule K-1 from a partnership, S-corp, estate, or trust
+- Miscellaneous income — rents, royalties, prizes, awards (Form 1099-MISC)
+- Payment card / third-party network settlements (Form 1099-K)
+- Sales of business or investment property (Form 4797)
 
 For each "yes," route into the matching sub-flow below.
 
-**Note:** Several of these income sources flow through **Schedule 1** (Additional Income and Adjustments to Income). The calc engine populates Schedule 1 Part I (additional income) and Part II (adjustments) automatically from the collected data — unemployment compensation (1099-G box 1), state tax refunds (1099-G box 2), rental income (Schedule E), self-employment deduction (half of SE tax), educator expenses, HSA deduction, IRA deduction, student loan interest, and the OBBBA Schedule 1-A items all land on Schedule 1 before flowing to Form 1040 line 8.
+**Note:** Several of these income sources flow through **Schedule 1** (Additional Income and Adjustments to Income). The calc engine populates Schedule 1 Part I (additional income) and Part II (adjustments) automatically from the collected data — unemployment compensation (1099-G box 1), state tax refunds (1099-G box 2), rental income (Schedule E), self-employment deduction (half of SE tax), educator expenses, HSA deduction, IRA deduction, student loan interest (Form 1098-E → Schedule 1 line 21, Tier-1 ingester supported), and the OBBBA Schedule 1-A items all land on Schedule 1 before flowing to Form 1040 line 8.
 
 ### 3a. W-2 wages
 
@@ -356,11 +359,30 @@ Per K-1:
 
 Set: `schedules_k1[]`.
 
-### 3l. Foreign accounts (Schedule B Part III)
+### 3l. Form 4797 — Sales of Business Property
+
+Ask: "Did you sell, exchange, or involuntarily convert any business or investment property during TY2025? This includes real property used in a trade or business held more than one year (§1231 assets), depreciable personal property (§1245), and depreciable real property (§1250)."
+
+If yes, collect per property:
+- Description of property.
+- Date acquired, date sold or disposed of.
+- Gross sales price, cost or other basis.
+- Depreciation allowed or allowable.
+- Section classification: `1231` (real or depreciable property used in business held > 1 year), `1245` (depreciable personal property — gain recaptured as ordinary income up to depreciation taken), or `1250` (depreciable real property — unrecaptured §1250 gain taxed at 25%).
+
+The engine classifies each sale, routes ordinary recapture to Part II and §1231 gains/losses to Part I, and flows the net result to Schedule D and Form 1040 via `skill/scripts/calc/form_4797.py`.
+
+Set: `forms_4797[]`.
+
+### 3m. Foreign accounts (Schedule B Part III)
 
 Always ask: "At any time during 2025, did you have a financial interest in or signature authority over a financial account in a foreign country whose aggregate value at any point exceeded USD 10,000?" If yes, set `has_foreign_financial_account_over_10k = true`, collect the country list (`foreign_account_countries`, ISO 3166-1 alpha-2), and warn that **FBAR (FinCEN Form 114)** must be filed separately through BSA E-Filing — this skill does NOT produce FBAR.
 
 Also ask: "During 2025, did you receive a distribution from, or were you the grantor of, or transferor to, a foreign trust?" If yes, set `has_foreign_trust_transaction = true` and warn that Form 3520 may be required.
+
+### Automatic: Form 8995 — Qualified Business Income (QBI) Deduction
+
+No interview questions are needed for the QBI deduction. The engine computes it automatically from Schedule C net profit, Schedule E rental income (if QBI-qualified), and Schedule K-1 §199A items. The deduction is 20% of combined qualified business income, subject to W-2 wage and UBIA limits for taxpayers above the income threshold ($191,950 single / $383,900 MFJ for TY2025). The result flows to Form 1040 line 13 via `skill/scripts/calc/qbi.py` and `skill/scripts/calc/form_8995.py`.
 
 ---
 
@@ -380,7 +402,7 @@ If yes, set `itemize_deductions = true` and walk Schedule A:
 | State and local income tax (or sales tax)          | `state_and_local_income_tax` / `state_and_local_sales_tax` + `elect_sales_tax_over_income_tax` | Pick the larger. SALT capped at $10,000 ($5,000 MFS) by the engine. |
 | Real estate tax                                    | `real_estate_tax`                   | Part of SALT cap. |
 | Personal property tax                              | `personal_property_tax`             | Part of SALT cap. |
-| Home mortgage interest                             | `home_mortgage_interest`            | From Form 1098 box 1. |
+| Home mortgage interest                             | `home_mortgage_interest`            | From Form 1098 box 1 (Tier-1 ingester extracts from PDF → Schedule A line 8a/8b). |
 | Mortgage points                                    | `mortgage_points`                   | From Form 1098 box 6. |
 | Mortgage insurance premiums                        | `mortgage_insurance_premiums`       | OBBBA restored deductibility. |
 | Investment interest                                | `investment_interest`               | Form 4952. |
@@ -433,7 +455,7 @@ If yes, collect per student:
 - Was the student at least half-time for at least one academic period.
 - Was the student in the first four years of postsecondary education (for AOTC eligibility).
 - Has the AOTC been claimed for this student in four or more prior tax years.
-- Was Form 1098-T received.
+- Was Form 1098-T received. **PDF ingestion:** The Tier-1 1098-T ingester extracts tuition statement data and routes it to Form 8863 automatically.
 
 Explain the two credits:
 - **American Opportunity Tax Credit (AOTC):** Up to $2,500 per student, first four years only, 40% refundable. Phases out at MAGI $80K–$90K single / $160K–$180K MFJ.
@@ -451,6 +473,8 @@ If yes, collect:
 - Form 1095-A data per covered month: enrollment premium, SLCSP (second-lowest-cost silver plan) premium, and advance payment of PTC.
 - If multiple 1095-A forms, collect each.
 
+**PDF ingestion:** The user can drop their 1095-A PDF into the input folder; the Tier-1 1095-A ingester extracts marketplace enrollment details, monthly premiums, SLCSP amounts, and advance PTC payments automatically.
+
 The engine reconciles the advance payments against the actual PTC on Form 8962. This can result in either an additional credit (Schedule 3) or a repayment (Schedule 2). Warn the user: "If your actual income was higher than the estimate you gave the Marketplace, you may owe back some of the advance credit."
 
 Set: `credits.premium_tax_credit` (Form8962 block).
@@ -460,7 +484,7 @@ Set: `credits.premium_tax_credit` (Form8962 block).
 The engine automatically populates Schedule 2 from collected data:
 - AMT (Form 6251) — computed automatically from the return data.
 - Excess advance PTC repayment (Form 8962) — from the PTC reconciliation above.
-- Self-employment tax (Schedule SE) — already computed from Schedule C.
+- Self-employment tax (Schedule SE) — computed from Schedule C and K-1 Box 14 self-employment earnings.
 - Additional tax on early IRA/retirement distributions (Form 5329) — triggered by 1099-R code 1.
 - Net investment income tax (Form 8960) — 3.8% on NII above $200K single / $250K MFJ, computed automatically.
 - Additional Medicare tax (Form 8959) — 0.9% on earnings above $200K single / $250K MFJ, computed automatically.
@@ -483,14 +507,24 @@ Branch on the answers:
 4. **Nonresident** (worked in a state without living there) — separate row with `residency = nonresident`. Watch for **state reciprocity** (e.g. PA-NJ, MD-VA-WV-PA-DC, IL-IN-IA-KY-MI-WI) — the wage state may not need a return if a reciprocal agreement applies. The state plugin checks `ReciprocityTable.load()`.
 5. **Multiple unrelated states** (e.g. dual residency, telecommuting, military) — handle each as its own row and explain how credit-for-taxes-paid-to-other-state apportionment will work in the resident state.
 
-### State coverage status (as of wave 4)
+### State coverage status (as of wave 8)
 
-The skill has 30 state plugins wired into the registry as of wave 4 (`skill/scripts/states/_registry.py`). Wave 5 adds the remaining 21 taxing states. Authoritative coverage matrix and capability notes: `skill/reference/tenforty-ty2025-gap.md`.
+The skill has 30 state plugins wired into the registry (`skill/scripts/states/_registry.py`), and **30 of 43 income-tax states** now render filled AcroForm PDFs. Authoritative coverage matrix and capability notes: `skill/reference/tenforty-ty2025-gap.md`.
 
 - **Wired (wave 1–4):** AK, AZ, CA, CO, CT, DC, FL, GA, IL, KS, KY, MA, MD, MI, MN, NC, NH, NJ, NV, NY, OH, OR, PA, SD, TN, TX, VA, WA, WI, WY.
 - **Coming in wave 5:** AL, AR, DE, HI, IA, ID, IN, LA, ME, MO, MS, MT, ND, NE, NM, OK, RI, SC, UT, VT, WV.
 
 If the user is a resident of a state in the wave-5 set, tell them the plugin is in flight and offer to either (a) skip state computation for now (they file their state return manually) or (b) use the federal output as input to commercial software for the state portion.
+
+### Nonresident apportionment (wave 8C)
+
+Three states now have **real per-category income sourcing** instead of simple day-proration:
+
+- **California:** Schedule CA (540NR) — wages sourced from W-2 state rows, interest/dividends sourced to domicile, rental income by property address, business income by location.
+- **New York:** IT-203 with IT-203-B workday allocation for nonresident wage sourcing.
+- **Illinois:** Schedule NR with prorated exemption for part-year / nonresident filers.
+
+For all other nonresident states, the engine uses the standard day-proration method.
 
 ### MD county special-case (CP8-D)
 
@@ -561,7 +595,7 @@ By this point you have a fully populated dict. Do three things in order:
 
 1. **Pretty-print the dict back to the user as a JSON code block** and ask them to confirm it looks right. Highlight any `notes[]` warnings (FFFF blockers, OBBBA caveats, MD county fallback, foreign account FBAR reminder).
 2. **Write it to disk** at the user-chosen location. Convention: `~/TaxData/<taxpayer-last-name>/ty2025/taxpayer_info.json`. Confirm the directory exists or offer to create it.
-3. **Tell the user where to drop their PDFs**: `~/TaxData/<taxpayer-last-name>/ty2025/input_pdfs/`. The pipeline ingests every `*.pdf` in the top level (no recursion). Supported tier-1 ingesters: W-2, 1099-INT, 1099-DIV, 1099-B, 1099-NEC, 1099-R, 1099-G, SSA-1099. Tier-2 (text-layer) and Tier-3 (Azure Document Intelligence Unified US Tax) cascade automatically when prereqs are present.
+3. **Tell the user where to drop their PDFs**: `~/TaxData/<taxpayer-last-name>/ty2025/input_pdfs/`. The pipeline ingests every `*.pdf` in the top level (no recursion). Supported **14 Tier-1 ingesters**: W-2, 1099-INT, 1099-DIV, 1099-B, 1099-NEC, 1099-R, 1099-G, 1099-MISC, 1099-K, SSA-1099, 1098 (Mortgage Interest), 1098-E (Student Loan Interest), 1098-T (Tuition Statement), 1095-A (Marketplace Insurance). Tier-2 (text-layer) and Tier-3 (Azure Document Intelligence Unified US Tax) cascade automatically when prereqs are present.
 
 ### Pipeline handoff
 
@@ -583,7 +617,7 @@ The pipeline does:
 2. Walks every PDF in `input_dir`, runs the ingester cascade, and patches extracted fields onto the dict.
 3. Validates the merged dict via `CanonicalReturn.model_validate`.
 4. Runs `engine.compute()` (multi-pass tenforty + OBBBA patches + CP8-A medical floor + state plugins).
-5. Renders Form 1040 PDF, Schedule 1 (if additional income or adjustments), Schedule 2 (if additional taxes), Schedule 3 (if additional credits or payments), Schedule A (if itemizing), Schedule B (if required), Schedule C (per business), Schedule E (per rental property), Schedule SE (if SE earnings ≥ $400), Form 2441 (if child/dependent care credit), Form 8606 (if nondeductible IRA activity), Form 8863 (if education credits), Form 8962 (if Marketplace insurance with APTC).
+5. Renders Form 1040 PDF, Schedule 1 (if additional income or adjustments), Schedule 2 (if additional taxes), Schedule 3 (if additional credits or payments), Schedule A (if itemizing), Schedule B (if required), Schedule C (per business), Schedule E (per rental property), Schedule SE (if SE earnings ≥ $400, including K-1 Box 14 self-employment earnings), Form 2441 (if child/dependent care credit), Form 4797 (if business property sales), Form 8606 (if nondeductible IRA activity), Form 8863 (if education credits), Form 8962 (if Marketplace insurance with APTC), Form 8995 (if QBI deduction applies).
 6. Writes `result.json` and the rendered PDFs into `output_dir`.
 7. Returns a `PipelineResult` dataclass with `canonical_return`, `ingest_results`, `rendered_paths`, `warnings`, and a `validation_report` view.
 
@@ -628,7 +662,10 @@ See `skill/reference/skill-interview-examples.md` for several end-to-end transcr
 - `skill/scripts/calc/form_2441.py` — Form 2441 (Child and Dependent Care Expenses).
 - `skill/scripts/calc/form_8606.py` — Form 8606 (Nondeductible IRA Contributions).
 - `skill/scripts/calc/form_8863.py` — Form 8863 (Education Credits — AOTC and LLC).
+- `skill/scripts/calc/form_4797.py` — Form 4797 (Sales of Business Property — §1231/§1245/§1250).
 - `skill/scripts/calc/form_8962.py` — Form 8962 (Premium Tax Credit — ACA reconciliation).
+- `skill/scripts/calc/form_8995.py` — Form 8995 (Qualified Business Income Deduction).
+- `skill/scripts/calc/qbi.py` — QBI computation engine (20% pass-through deduction).
 - `skill/scripts/validate/ffff_limits.py` — FFFF compatibility checker.
 - `skill/reference/tenforty-ty2025-gap.md` — state coverage matrix.
 - `skill/reference/ffff-limits.md` — FFFF hard caps and unsupported forms.

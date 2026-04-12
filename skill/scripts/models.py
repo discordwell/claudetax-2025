@@ -846,6 +846,23 @@ class DependentCareExpenses(_StrictModel):
     """Box 10 of W-2 — dependent care benefits excluded from income."""
 
 
+class EducationStudent(_StrictModel):
+    """One student for Form 8863."""
+    name: str
+    ssn: SSN
+    institution_name: str = ""
+    qualified_expenses: Money = Decimal("0")
+    is_aotc_eligible: bool = True
+    completed_4_years: bool = False
+    half_time_student: bool = True
+    felony_drug_conviction: bool = False
+
+
+class EducationCredits(_StrictModel):
+    """Form 8863 input block."""
+    students: list[EducationStudent] = Field(default_factory=list)
+
+
 class Credits(_StrictModel):
     child_tax_credit: Money = Decimal("0")  # computed
     additional_child_tax_credit_refundable: Money = Decimal("0")  # computed
@@ -1061,6 +1078,10 @@ class CanonicalReturn(_StrictModel):
 
     # Form 2441 — Child and Dependent Care Expenses
     dependent_care: DependentCareExpenses | None = None
+
+    # Form 8863 — Education Credits (AOTC + LLC). Optional; omit when
+    # the taxpayer has no education expenses to claim.
+    education: EducationCredits | None = None
 
     # States
     state_returns: list[StateReturn] = Field(default_factory=list)

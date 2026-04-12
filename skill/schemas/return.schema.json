@@ -1148,6 +1148,82 @@
       "title": "DepreciableAsset",
       "type": "object"
     },
+    "EducationCredits": {
+      "additionalProperties": false,
+      "description": "Form 8863 input block.",
+      "properties": {
+        "students": {
+          "items": {
+            "$ref": "#/$defs/EducationStudent"
+          },
+          "title": "Students",
+          "type": "array"
+        }
+      },
+      "title": "EducationCredits",
+      "type": "object"
+    },
+    "EducationStudent": {
+      "additionalProperties": false,
+      "description": "One student for Form 8863.",
+      "properties": {
+        "completed_4_years": {
+          "default": false,
+          "title": "Completed 4 Years",
+          "type": "boolean"
+        },
+        "felony_drug_conviction": {
+          "default": false,
+          "title": "Felony Drug Conviction",
+          "type": "boolean"
+        },
+        "half_time_student": {
+          "default": true,
+          "title": "Half Time Student",
+          "type": "boolean"
+        },
+        "institution_name": {
+          "default": "",
+          "title": "Institution Name",
+          "type": "string"
+        },
+        "is_aotc_eligible": {
+          "default": true,
+          "title": "Is Aotc Eligible",
+          "type": "boolean"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "qualified_expenses": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "description": "US dollar amount, 2 decimal places",
+          "title": "Qualified Expenses"
+        },
+        "ssn": {
+          "description": "Social Security Number, ddd-dd-dddd or ddddddddd",
+          "pattern": "^\\d{3}-?\\d{2}-?\\d{4}$",
+          "title": "Ssn",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "ssn"
+      ],
+      "title": "EducationStudent",
+      "type": "object"
+    },
     "FilingStatus": {
       "enum": [
         "single",
@@ -4975,6 +5051,17 @@
       },
       "title": "Dependents",
       "type": "array"
+    },
+    "education": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EducationCredits"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "email": {
       "anyOf": [

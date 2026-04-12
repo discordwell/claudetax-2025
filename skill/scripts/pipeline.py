@@ -451,6 +451,7 @@ def run_pipeline(
     render_form_8829: bool = True,
     render_form_2441: bool = True,
     render_form_8606: bool = True,
+    render_form_8863: bool = True,
     render_form_8962: bool = True,
     render_schedule_1: bool = True,
     render_schedule_2: bool = True,
@@ -653,6 +654,20 @@ def run_pipeline(
 
         sch_e_paths = render_schedule_e_pdfs_all(canonical, output_dir)
         rendered.extend(sch_e_paths)
+
+    # Form 8863 renders when the taxpayer has education credit data.
+    if render_form_8863 and canonical.education is not None:
+        from skill.scripts.output.form_8863 import (
+            compute_form_8863_fields,
+            render_form_8863_pdf,
+        )
+
+        fields_8863 = compute_form_8863_fields(canonical)
+        canonical.credits.education_credits_nonrefundable = fields_8863.total_nonrefundable
+        canonical.credits.education_credits_refundable = fields_8863.total_refundable
+        out_path_8863 = output_dir / "form_8863.pdf"
+        render_form_8863_pdf(fields_8863, out_path_8863)
+        rendered.append(out_path_8863)
 
     if render_schedule_d:
         from skill.scripts.output.schedule_d import (

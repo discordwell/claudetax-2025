@@ -455,6 +455,7 @@ def run_pipeline(
     render_schedule_1: bool = True,
     render_schedule_2: bool = True,
     render_schedule_3: bool = True,
+    render_schedule_e: bool = True,
     render_state_returns: bool = True,
     build_paper_bundle: bool = True,
     emit_ffff_map: bool = True,
@@ -646,6 +647,12 @@ def run_pipeline(
             out_path_3 = output_dir / "schedule_3.pdf"
             render_schedule_3_pdf(fields_3, out_path_3)
             rendered.append(out_path_3)
+
+    if render_schedule_e and canonical.schedules_e:
+        from skill.scripts.output.schedule_e import render_schedule_e_pdfs_all
+
+        sch_e_paths = render_schedule_e_pdfs_all(canonical, output_dir)
+        rendered.extend(sch_e_paths)
 
     if render_schedule_d:
         from skill.scripts.output.schedule_d import (

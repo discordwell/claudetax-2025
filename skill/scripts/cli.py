@@ -123,6 +123,73 @@ def _cmd_schema(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_scan_email(args: argparse.Namespace) -> int:
+    from skill.scripts.email_scanner import scan_gmail
+
+    credentials_path = Path(args.credentials).expanduser().resolve()
+    output_dir = Path(args.output).expanduser().resolve()
+
+    if not credentials_path.exists():
+        print(
+            f"error: credentials file not found: {credentials_path}\n"
+            "Download OAuth2 client credentials from Google Cloud Console:\n"
+            "  1. Go to console.cloud.google.com/apis/credentials\n"
+            "  2. Create an OAuth 2.0 Client ID (Desktop app)\n"
+            "  3. Download the JSON and pass it via --credentials",
+            file=sys.stderr,
+        )
+        return 2
+
+    print(f"Scanning Gmail for TY{args.tax_year} tax documents...")
+    result = scan_gmail(
+        credentials_path=credentials_path,
+        output_dir=output_dir,
+        tax_year=args.tax_year,
+        filter_tax_filenames=args.filter_tax_only,
+    )
+
+    print(f"messages found:        {result.messages_found}")
+    print(f"PDFs downloaded:       {len(result.attachments_downloaded)}")
+    if result.skipped_non_pdf:
+        print(f"skipped (not PDF):     {result.skipped_non_pdf}")
+    if result.skipped_non_tax:
+        print(f"skipped (not tax doc): {result.skipped_non_tax}")
+    if result.errors:
+        print(f"errors:                {len(result.errors)}")
+        for e in result.errors:
+            print(f"  - {e}")
+
+    if result.attachments_downloaded:
+        print(f"\nDownloaded to {output_dir}:")
+        for att in result.attachments_downloaded:
+            size_kb = att.size_bytes / 1024
+            print(f"  {att.filename} ({size_kb:.0f} KB) — from: {att.sender}")
+
+        if args.run_pipeline:
+            print(f"\nRunning pipeline on {len(result.attachments_downloaded)} PDFs...")
+            taxpayer_info = Path(args.taxpayer_info).expanduser().resolve()
+            pipeline_output = Path(args.pipeline_output).expanduser().resolve()
+            return _cmd_run(
+                argparse.Namespace(
+                    input=str(output_dir),
+                    taxpayer_info=str(taxpayer_info),
+                    output=str(pipeline_output),
+                    no_bundle=False,
+                    no_ffff=False,
+                )
+            )
+        else:
+            print(
+                f"\nTo process these, run:\n"
+                f"  tax-prep run --input {output_dir} "
+                f"--taxpayer-info taxpayer.json --output ./out"
+            )
+    else:
+        print("\nNo tax document PDFs found in this scan.")
+
+    return 0
+
+
 def _cmd_version(args: argparse.Namespace) -> int:
     print(_package_version())
     return 0
@@ -184,6 +251,67 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip FFFF entry map emission (ffff_entries.json/.txt).",
     )
     run_p.set_defaults(func=_cmd_run)
+
+    # scan-email
+    scan_p = subparsers.add_parser(
+        "scan-email",
+        help="Scan Gmail for tax document PDF attachments.",
+        description=(
+            "Search Gmail for W-2, 1099, 1098, 1095-A, SSA-1099, "
+            "and K-1 PDF attachments. Downloads them to --output "
+            "for processing by 'tax-prep run'."
+        ),
+    )
+    scan_p.add_argument(
+        "--credentials",
+        required=True,
+        help=(
+            "Path to Google OAuth2 client_secret JSON file. "
+            "Download from console.cloud.google.com/apis/credentials."
+        ),
+    )
+    scan_p.add_argument(
+        "--output",
+        required=True,
+        help="Directory to save downloaded PDF attachments.",
+    )
+    scan_p.add_argument(
+        "--tax-year",
+        type=int,
+        default=2025,
+        help="Tax year to search for (default: 2025).",
+    )
+    scan_p.add_argument(
+        "--filter-tax-only",
+        action="store_true",
+        help=(
+            "Only download PDFs whose filenames match tax document "
+            "patterns (W-2, 1099, etc). Without this flag, downloads "
+            "all PDF attachments from matching emails."
+        ),
+    )
+    scan_p.add_argument(
+        "--run-pipeline",
+        action="store_true",
+        help="Automatically run the pipeline on downloaded PDFs.",
+    )
+    scan_p.add_argument(
+        "--taxpayer-info",
+        default="taxpayer.json",
+        help=(
+            "Path to taxpayer_info.json (only used with --run-pipeline). "
+            "Default: taxpayer.json in current directory."
+        ),
+    )
+    scan_p.add_argument(
+        "--pipeline-output",
+        default="./out",
+        help=(
+            "Pipeline output directory (only used with --run-pipeline). "
+            "Default: ./out"
+        ),
+    )
+    scan_p.set_defaults(func=_cmd_scan_email)
 
     # schema
     schema_p = subparsers.add_parser(

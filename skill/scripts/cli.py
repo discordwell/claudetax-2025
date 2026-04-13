@@ -123,6 +123,12 @@ def _cmd_schema(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_setup_gmail(args: argparse.Namespace) -> int:
+    from skill.scripts.gmail_setup import setup
+
+    return setup()
+
+
 def _cmd_scan_email(args: argparse.Namespace) -> int:
     from skill.scripts.email_scanner import scan_gmail
 
@@ -131,11 +137,11 @@ def _cmd_scan_email(args: argparse.Namespace) -> int:
 
     if not credentials_path.exists():
         print(
-            f"error: credentials file not found: {credentials_path}\n"
-            "Download OAuth2 client credentials from Google Cloud Console:\n"
-            "  1. Go to console.cloud.google.com/apis/credentials\n"
-            "  2. Create an OAuth 2.0 Client ID (Desktop app)\n"
-            "  3. Download the JSON and pass it via --credentials",
+            f"error: credentials file not found: {credentials_path}\n\n"
+            "Run 'tax-prep setup-gmail' for step-by-step setup instructions,\n"
+            "or download OAuth2 credentials from Google Cloud Console:\n"
+            "  https://console.cloud.google.com/apis/credentials\n\n"
+            "Then pass the JSON file via --credentials.",
             file=sys.stderr,
         )
         return 2
@@ -252,6 +258,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run_p.set_defaults(func=_cmd_run)
 
+    # setup-gmail
+    setup_p = subparsers.add_parser(
+        "setup-gmail",
+        help="Set up Gmail API credentials for email scanning.",
+        description=(
+            "Interactive setup for Gmail API OAuth2 credentials. "
+            "Walk through creating a Google Cloud project, enabling "
+            "the Gmail API, and downloading client credentials."
+        ),
+    )
+    setup_p.set_defaults(func=_cmd_setup_gmail)
+
     # scan-email
     scan_p = subparsers.add_parser(
         "scan-email",
@@ -264,10 +282,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     scan_p.add_argument(
         "--credentials",
-        required=True,
+        default="~/.tax-prep/client_secret.json",
         help=(
             "Path to Google OAuth2 client_secret JSON file. "
-            "Download from console.cloud.google.com/apis/credentials."
+            "Default: ~/.tax-prep/client_secret.json. "
+            "Run 'tax-prep setup-gmail' for setup instructions."
         ),
     )
     scan_p.add_argument(

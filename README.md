@@ -64,8 +64,10 @@ The installed `tax-prep` script is a thin wrapper over `skill.scripts.pipeline.r
 
 ```
 tax-prep run --input <pdf_dir> --taxpayer-info <taxpayer.json> --output <out_dir> [--no-bundle] [--no-ffff]
-tax-prep schema    # print the CanonicalReturn JSON schema on stdout
-tax-prep version   # print the installed package version
+tax-prep scan-email --output <pdf_dir> [--credentials <path>] [--tax-year 2025] [--run-pipeline]
+tax-prep setup-gmail  # interactive Gmail API credential setup
+tax-prep schema       # print the CanonicalReturn JSON schema on stdout
+tax-prep version      # print the installed package version
 ```
 
 Example:
@@ -76,6 +78,23 @@ tax-prep run \
     --taxpayer-info ~/TaxData/alex/ty2025/taxpayer_info.json \
     --output ~/TaxData/alex/ty2025/output
 ```
+
+### Email scanning
+
+Scan Gmail for tax document PDFs (W-2, 1099, 1098, 1095-A, SSA-1099, K-1) and download them automatically:
+
+```bash
+# One-time setup (creates Google Cloud project + OAuth2 credentials)
+tax-prep setup-gmail
+
+# Scan and download
+tax-prep scan-email --output ./tax_pdfs
+
+# Scan, download, and run the full pipeline in one command
+tax-prep scan-email --output ./tax_pdfs --run-pipeline --taxpayer-info taxpayer.json
+```
+
+The setup wizard detects `gcloud` CLI and automates what it can. Without `gcloud`, it prints step-by-step instructions for the Google Cloud Console. OAuth2 tokens are cached at `~/.tax-prep/gmail_token.json` so subsequent scans are silent.
 
 `taxpayer_info.json` is a partial `CanonicalReturn` dict. The minimal shape is:
 

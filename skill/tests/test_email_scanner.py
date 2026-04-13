@@ -354,11 +354,10 @@ class TestCLIScanEmail:
         parser = build_parser()
         args = parser.parse_args([
             "scan-email",
-            "--credentials", "creds.json",
             "--output", "/tmp/out",
         ])
         assert args.command == "scan-email"
-        assert args.credentials == "creds.json"
+        assert args.credentials == "~/.tax-prep/client_secret.json"
         assert args.tax_year == 2025
         assert args.filter_tax_only is False
         assert args.run_pipeline is False
@@ -382,3 +381,10 @@ class TestCLIScanEmail:
         assert args.run_pipeline is True
         assert args.taxpayer_info == "tp.json"
         assert args.pipeline_output == "./results"
+
+    def test_setup_gmail_subcommand_exists(self):
+        from skill.scripts.cli import build_parser
+
+        parser = build_parser()
+        args = parser.parse_args(["setup-gmail"])
+        assert args.command == "setup-gmail"

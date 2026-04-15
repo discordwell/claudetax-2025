@@ -132,19 +132,12 @@ def _cmd_setup_gmail(args: argparse.Namespace) -> int:
 def _cmd_scan_email(args: argparse.Namespace) -> int:
     from skill.scripts.email_scanner import scan_gmail
 
-    credentials_path = Path(args.credentials).expanduser().resolve()
+    credentials_path = (
+        Path(args.credentials).expanduser().resolve()
+        if args.credentials
+        else None  # scan_gmail will use bundled credentials
+    )
     output_dir = Path(args.output).expanduser().resolve()
-
-    if not credentials_path.exists():
-        print(
-            f"error: credentials file not found: {credentials_path}\n\n"
-            "Run 'tax-prep setup-gmail' for step-by-step setup instructions,\n"
-            "or download OAuth2 credentials from Google Cloud Console:\n"
-            "  https://console.cloud.google.com/apis/credentials\n\n"
-            "Then pass the JSON file via --credentials.",
-            file=sys.stderr,
-        )
-        return 2
 
     print(f"Scanning Gmail for TY{args.tax_year} tax documents...")
     result = scan_gmail(
@@ -282,11 +275,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     scan_p.add_argument(
         "--credentials",
-        default="~/.tax-prep/client_secret.json",
+        default=None,
         help=(
             "Path to Google OAuth2 client_secret JSON file. "
-            "Default: ~/.tax-prep/client_secret.json. "
-            "Run 'tax-prep setup-gmail' for setup instructions."
+            "Default: uses bundled credentials (no setup needed)."
         ),
     )
     scan_p.add_argument(

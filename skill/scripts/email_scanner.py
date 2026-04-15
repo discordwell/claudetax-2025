@@ -40,6 +40,7 @@ from typing import Any
 
 _TOKEN_DIR = Path.home() / ".tax-prep"
 _TOKEN_FILE = _TOKEN_DIR / "gmail_token.json"
+_DEFAULT_CREDENTIALS = _TOKEN_DIR / "client_secret.json"
 _SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
 # Tax document search queries. Each targets a specific form family.
@@ -254,8 +255,8 @@ def _download_attachments(
 
 
 def scan_gmail(
-    credentials_path: Path,
-    output_dir: Path,
+    credentials_path: Path | None = None,
+    output_dir: Path = Path("./tax_pdfs"),
     tax_year: int = 2025,
     *,
     queries: dict[str, str] | None = None,
@@ -288,6 +289,16 @@ def scan_gmail(
     ScanResult
         Summary of the scan including downloaded files and any errors.
     """
+    # Resolve credentials: explicit path > ~/.tax-prep/client_secret.json > error
+    if credentials_path is None:
+        credentials_path = _DEFAULT_CREDENTIALS
+    credentials_path = Path(credentials_path)
+    if not credentials_path.exists():
+        raise FileNotFoundError(
+            f"Gmail credentials not found at {credentials_path}. "
+            "Run 'tax-prep setup-gmail' for setup instructions."
+        )
+
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 

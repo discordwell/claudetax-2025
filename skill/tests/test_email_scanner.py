@@ -173,6 +173,13 @@ def _make_mock_service(messages: list[dict]) -> MagicMock:
     return service
 
 
+def _write_fake_creds(tmp_path: Path) -> Path:
+    """Write a dummy client_secret.json so scan_gmail's existence check passes."""
+    creds = tmp_path / "fake_creds.json"
+    creds.write_text('{"installed":{"client_id":"x","client_secret":"y"}}')
+    return creds
+
+
 class TestScanGmailMocked:
     def test_downloads_w2_attachment(self, tmp_path: Path):
         fake_pdf_data = base64.urlsafe_b64encode(b"%PDF-1.4 fake W-2").decode()
@@ -201,7 +208,7 @@ class TestScanGmailMocked:
             "skill.scripts.email_scanner._authenticate", return_value=mock_service
         ):
             result = scan_gmail(
-                credentials_path=tmp_path / "fake_creds.json",
+                credentials_path=_write_fake_creds(tmp_path),
                 output_dir=tmp_path / "downloads",
                 tax_year=2025,
             )
@@ -238,7 +245,7 @@ class TestScanGmailMocked:
             "skill.scripts.email_scanner._authenticate", return_value=mock_service
         ):
             result = scan_gmail(
-                credentials_path=tmp_path / "creds.json",
+                credentials_path=_write_fake_creds(tmp_path),
                 output_dir=tmp_path / "dl",
                 tax_year=2025,
             )
@@ -270,7 +277,7 @@ class TestScanGmailMocked:
             "skill.scripts.email_scanner._authenticate", return_value=mock_service
         ):
             result = scan_gmail(
-                credentials_path=tmp_path / "creds.json",
+                credentials_path=_write_fake_creds(tmp_path),
                 output_dir=tmp_path / "dl",
                 tax_year=2025,
                 filter_tax_filenames=True,
@@ -315,7 +322,7 @@ class TestScanGmailMocked:
             "skill.scripts.email_scanner._authenticate", return_value=mock_service
         ):
             result = scan_gmail(
-                credentials_path=tmp_path / "creds.json",
+                credentials_path=_write_fake_creds(tmp_path),
                 output_dir=tmp_path / "dl",
                 tax_year=2025,
             )
@@ -333,7 +340,7 @@ class TestScanGmailMocked:
             "skill.scripts.email_scanner._authenticate", return_value=service
         ):
             result = scan_gmail(
-                credentials_path=tmp_path / "creds.json",
+                credentials_path=_write_fake_creds(tmp_path),
                 output_dir=tmp_path / "dl",
                 tax_year=2025,
             )
@@ -357,7 +364,7 @@ class TestCLIScanEmail:
             "--output", "/tmp/out",
         ])
         assert args.command == "scan-email"
-        assert args.credentials == "~/.tax-prep/client_secret.json"
+        assert args.credentials is None  # uses bundled credentials by default
         assert args.tax_year == 2025
         assert args.filter_tax_only is False
         assert args.run_pipeline is False

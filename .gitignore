@@ -65,3 +65,4 @@ secrets*
 !skill/reference/**/*.pdf
 !skill/fixtures/**/*.pdf
 !skill/tests/**/*.pdf
+skill/reference/gmail_client_secret.json

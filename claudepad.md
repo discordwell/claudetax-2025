@@ -6,6 +6,20 @@ Session memory for this project. Top section = most recent session summaries (ne
 
 ## Session Summaries
 
+### 2026-06-17 — Wash-sale disallowed loss + Form 1040 line-25 reconciliation + QSS senior deduction
+
+Maintenance pass. Three "silently wrong number" correctness bugs, all in the same spirit as the prior session's diagnostic-warnings work — except these produce a *wrong tax figure*, not just a missing warning. Found via two read-only audit sub-agents, fixed, locked with 14 new tests, and re-reviewed by a 3-agent code-review pass (all CONFIRMED correct).
+
+**Bug 1 — Wash-sale disallowed loss dropped everywhere except Form 8949 (HIGH impact).** A 1099-B box-1g wash-sale disallowed loss is a POSITIVE Form 8949 column-(g) adjustment that *reduces* an otherwise-reportable loss. `Form8949`/`Schedule D` included it, but the calc engine (`_to_tenforty_input`, `total_income`, `investment_income`), NIIT, Form 1040 line 7, and **all 43 state plugins** inlined `proceeds - cost_basis + adjustment_amount` and silently omitted `wash_sale_loss_disallowed`. Result: the engine *allowed a disallowed loss* (under-reported tax) and the printed Form 8949 disagreed with Schedule D / 1040 in the same bundle. Fix: new `Form1099BTransaction.net_gain_loss()` model method = the single source of truth (`proceeds - cost_basis + adjustment_amount + wash_sale_loss_disallowed`); replaced 47 inlined sites across 45 files with it. DC was the lone holdout (used local var `t`, and had *also* been dropping `adjustment_amount`) — brought in line.
+
+**Bug 2 — Form 1040 line 25 under-counted withholding.** Line 25 omitted SSA-1099 box 6 withholding and the `payments.federal_income_tax_withheld_from_1099` / `_from_w2` aggregates, all of which `engine.total_payments()` *does* count. So printed line 33 (total payments) didn't reconcile with line 34/37 (refund/owed, taken straight from the engine) for any filer with SSA withholding or aggregate-input withholding. Fixed line 25a/25b to mirror `total_payments()` component-for-component.
+
+**Bug 3 — OBBBA senior deduction double-counted a deceased spouse on QSS.** `_count_qualifying_filers` counted the spouse for `MFJ` *and* `QSS`. But a QSS return's spouse is deceased (died in a prior year; model requires `date_of_death`) — not a living filer age 65+ on this return — so the $6,000-per-eligible-individual deduction was doubling to $12,000, overstating the deduction / understating tax. Fixed to count the spouse for MFJ only. Left the phase-out *threshold* mapping (`phase_out_start_mfj_qss` → $150k) intentional — that's a documented design choice for the single surviving filer; only the per-filer count was wrong.
+
+**Tests:** +14 (`test_wash_sale_disallowed_loss.py` ×8 incl. cross-form 8949≡SchedD≡1040 consistency + end-to-end tax delta; form_1040 line-25 SSA/aggregate + reconciliation ×3; QSS ×2; DC cap-gains ×1). Each was confirmed to FAIL against the old code (review agent stashed the fix to verify). Suite **4165 → 4179 passed**, 3 skipped. No schema regen needed (method, not field).
+
+**Files:** `models.py`, `calc/engine.py`, `calc/patches/niit.py`, `calc/patches/obbba_senior_deduction.py`, `output/form_1040.py`, 43 state plugins, 4 test files.
+
 ### 2026-06-17 — Engine diagnostic warnings (silent-overpayment guard) + email scanner error surfacing
 
 Maintenance pass. No new forms/states — closed a "silently wrong number" gap, the worst failure mode for a tax tool.
@@ -369,6 +383,15 @@ But it has hard limits: ≤50 W-2s, ≤11 Schedule E properties, no document att
 
 ### The engine warns rather than silently producing a wrong number
 `engine.compute()` surfaces human-readable diagnostics on `ComputedTotals.warnings` (merged into `PipelineResult.warnings`, printed by CLI `run`, persisted in `result.json`) whenever it makes a simplifying assumption that could change tax owed. The rule: a *silently* wrong/incomplete number is the worst failure mode for a tax tool — flag it so the human can verify. Add a warning here whenever you defer a computation that affects the tax line. Current cases: QBI above the §199A simplified threshold, and duplicated W-2 withholding inputs.
+
+### Capital gain per 1099-B lot has ONE source of truth: `Form1099BTransaction.net_gain_loss()`
+`proceeds - cost_basis + adjustment_amount + wash_sale_loss_disallowed`. The wash-sale disallowed loss (box 1g) and column-(g) adjustments are POSITIVE values that reduce an otherwise-reportable loss (Form 8949 instructions). NEVER inline `proceeds - cost_basis + ...` — the expression was duplicated 47× across the engine, NIIT, Form 1040, and 43 state plugins, and the duplication silently dropped the wash-sale term everywhere except Form 8949 (engine *allowed a disallowed loss*; printed forms disagreed). Any new capital-gains code (states, forms, Schedule D Part II §1250/28% work, a future Form1099DA) must call `net_gain_loss()`. Note: `accrued_market_discount` (box 1f) is intentionally NOT in the helper — it reclassifies gain to ordinary interest and needs the interest path wired first; fold it in there, not by half-applying it here.
+
+### Printed Form 1040 line 25 must reconcile with `engine.total_payments()`
+Line 34/37 (refund / amount owed) come straight from the engine. If the rendered line 25/33 (withholding / total payments) is built from a different set of components, the printed form is internally inconsistent. Keep `output/form_1040.py` line 25 in lockstep with `engine.total_payments()`: W-2 box 2 (+ `_from_w2` aggregate fallback), 1099 INT/DIV/B/NEC/R/G box 4, SSA-1099 box 6, `payments._from_1099`, `payments._other`.
+
+### QSS senior deduction counts ONE filer (the deceased spouse is not eligible)
+The OBBBA $6,000 senior deduction is per *living* individual age 65+ on the return. A QSS (Qualifying Surviving Spouse) return has one living filer — the spouse died in a prior year (the model requires `date_of_death`). Count the spouse only for MFJ. The phase-out *threshold* still treats QSS like MFJ ($150k, the `phase_out_start_mfj_qss` constant) — that's an intentional MFJ-equivalent-treatment choice for the single surviving filer, separate from the per-filer count. (Open question, NOT yet resolved: OBBBA's "$150,000 in the case of a joint return" language could argue QSS belongs at the $75k bucket since QSS is technically not a joint return — would need a statute/IRS citation to change.)
 
 ### QBI above the §199A threshold (Form 8995-A) is intentionally NOT computed
 For TI before QBI above $197,300 S / $394,600 MFJ, the deduction is shown as **$0** and a warning fires. This is deliberate, not a bug to "fix" by computing a number: a correct 8995-A needs SSTB classification, per-business W-2 wages, and UBIA of qualified property. The models carry §199A W-2 wages + UBIA on K-1 only (`ScheduleK1.section_199a_w2_wages`/`_ubia`); Schedule C/E have neither, and **no SSTB flag exists anywhere**. Guessing "non-SSTB" would *understate* tax for a doctor/lawyer/consultant K-1 — worse than overstating. If you ever implement 8995-A: add SSTB + per-business W-2-wage/UBIA fields to ScheduleC and ScheduleEProperty first, and handle the phase-in range (threshold → +$50k S / +$100k MFJ) carefully — that partial-phaseout math is the hard part.

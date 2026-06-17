@@ -518,7 +518,7 @@ class WestVirginiaPlugin:
         lt_gain = Decimal("0")
         for form in return_.forms_1099_b:
             for txn in form.transactions:
-                gain = txn.proceeds - txn.cost_basis + txn.adjustment_amount
+                gain = txn.net_gain_loss()
                 if txn.is_long_term:
                     lt_gain += gain
                 else:

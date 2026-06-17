@@ -123,14 +123,16 @@ def _sum_capital_gain_distributions(return_: CanonicalReturn) -> Decimal:
 def _sum_realized_capital_gains(return_: CanonicalReturn) -> Decimal:
     """Sum of realized gains on 1099-B transactions (ST + LT).
 
-    Gain per transaction = proceeds - cost_basis + adjustment_amount.
-    Matches the engine's marshaling for tenforty; kept in sync by formula not
-    by shared helper to keep this patch decoupled from the tenforty wiring.
+    Gain per transaction comes from ``Form1099BTransaction.net_gain_loss()``
+    (proceeds − cost_basis + adjustment_amount + wash_sale_loss_disallowed),
+    the shared helper the engine and federal forms also use, so NIIT's net
+    investment income agrees with the rest of the return (including the
+    wash-sale add-back).
     """
     total = Decimal("0")
     for form in return_.forms_1099_b:
         for txn in form.transactions:
-            total += txn.proceeds - txn.cost_basis + txn.adjustment_amount
+            total += txn.net_gain_loss()
     return total
 
 

@@ -10,9 +10,12 @@ Design:
 - Base: $6,000 per filer age 65 or older at end of tax year (12/31).
 - Eligibility:
     * Taxpayer: always considered.
-    * Spouse: ONLY considered on MFJ or QSS (the joint-return bucket).
-      On MFS the spouse would claim their own senior deduction on their own
-      return, so we do not count the spouse here.
+    * Spouse: counted ONLY on MFJ (a true joint return with two living
+      filers). NOT on QSS — a Qualifying Surviving Spouse return has a single
+      living filer; the spouse died in a prior year and so is not an
+      individual who attained age 65 before the close of THIS tax year. On
+      MFS the spouse would claim their own senior deduction on their own
+      return, so we do not count the spouse here either.
 - Phase-out:
     * Begins at MAGI $75,000 (single/HoH/MFS) or $150,000 (MFJ/QSS).
       Thresholds come from C.obbba_senior_deduction().
@@ -81,7 +84,8 @@ class SeniorDeductionResult:
         ``AdjustmentsToIncome.senior_deduction_obbba`` in the canonical
         return.
     num_filers_age_65_plus : int
-        0, 1, or 2. Includes taxpayer and (for MFJ/QSS only) spouse.
+        0, 1, or 2. Includes taxpayer and (for MFJ only) spouse. A QSS
+        return has a single living filer, so its maximum here is 1.
     base_deduction : Decimal
         num_filers_age_65_plus * $6,000, before phase-out. Zero for years
         outside the OBBBA window (2025-2028).
@@ -124,17 +128,26 @@ def _count_qualifying_filers(
     """Count filers age 65+ at end of tax year.
 
     - Taxpayer is always considered.
-    - Spouse is considered ONLY on MFJ or QSS (the joint-return statuses).
-      On MFS the spouse files separately and claims their own senior
-      deduction on their own return; we do not double-count here. On
-      single/HoH there is no spouse.
+    - Spouse is counted ONLY on MFJ (a true joint return with two living
+      filers). NOT on QSS: a Qualifying Surviving Spouse return has a single
+      living filer; the spouse died in a prior year and is therefore not an
+      individual who attained age 65 before the close of *this* tax year, so
+      they generate no second $6,000. (This mirrors the age-65 additional
+      standard deduction, where a QSS filer checks only their own box.) On
+      MFS the spouse files separately and claims their own senior deduction;
+      on single/HoH there is no spouse.
+
+    Note the phase-out *threshold* still treats QSS like MFJ ($150k) — see
+    ``_threshold_for`` and the ``phase_out_start_mfj_qss`` constant — because
+    QSS gets MFJ-equivalent treatment for the single surviving filer. Only
+    the per-filer count differs.
     """
     tax_year = return_.tax_year
     count = 0
     if _is_age_65_or_older(return_.taxpayer, tax_year):
         count += 1
     if (
-        return_.filing_status in (FilingStatus.MFJ, FilingStatus.QSS)
+        return_.filing_status == FilingStatus.MFJ
         and return_.spouse is not None
         and _is_age_65_or_older(return_.spouse, tax_year)
     ):

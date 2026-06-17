@@ -224,11 +224,14 @@ class DistrictOfColumbiaPlugin:
             (f.box1a_ordinary_dividends for f in return_.forms_1099_div),
             start=Decimal("0"),
         )
-        # Capital gains: net proceeds - basis across all 1099-B transactions.
+        # Capital gains: reportable gain/loss across all 1099-B transactions,
+        # via Form1099BTransaction.net_gain_loss() so DC matches the federal
+        # reportable gain (folds in adjustment_amount + the wash-sale add-back
+        # that the engine and every other state plugin already include).
         cap_gains = Decimal("0")
         for b in return_.forms_1099_b:
             for t in b.transactions:
-                cap_gains += t.proceeds - t.cost_basis
+                cap_gains += t.net_gain_loss()
         se_income = sum(
             (
                 c.line1_gross_receipts

@@ -483,7 +483,7 @@ def _to_tenforty_input(
     lt_1099b = Decimal("0")
     for form in return_.forms_1099_b:
         for txn in form.transactions:
-            gain = txn.proceeds - txn.cost_basis + txn.adjustment_amount
+            gain = txn.net_gain_loss()
             if txn.is_long_term:
                 lt_1099b += gain
             else:
@@ -571,7 +571,7 @@ def total_income(return_: CanonicalReturn) -> Decimal:
     lt_1099b = Decimal("0")
     for form in return_.forms_1099_b:
         for txn in form.transactions:
-            gain = txn.proceeds - txn.cost_basis + txn.adjustment_amount
+            gain = txn.net_gain_loss()
             if txn.is_long_term:
                 lt_1099b += gain
             else:
@@ -766,7 +766,7 @@ def investment_income(return_: CanonicalReturn) -> Decimal:
     realized_gains = Decimal("0")
     for form in return_.forms_1099_b:
         for txn in form.transactions:
-            realized_gains += txn.proceeds - txn.cost_basis + txn.adjustment_amount
+            realized_gains += txn.net_gain_loss()
 
     rental_net = sum(
         (schedule_e_total_net(sched) for sched in return_.schedules_e),

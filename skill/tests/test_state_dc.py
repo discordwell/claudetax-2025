@@ -269,6 +269,52 @@ def test_apportion_income_part_year_prorated(canonical_return):
     assert apportionment.state_source_wages == expected
 
 
+def test_apportion_income_capital_gains_use_net_gain_loss():
+    """DC capital-gains apportionment uses the federal reportable gain
+    (Form1099BTransaction.net_gain_loss), so a wash-sale disallowed loss is
+    folded in — not raw proceeds - cost_basis. DC was previously the lone
+    state plugin that omitted both the wash sale and adjustment_amount."""
+    ret = CanonicalReturn.model_validate(
+        {
+            "schema_version": "0.1.0",
+            "tax_year": 2025,
+            "filing_status": "single",
+            "taxpayer": {
+                "first_name": "Dee",
+                "last_name": "Cee",
+                "ssn": "111-22-3333",
+                "date_of_birth": "1985-01-01",
+            },
+            "address": {
+                "street1": "1 K St NW",
+                "city": "Washington",
+                "state": "DC",
+                "zip": "20001",
+            },
+            "forms_1099_b": [
+                {
+                    "broker_name": "Brokerage",
+                    "transactions": [
+                        {
+                            "description": "100 sh ABC",
+                            "date_sold": "2025-03-01",
+                            "proceeds": "5000",
+                            "cost_basis": "7000",
+                            "wash_sale_loss_disallowed": "1500",
+                            "is_long_term": True,
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+    apportionment = DC_PLUGIN.apportion_income(
+        ret, ResidencyStatus.RESIDENT, days_in_state=365
+    )
+    # raw proceeds - basis = -2000; net reportable = -2000 + 1500 wash = -500.
+    assert apportionment.state_source_capital_gains == Decimal("-500")
+
+
 # ---------------------------------------------------------------------------
 # render_pdfs / form_ids
 # ---------------------------------------------------------------------------

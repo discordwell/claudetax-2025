@@ -26,7 +26,7 @@ from pathlib import Path
 
 import pytest
 
-from skill.scripts.calc.engine import compute
+from skill.scripts.calc.engine import compute, total_payments
 from skill.scripts.models import CanonicalReturn
 from skill.scripts.output.form_1040 import (
     Form1040Fields,
@@ -388,6 +388,105 @@ def _canonical_with_w2(wages: str, withheld: str) -> CanonicalReturn:
             "itemize_deductions": False,
         }
     )
+
+
+def _canonical_with_mixed_withholding() -> CanonicalReturn:
+    """A return whose only payments are W-2 box 2 withholding, SSA-1099
+    box 6 withholding, and the payments-level 1099 aggregate. Exercises the
+    line 25 sub-totals that historically dropped SSA box 6 and the aggregate,
+    which broke the reconciliation between line 33 and the engine refund/owed.
+    """
+    return CanonicalReturn.model_validate(
+        {
+            "schema_version": "0.1.0",
+            "tax_year": 2025,
+            "filing_status": "single",
+            "taxpayer": {
+                "first_name": "With",
+                "last_name": "Holding",
+                "ssn": "111-22-3333",
+                "date_of_birth": "1990-01-01",
+            },
+            "address": {
+                "street1": "1 Test",
+                "city": "Springfield",
+                "state": "IL",
+                "zip": "62701",
+            },
+            "w2s": [
+                {
+                    "employer_name": "Acme",
+                    "box1_wages": "65000.00",
+                    "box2_federal_income_tax_withheld": "5000.00",
+                }
+            ],
+            "forms_ssa_1099": [
+                {
+                    "box5_net_benefits": "0",
+                    "box6_federal_income_tax_withheld": "1200.00",
+                }
+            ],
+            "payments": {"federal_income_tax_withheld_from_1099": "300.00"},
+            "itemize_deductions": False,
+        }
+    )
+
+
+def test_line_25_includes_ssa_box6_and_1099_aggregate() -> None:
+    ret = compute(_canonical_with_mixed_withholding())
+    fields = compute_form_1040_fields(ret)
+    assert fields.line_25a_w2_withholding == Decimal("5000.00")
+    # SSA-1099 box 6 ($1,200) + payments 1099 aggregate ($300) route to 25b.
+    assert fields.line_25b_1099_withholding == Decimal("1500.00")
+    assert fields.line_25d_total_withholding == Decimal("6500.00")
+
+
+def test_line_25d_reconciles_with_engine_total_payments() -> None:
+    """The printed line 33 (total payments) must equal the withholding the
+    engine folds into refund/owed (line 34/37); otherwise the form is
+    internally inconsistent for any filer with SSA-1099 box 6 withholding."""
+    canonical = _canonical_with_mixed_withholding()
+    ret = compute(canonical)
+    fields = compute_form_1040_fields(ret)
+    # No estimated / other payments, so total payments == total withholding.
+    assert fields.line_25d_total_withholding == total_payments(canonical)
+    assert fields.line_33_total_payments == total_payments(canonical)
+
+
+def test_line_25a_w2_aggregate_fallback_when_no_per_w2_boxes() -> None:
+    """When the caller supplies the W-2 withholding aggregate instead of
+    per-W-2 box 2 (and ``w2s`` is empty), line 25a falls back to the
+    aggregate — mirroring engine.total_payments — so the printed form still
+    reconciles with the engine refund/owed."""
+    canonical = CanonicalReturn.model_validate(
+        {
+            "schema_version": "0.1.0",
+            "tax_year": 2025,
+            "filing_status": "single",
+            "taxpayer": {
+                "first_name": "Agg",
+                "last_name": "Regate",
+                "ssn": "111-22-3333",
+                "date_of_birth": "1990-01-01",
+            },
+            "address": {
+                "street1": "1 Test",
+                "city": "Springfield",
+                "state": "IL",
+                "zip": "62701",
+            },
+            "forms_1099_int": [
+                {"payer_name": "Bank", "box1_interest_income": "50000"}
+            ],
+            "payments": {"federal_income_tax_withheld_from_w2": "4000"},
+            "itemize_deductions": False,
+        }
+    )
+    ret = compute(canonical)
+    fields = compute_form_1040_fields(ret)
+    assert fields.line_25a_w2_withholding == Decimal("4000")
+    assert fields.line_25d_total_withholding == total_payments(canonical)
+    assert fields.line_33_total_payments == total_payments(canonical)
 
 
 def test_refund_vs_owed_mutually_exclusive() -> None:

@@ -199,7 +199,7 @@ def compute_form_1040_fields(return_: CanonicalReturn) -> Form1040Fields:
     lt_1099b = _ZERO
     for form in return_.forms_1099_b:
         for txn in form.transactions:
-            gain = txn.proceeds - txn.cost_basis + txn.adjustment_amount
+            gain = txn.net_gain_loss()
             if txn.is_long_term:
                 lt_1099b += gain
             else:
@@ -235,9 +235,24 @@ def compute_form_1040_fields(return_: CanonicalReturn) -> Form1040Fields:
     line_24 = _dec(c.total_tax)
 
     # -- Line 25: withholding -----------------------------------------
+    # The line 25 sub-totals must add up to the same withholding the engine
+    # folds into total_payments (engine.total_payments), or the printed
+    # line 33 (total payments) will not reconcile with line 34/37
+    # (refund / amount owed), which come straight from the engine.
     line_25a = _sum(w.box2_federal_income_tax_withheld for w in return_.w2s)
+    # Mirror engine.total_payments: fall back to the W-2 withholding aggregate
+    # only when no per-W-2 box-2 amounts were supplied (same guard the engine
+    # uses), so line 25a reconciles whichever input path the caller used.
+    if (
+        line_25a == _ZERO
+        and return_.payments.federal_income_tax_withheld_from_w2 > _ZERO
+    ):
+        line_25a = return_.payments.federal_income_tax_withheld_from_w2
 
-    # 1099 withholding: sum box4 across INT/DIV/B/NEC/R/G
+    # 1099 withholding: box4 across INT/DIV/B/NEC/R/G, plus SSA-1099 box 6
+    # (Social Security benefit withholding) and the payments-level 1099
+    # aggregate. The IRS routes 1099-series and SSA/RRB withholding to
+    # line 25b.
     withholding_1099 = (
         _sum(f.box4_federal_income_tax_withheld for f in return_.forms_1099_int)
         + _sum(f.box4_federal_income_tax_withheld for f in return_.forms_1099_div)
@@ -245,6 +260,8 @@ def compute_form_1040_fields(return_: CanonicalReturn) -> Form1040Fields:
         + _sum(f.box4_federal_income_tax_withheld for f in return_.forms_1099_nec)
         + _sum(f.box4_federal_income_tax_withheld for f in return_.forms_1099_r)
         + _sum(f.box4_federal_income_tax_withheld for f in return_.forms_1099_g)
+        + _sum(f.box6_federal_income_tax_withheld for f in return_.forms_ssa_1099)
+        + return_.payments.federal_income_tax_withheld_from_1099
     )
     line_25b = withholding_1099
     line_25c = return_.payments.federal_income_tax_withheld_other

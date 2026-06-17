@@ -206,8 +206,9 @@ def _sum_long_term_capital_gains(return_: CanonicalReturn) -> Decimal:
     """Sum all long-term capital gains visible on the canonical return.
 
     Sources:
-    - 1099-B transactions with is_long_term=True:
-      proceeds - cost_basis + adjustment_amount
+    - 1099-B transactions with is_long_term=True, via
+      ``Form1099BTransaction.net_gain_loss()`` (proceeds − cost_basis +
+      adjustment_amount + wash_sale_loss_disallowed)
     - 1099-DIV box 2a (total capital gain distributions — always long-term
       per IRS; see Form 1099-DIV instructions).
     """
@@ -216,7 +217,7 @@ def _sum_long_term_capital_gains(return_: CanonicalReturn) -> Decimal:
     for broker in return_.forms_1099_b:
         for txn in broker.transactions:
             if txn.is_long_term:
-                total += txn.proceeds - txn.cost_basis + txn.adjustment_amount
+                total += txn.net_gain_loss()
 
     for div in return_.forms_1099_div:
         total += div.box2a_total_capital_gain_distributions

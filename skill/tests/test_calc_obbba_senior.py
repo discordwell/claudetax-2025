@@ -61,6 +61,7 @@ def _make_return(
     spouse_dob: dt.date | None = None,
     tax_year: int = 2025,
     wages: Decimal = Decimal("60000"),
+    spouse_date_of_death: dt.date | None = None,
 ) -> CanonicalReturn:
     taxpayer = _person("Alex", "Doe", "111-11-1111", taxpayer_dob)
     spouse: Person | None = None
@@ -69,12 +70,14 @@ def _make_return(
         assert spouse_dob is not None, "spouse_dob required for mfj/mfs tests"
         spouse = _person("Sam", "Doe", "222-22-2222", spouse_dob)
     elif status == FilingStatus.QSS and spouse_dob is not None:
-        # QSS requires a deceased spouse; we don't use QSS here, but document
-        spouse = _person(
-            "Sam",
-            "Doe",
-            "222-22-2222",
-            spouse_dob,
+        # QSS requires a DECEASED spouse (date_of_death set). The spouse
+        # died in a prior year and is not a living filer on this return.
+        spouse = Person(
+            first_name="Sam",
+            last_name="Doe",
+            ssn="222-22-2222",
+            date_of_birth=spouse_dob,
+            date_of_death=spouse_date_of_death or dt.date(tax_year - 1, 3, 1),
         )
     return CanonicalReturn(
         tax_year=tax_year,
@@ -266,6 +269,55 @@ def test_mfj_both_70_fully_phased_out_at_400k() -> None:
     assert result.base_deduction == Decimal("12000")
     assert result.phase_out_reduction == Decimal("12000")
     assert result.deduction == Decimal("0")
+
+
+# ---------------------------------------------------------------------------
+# QSS (Qualifying Surviving Spouse): ONE living filer
+# ---------------------------------------------------------------------------
+
+
+def test_qss_deceased_spouse_not_counted() -> None:
+    """QSS, taxpayer age 70, spouse died last year having been 71.
+
+    The deceased spouse is NOT a living filer who attained age 65 before the
+    close of THIS tax year, so they generate no second $6,000. A QSS return
+    caps at one filer / $6,000 — counting the spouse would silently double
+    the deduction and understate tax.
+    """
+    ret = _make_return(
+        FilingStatus.QSS,
+        taxpayer_dob=dt.date(1955, 1, 1),
+        spouse_dob=dt.date(1954, 2, 2),
+        spouse_date_of_death=dt.date(2024, 5, 1),
+    )
+    result = compute_senior_deduction(return_=ret, magi=Decimal("100000"))
+
+    assert result.num_filers_age_65_plus == 1
+    assert result.base_deduction == Decimal("6000")
+    assert result.phase_out_reduction == Decimal("0")
+    assert result.deduction == Decimal("6000")
+
+
+def test_qss_uses_mfj_threshold_for_single_filer() -> None:
+    """QSS keeps MFJ-equivalent treatment for the single surviving filer:
+    the phase-out threshold is $150k (not the $75k single threshold).
+
+    MAGI $160k: excess over $150k = $10k; reduction = 0.06 * $10k = $600;
+    deduction = $6,000 - $600 = $5,400. (At the $75k threshold it would be
+    $900 — so $5,400 locks the MFJ threshold.)
+    """
+    ret = _make_return(
+        FilingStatus.QSS,
+        taxpayer_dob=dt.date(1955, 1, 1),
+        spouse_dob=dt.date(1954, 2, 2),
+        spouse_date_of_death=dt.date(2024, 5, 1),
+    )
+    result = compute_senior_deduction(return_=ret, magi=Decimal("160000"))
+
+    assert result.num_filers_age_65_plus == 1
+    assert result.base_deduction == Decimal("6000")
+    assert result.phase_out_reduction == Decimal("600")
+    assert result.deduction == Decimal("5400")
 
 
 # ---------------------------------------------------------------------------

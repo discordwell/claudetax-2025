@@ -319,6 +319,32 @@ class Form1099BTransaction(_StrictModel):
     boxes G/H/I/J/K/L are NOT yet modelled — wave 7 will add a
     Form1099DA model for those."""
 
+    def net_gain_loss(self) -> Decimal:
+        """Reportable capital gain/loss for this lot (Form 8949 column (h)).
+
+        ``proceeds − cost_basis + adjustment_amount + wash_sale_loss_disallowed``
+
+        The wash-sale disallowed loss (1099-B box 1g) is entered on Form 8949
+        as a POSITIVE column-(g) adjustment with code 'W' that reduces an
+        otherwise-reportable loss (IRS Form 8949 instructions). It therefore
+        must be folded into the gain *everywhere* the gain is aggregated — the
+        calc engine, the federal forms, and the per-state apportionment
+        helpers — so they all agree with the Form 8949 the same pipeline
+        renders. This method is the single source of truth for that math;
+        prefer it over inlining the expression.
+
+        (``accrued_market_discount`` (box 1f) is a separate code-'D'
+        adjustment that also reclassifies gain to ordinary interest income;
+        it is not yet wired through the interest path, so it is intentionally
+        excluded here rather than half-applied.)
+        """
+        return (
+            self.proceeds
+            - self.cost_basis
+            + self.adjustment_amount
+            + self.wash_sale_loss_disallowed
+        )
+
 
 class Form1099B(_StrictModel):
     """Form 1099-B, Proceeds From Broker and Barter Exchange Transactions."""

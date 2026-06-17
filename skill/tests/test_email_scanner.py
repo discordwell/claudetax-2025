@@ -348,6 +348,34 @@ class TestScanGmailMocked:
         assert result.messages_found == 0
         assert result.attachments_downloaded == []
 
+    def test_failed_query_is_recorded_not_swallowed(self, tmp_path: Path):
+        """A search query that raises is non-fatal but surfaces in errors.
+
+        Previously these failures were silently swallowed, so a user whose
+        scan hit (e.g.) a transient API error for one form family would never
+        learn the scan was partial. Now each failure is recorded.
+        """
+        service = MagicMock()
+
+        with patch(
+            "skill.scripts.email_scanner._authenticate", return_value=service
+        ), patch(
+            "skill.scripts.email_scanner._search_messages",
+            side_effect=RuntimeError("rate limit exceeded"),
+        ):
+            result = scan_gmail(
+                credentials_path=_write_fake_creds(tmp_path),
+                output_dir=tmp_path / "dl",
+                tax_year=2025,
+            )
+
+        # Scan completed (did not raise) but found nothing and recorded one
+        # error per query in the default query set.
+        assert result.messages_found == 0
+        assert result.attachments_downloaded == []
+        assert len(result.errors) == len(_TAX_DOC_QUERIES)
+        assert all("rate limit exceeded" in e for e in result.errors)
+
 
 # ---------------------------------------------------------------------------
 # CLI integration test

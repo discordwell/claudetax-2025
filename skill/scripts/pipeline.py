@@ -570,6 +570,10 @@ def run_pipeline(
     canonical = CanonicalReturn.model_validate(base)
     canonical = compute(canonical)
 
+    # Surface engine-level diagnostics (e.g. QBI above the §199A simplified
+    # threshold, duplicated W-2 withholding) alongside ingest/state warnings.
+    warnings.extend(canonical.computed.warnings)
+
     # ------------------------------------------------------------------
     # 3b. State plugin dispatch (wave 6)
     # ------------------------------------------------------------------

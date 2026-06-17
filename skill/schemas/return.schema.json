@@ -737,6 +737,13 @@
           ],
           "default": null,
           "title": "Validation Report"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
         }
       },
       "title": "ComputedTotals",

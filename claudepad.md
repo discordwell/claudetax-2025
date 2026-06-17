@@ -6,6 +6,22 @@ Session memory for this project. Top section = most recent session summaries (ne
 
 ## Session Summaries
 
+### 2026-06-17 — Engine diagnostic warnings (silent-overpayment guard) + email scanner error surfacing
+
+Maintenance pass. No new forms/states — closed a "silently wrong number" gap, the worst failure mode for a tax tool.
+
+**The problem:** `engine.compute()` drops the QBI (§199A) deduction to **$0** for filers above the simplified threshold ($197,300 single / $394,600 MFJ) because Form 8995-A is out of scope. This was done *silently* — a high-income business owner (esp. K-1 holders with reported §199A W-2 wages, or a Schedule C with employees) would see $0 QBI and overpay tax with no indication. A full 8995-A is intentionally NOT implemented: it needs SSTB classification, per-business W-2 wages, and UBIA that the models don't collect, and guessing "non-SSTB" could *understate* tax (worse). So the right fix given available data is to **warn loudly**, not compute.
+
+**What landed:**
+- New `ComputedTotals.warnings: list[str]` field (additive, default `[]`; schema regenerated). General-purpose channel for engine diagnostics.
+- `compute()` populates it for two cases: (1) QBI dropped above the §199A threshold with positive total QBI; (2) W-2 withholding supplied on **both** the per-W-2 boxes and the `payments` aggregate (the aggregate is silently dropped to avoid double-counting — resolves the long-standing `total_payments` TODO).
+- `run_pipeline` merges `computed.warnings` into `PipelineResult.warnings` → surfaces via CLI `run` (already prints `result.warnings`) and `result.json`.
+- `email_scanner.scan_gmail`: per-query Gmail search failures were swallowed by `except Exception: pass` — now recorded in `ScanResult.errors` (CLI `scan-email` already prints them). One error per failed query.
+
+**Tests:** +10 (new `test_engine_warnings.py` with 9; +1 in `test_email_scanner.py`). Suite **4155 → 4165 passed**, 3 skipped. Code-review subagent: LGTM, no real issues.
+
+**Files:** `models.py`, `calc/engine.py`, `calc/patches/qbi.py` (docstring), `pipeline.py`, `email_scanner.py`, `schemas/return.schema.json`.
+
 ### 2026-04-12 12:00 UTC — Wave 8C/8D/8E: nonresident apportionment, Form 4797, EITC, infrastructure
 
 **Wave 8C — Real nonresident apportionment (3 states):**
@@ -350,3 +366,9 @@ Once CP5 freezes the `StatePlugin` interface and the reciprocity table, the 43 s
 
 ### FFFF is the primary free federal e-file path for this profile
 But it has hard limits: ≤50 W-2s, ≤11 Schedule E properties, no document attachments, no state returns, some forms force paper. The skill must check these limits before recommending FFFF and fall back to paper or commercial if exceeded. Track at `skill/reference/ffff-limits.md`.
+
+### The engine warns rather than silently producing a wrong number
+`engine.compute()` surfaces human-readable diagnostics on `ComputedTotals.warnings` (merged into `PipelineResult.warnings`, printed by CLI `run`, persisted in `result.json`) whenever it makes a simplifying assumption that could change tax owed. The rule: a *silently* wrong/incomplete number is the worst failure mode for a tax tool — flag it so the human can verify. Add a warning here whenever you defer a computation that affects the tax line. Current cases: QBI above the §199A simplified threshold, and duplicated W-2 withholding inputs.
+
+### QBI above the §199A threshold (Form 8995-A) is intentionally NOT computed
+For TI before QBI above $197,300 S / $394,600 MFJ, the deduction is shown as **$0** and a warning fires. This is deliberate, not a bug to "fix" by computing a number: a correct 8995-A needs SSTB classification, per-business W-2 wages, and UBIA of qualified property. The models carry §199A W-2 wages + UBIA on K-1 only (`ScheduleK1.section_199a_w2_wages`/`_ubia`); Schedule C/E have neither, and **no SSTB flag exists anywhere**. Guessing "non-SSTB" would *understate* tax for a doctor/lawyer/consultant K-1 — worse than overstating. If you ever implement 8995-A: add SSTB + per-business W-2-wage/UBIA fields to ScheduleC and ScheduleEProperty first, and handle the phase-in range (threshold → +$50k S / +$100k MFJ) carefully — that partial-phaseout math is the hard part.

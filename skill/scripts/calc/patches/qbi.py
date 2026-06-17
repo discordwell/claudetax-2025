@@ -65,7 +65,10 @@ class QBIResult:
     simplified_eligible : bool
         True when TI before QBI is at or below the simplified threshold
         for the filing status. When False, Form 8995-A is required
-        (not implemented in v1 — deduction falls back to zero).
+        (not implemented in v1 — deduction falls back to zero). When this
+        is False but ``total_qbi`` is positive, ``engine.compute()`` emits a
+        ``ComputedTotals.warnings`` entry so the dropped deduction is visible
+        rather than silently overstating tax.
     schedule_c_qbi : Decimal
         QBI component from Schedule C net profits.
     schedule_e_qbi : Decimal

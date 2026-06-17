@@ -1167,6 +1167,16 @@ class ComputedTotals(_StrictModel):
     rules) will add new top-level keys additively. Downstream consumers
     should treat the dict as opaque. Set by the calc engine."""
 
+    warnings: list[str] = Field(default_factory=list)
+    """Human-readable diagnostics emitted by the calc engine when it makes a
+    simplifying assumption that could change the tax owed — e.g. a QBI
+    deduction dropped because Form 8995-A (above the §199A simplified
+    threshold) is out of scope, or W-2 withholding supplied on both the
+    per-W-2 boxes and the payments aggregate. These flag *silently wrong or
+    incomplete* numbers so the human can verify them; an empty list means the
+    engine computed everything it knows how to. The pipeline merges these into
+    ``PipelineResult.warnings`` so they surface to the CLI / result.json."""
+
 
 # ---------------------------------------------------------------------------
 # Root

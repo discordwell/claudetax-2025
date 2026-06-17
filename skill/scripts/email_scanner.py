@@ -314,6 +314,7 @@ def scan_gmail(
     seen_ids: set[str] = set()
     all_msg_ids: list[str] = []
     combined_query_parts: list[str] = []
+    query_errors: list[str] = []
 
     for name, query in queries.items():
         full_query = query + date_filter
@@ -325,12 +326,16 @@ def scan_gmail(
                     seen_ids.add(mid)
                     all_msg_ids.append(mid)
         except Exception as exc:
-            pass  # Individual query failures are non-fatal
+            # A single query failing is non-fatal — the other queries still
+            # run — but record it so the user learns the scan was partial
+            # rather than silently missing a whole form family.
+            query_errors.append(f"search query {name!r} failed: {exc}")
 
     result = ScanResult(
         query_used=" OR ".join(combined_query_parts) + date_filter,
         messages_found=len(all_msg_ids),
     )
+    result.errors.extend(query_errors)
 
     for msg_id in all_msg_ids:
         try:

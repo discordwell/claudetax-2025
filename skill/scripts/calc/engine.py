@@ -634,7 +634,7 @@ def total_payments(return_: CanonicalReturn) -> Decimal:
     - W-2 federal withholding is summed from w2s[].box2 (preferred source).
     - Payments.federal_income_tax_withheld_from_w2 is a fallback aggregate;
       use it only if w2s is empty. If both are populated, we use w2s and the
-      caller is expected to see a warning (TODO: emit via logging).
+      engine surfaces a double-entry warning on ComputedTotals.warnings.
     - 1099 federal withholding is summed from each 1099 form's box 4.
     - Estimated payments, prior-year overpayment applied, extension payment,
       excess SS, and refundable credits all add to the total.
@@ -1009,6 +1009,13 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
         compute_senior_deduction,
     )
 
+    # Diagnostics surfaced to the human when the engine makes a simplifying
+    # assumption that could change the tax owed (e.g. QBI above the §199A
+    # simplified threshold, or duplicated W-2 withholding inputs). Populated
+    # below and attached to ComputedTotals.warnings; the pipeline merges these
+    # into PipelineResult.warnings so they reach the CLI / result.json.
+    compute_warnings: list[str] = []
+
     # -------------------------------------------------------------------
     # Wave 6 — Form 8829 home-office dispatcher (pre-compute)
     # -------------------------------------------------------------------
@@ -1190,6 +1197,24 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     if _has_qbi_sources:
         ti_before_qbi = ti if ti is not None else Decimal("0")
         qbi_result = compute_qbi(return_=return_, taxable_income_before_qbi=ti_before_qbi)
+        if not qbi_result.simplified_eligible and qbi_result.total_qbi > Decimal("0"):
+            # Above the §199A simplified threshold, Form 8995-A governs the
+            # deduction. We deliberately do NOT compute it: a safe 8995-A needs
+            # per-business W-2 wages, UBIA of qualified property, and SSTB
+            # classification that this tool does not collect, and guessing
+            # "non-SSTB" could understate tax. So the deduction shows as $0 —
+            # but a silent $0 would overstate tax for filers who do qualify, so
+            # warn loudly instead of dropping it quietly.
+            compute_warnings.append(
+                "QBI deduction shown as $0: taxable income before QBI "
+                f"(${ti_before_qbi:,.0f}) exceeds the Section 199A simplified "
+                "threshold, so Form 8995-A applies. This tool does not compute "
+                "Form 8995-A (it needs SSTB classification, per-business W-2 "
+                "wages, and UBIA of qualified property). Total qualified "
+                f"business income of ${qbi_result.total_qbi:,.0f} was found; "
+                "your actual QBI deduction may be greater than $0. Compute "
+                "Form 8995-A manually to confirm."
+            )
         if qbi_result.qbi_deduction > Decimal("0"):
             qbi_deduction_val = qbi_result.qbi_deduction
             # Re-call tenforty with the QBI deduction added to the
@@ -1463,6 +1488,30 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
         else None
     )
 
+    # W-2 withholding double-entry guard. ``total_payments`` prefers the
+    # per-W-2 box-2 sum and ignores ``payments.federal_income_tax_withheld_
+    # from_w2`` whenever the W-2s carry withholding. If the caller populated
+    # both, the aggregate is silently dropped — which is correct when it
+    # duplicates the W-2s but wrong if it was meant to be additional. Warn so
+    # the human can confirm (resolves the long-standing TODO in
+    # ``total_payments``).
+    _w2_box2_sum = sum(
+        (w2.box2_federal_income_tax_withheld for w2 in return_.w2s),
+        start=Decimal("0"),
+    )
+    if (
+        _w2_box2_sum > Decimal("0")
+        and return_.payments.federal_income_tax_withheld_from_w2 > Decimal("0")
+    ):
+        compute_warnings.append(
+            "W-2 federal withholding was supplied twice: the per-W-2 boxes sum "
+            f"to ${_w2_box2_sum:,.0f} and payments.federal_income_tax_withheld_"
+            f"from_w2 is ${return_.payments.federal_income_tax_withheld_from_w2:,.0f}. "
+            "To avoid double-counting, only the per-W-2 sum is used and the "
+            "aggregate is ignored. Clear payments.federal_income_tax_withheld_"
+            "from_w2 if the W-2 boxes already cover all withholding."
+        )
+
     computed = ComputedTotals(
         total_income=ti_val,
         adjustments_total=adjustments_val,
@@ -1482,6 +1531,7 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
         marginal_rate=marginal_rate,
         computed_input_hash=_input_hash(return_),
         validation_report=validation_report,
+        warnings=compute_warnings,
     )
 
     return return_with_patches.model_copy(update={"computed": computed})

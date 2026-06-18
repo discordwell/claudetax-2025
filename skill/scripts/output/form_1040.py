@@ -34,9 +34,14 @@ Simplifications documented here (tracked for later waves):
 * Line 13 (QBI) — Section 199A QBI deduction from Form 8995 (simplified).
   Computed by ``skill.scripts.calc.patches.qbi`` and stored on
   ``ComputedTotals.qbi_deduction``.
-* Line 17 (Schedule 2 Part I) is 0 — AMT/excess APTC is not yet modeled.
-* Line 20 / line 31 (Schedule 3) are 0 — nonrefundable credits beyond CTC
-  and refundable credits beyond EITC/ACTC/AOTC are not yet modeled.
+* Line 17 (Schedule 2 Part I) is 0 — AMT and excess-APTC repayment are
+  folded into the engine's ``other_taxes_total`` (line 23) rather than
+  broken out on line 17, so line 24 (total tax) still reconciles.
+* Line 20 (Schedule 3 line 8) carries the nonrefundable credits the engine
+  computes/threads: education (Form 8863), dependent care (Form 2441),
+  foreign tax, retirement savings, residential energy, and other credits.
+* Line 31 (Schedule 3 line 15) carries the net premium tax credit (Form
+  8962) plus the extension payment and excess Social Security withholding.
 * TY2025 PDF renumbers line 12 → 12e and line 13 → 13a (with new 13b
   for Schedule 1-A additional deductions). The widget map records the
   renumbering so the Layer 1 ``line_12_*`` / ``line_13_*`` values land
@@ -228,7 +233,18 @@ def compute_form_1040_fields(return_: CanonicalReturn) -> Form1040Fields:
     line_17 = _ZERO  # Schedule 2 Part I not yet patched
     line_18 = line_16 + line_17
     line_19 = return_.credits.child_tax_credit + return_.credits.credit_for_other_dependents
-    line_20 = _ZERO  # Schedule 3 Part I (nonrefundable) not yet patched
+    # Line 20: Schedule 3 line 8 — nonrefundable credits beyond CTC/ODC. The
+    # engine populates these credit fields during compute() (Form 8863
+    # education, Form 2441 dependent care, plus caller-supplied foreign tax /
+    # saver / energy / other); they reduce regular tax on line 22.
+    line_20 = (
+        return_.credits.foreign_tax_credit
+        + return_.credits.dependent_care_credit
+        + return_.credits.education_credits_nonrefundable
+        + return_.credits.retirement_savings_credit
+        + return_.credits.residential_energy_credits
+        + _sum(return_.credits.other_credits.values())
+    )
     line_21 = line_19 + line_20
     line_22 = max(_ZERO, line_18 - line_21)
     line_23 = _dec(c.other_taxes_total)
@@ -277,7 +293,16 @@ def compute_form_1040_fields(return_: CanonicalReturn) -> Form1040Fields:
     line_27 = return_.credits.earned_income_tax_credit
     line_28 = return_.payments.additional_child_tax_credit_refundable
     line_29 = return_.payments.american_opportunity_credit_refundable
-    line_31 = _ZERO  # Schedule 3 Part II (refundable, beyond the above) not yet patched
+    # Line 31: Schedule 3 line 15 — other payments / refundable credits. Net
+    # premium tax credit (Form 8962, engine-populated) plus the extension
+    # payment and excess Social Security withholding, which the engine's
+    # total_payments() also counts but the 1040 had no line for. Including them
+    # here keeps line 33 reconciled with the engine refund/owed.
+    line_31 = (
+        return_.credits.premium_tax_credit_net
+        + return_.payments.amount_paid_with_4868_extension
+        + return_.payments.excess_social_security_tax_withheld
+    )
     line_32 = line_27 + line_28 + line_29 + line_31
 
     # -- Line 33: total payments --------------------------------------

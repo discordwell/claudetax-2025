@@ -6,6 +6,29 @@ Session memory for this project. Top section = most recent session summaries (ne
 
 ## Session Summaries
 
+### 2026-06-17 — Schedule 3 credits now reach Form 1040 total tax / refund (education, dependent care, PTC)
+
+Maintenance pass. One large "silently wrong number" wiring gap, same spirit as the wash-sale bug: a credit computed and printed on its own form that never reached the headline tax.
+
+**The bug (HIGH impact, very common profiles).** The engine's `compute()` ran ONCE in the pipeline, then Forms 8863 (education), 2441 (dependent care), and 8962 (PTC) computed their credits and wrote them into `canonical.credits` *afterward* — but the engine never read them and was never re-run. Form 1040 line 20 (Schedule 3 line 8, nonrefundable) and line 31 (Schedule 3 line 15, refundable) were hardcoded `_ZERO` with `# not yet patched`. Result: anyone with college tuition, daycare, or ACA marketplace coverage had **total_tax OVERSTATED / refund UNDERSTATED**, and the rendered 8863/2441/8962 disagreed with the Form 1040 in the same bundle. Confirmed empirically: a $4k AOTC and a $3k daycare each left `total_tax` and `refund` literally unchanged. The 8962 block didn't even set `credits.premium_tax_credit_net`, and refundable AOTC never reached `payments.american_opportunity_credit_refundable`.
+
+**The fix.** New engine helpers `_compute_schedule_3_credits()` / `_has_schedule_3_inputs()` / `_Schedule3Result`. After AGI is final (post-OBBBA/QBI), the engine recomputes education/dependent-care/PTC from the input blocks (feeding AGI via a throwaway `computed` block) and honors caller-supplied foreign-tax/saver/energy/other credits. Then:
+- **Nonrefundable** (Sch 3 Part I) → folded into `total_credits_nonref`; the CTC tax base is reduced by it FIRST (`tax_after_schedule_3`) so the Schedule 8812 Credit Limit Worksheet ordering is correct — Schedule 3 credits consume tax before CTC, pushing surplus CTC into refundable ACTC instead of losing it.
+- **Net PTC** (8962 line 24) → `credits.premium_tax_credit_net`, now summed by `total_payments()` (refundable).
+- **Refundable AOTC** (8863 40%) → `payments.american_opportunity_credit_refundable` (Form 1040 line 29).
+- **Excess advance PTC repayment** (8962 line 29) → `other_taxes_val` + stamped on `OtherTaxes.other` (an additional tax — wrong direction would understate tax).
+- Form 1040 line 20 = Sch 3 nonref sum; line 31 = net PTC + extension payment + excess SS (the latter two were a latent line-33 reconciliation gap, now closed).
+
+**Gating:** all folding is gated behind `_has_schedule_3_inputs`, so returns without these credits are **bit-for-bit unchanged** (no golden fixture uses them).
+
+**Adversarial code-review caught one more bug (fixed).** A caller-supplied `credits.education_credits_refundable` with NO `education` input block was silently dropped from the refund: the gate fired and the value was stored back on the model (so the Schedule 3 renderer showed it), but the AOTC-refundable→payments routing only copied it when `return_.education is not None`. Fix: route `sched3_education_ref` whenever it's present (`return_.education is not None or sched3_education_ref > 0`), falling back to a directly-set payments field only when there's no education-refundable value. Reviewer confirmed concerns 1–3 + 5 correct (no double-subtract in the CTC ordering, repayment direction correct, no double-count, reconciliation holds).
+
+**Tests:** +9 (`test_schedule_3_credits_flow.py`): AOTC nonref+refundable split, LLC nonref-only, dependent care, net PTC → refund, excess APTC → tax, caller foreign tax credit, caller refundable-education → refund (the review-found bug), CTC↔Sch3 ordering into ACTC, and a no-inputs invariance test. 8 of 9 confirmed to FAIL against pre-fix code (git-stash + targeted-revert verified). Each return checks Form 1040 reconciliation (line 24 == 22+23; line 33 == engine total_payments; refund == 33−24). Suite **4179 → 4188 passed**, 3 skipped. No schema change.
+
+**Known still-simplified (no headline-tax impact, pre-existing):** Form 8863/2441 nonrefundable amounts aren't capped to tax liability inside their form modules, so Form 1040 line 20 / Schedule 3 line 8 can over-display in the rare tax<credit case — but the engine's `max(0, …)` floor makes total_tax identical either way, so it's cosmetic. A real per-credit cap (8863/2441 Credit Limit Worksheets) is future display-fidelity work.
+
+**Files:** `calc/engine.py`, `output/form_1040.py`, `tests/test_schedule_3_credits_flow.py`.
+
 ### 2026-06-17 — Wash-sale disallowed loss + Form 1040 line-25 reconciliation + QSS senior deduction
 
 Maintenance pass. Three "silently wrong number" correctness bugs, all in the same spirit as the prior session's diagnostic-warnings work — except these produce a *wrong tax figure*, not just a missing warning. Found via two read-only audit sub-agents, fixed, locked with 14 new tests, and re-reviewed by a 3-agent code-review pass (all CONFIRMED correct).
@@ -395,3 +418,6 @@ The OBBBA $6,000 senior deduction is per *living* individual age 65+ on the retu
 
 ### QBI above the §199A threshold (Form 8995-A) is intentionally NOT computed
 For TI before QBI above $197,300 S / $394,600 MFJ, the deduction is shown as **$0** and a warning fires. This is deliberate, not a bug to "fix" by computing a number: a correct 8995-A needs SSTB classification, per-business W-2 wages, and UBIA of qualified property. The models carry §199A W-2 wages + UBIA on K-1 only (`ScheduleK1.section_199a_w2_wages`/`_ubia`); Schedule C/E have neither, and **no SSTB flag exists anywhere**. Guessing "non-SSTB" would *understate* tax for a doctor/lawyer/consultant K-1 — worse than overstating. If you ever implement 8995-A: add SSTB + per-business W-2-wage/UBIA fields to ScheduleC and ScheduleEProperty first, and handle the phase-in range (threshold → +$50k S / +$100k MFJ) carefully — that partial-phaseout math is the hard part.
+
+### Schedule 3 credits are owned by `engine.compute()`, NOT the pipeline
+Education (8863), dependent care (2441), and net PTC (8962) flow into `total_tax`/`refund` from inside `compute()` via `_compute_schedule_3_credits()` — the engine recomputes them (threading final AGI through a throwaway `computed` block) and folds them: nonrefundable → `total_credits_nonref` (Form 1040 line 20), net PTC → `credits.premium_tax_credit_net` (read by `total_payments()`), refundable AOTC → `payments.american_opportunity_credit_refundable` (line 29), excess advance PTC repayment → `other_taxes_val` (a tax, line 23). The pipeline still RENDERS these forms and its post-compute `canonical.credits.* = fields.*` assignments are now redundant-but-harmless (same values). **Ordering matters:** Schedule 3 Part I credits reduce the CTC tax base FIRST (`tax_after_schedule_3`) so surplus CTC spills into refundable ACTC (Schedule 8812 Credit Limit Worksheet), then the same nonref total is subtracted in the final `max(0, fed_tax − total_credits_nonref)` — that is NOT a double-subtract (worked example: fed_tax 3000, CTC 2000, edu 1500 → line 22 = 0, ACTC = 500). The whole fold is gated by `_has_schedule_3_inputs()` for bit-for-bit invariance. Any new nonrefundable credit (Form 8880 saver's, 5695 energy, 1116 foreign) goes in the Schedule 3 nonref sum in BOTH `engine._compute_schedule_3_credits`/`compute` AND `output/form_1040.py` line 20.

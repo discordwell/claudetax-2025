@@ -638,6 +638,9 @@ def total_payments(return_: CanonicalReturn) -> Decimal:
     - 1099 federal withholding is summed from each 1099 form's box 4.
     - Estimated payments, prior-year overpayment applied, extension payment,
       excess SS, and refundable credits all add to the total.
+    - Net premium tax credit (Form 8962, Schedule 3 line 9) is a refundable
+      credit and is read from ``credits.premium_tax_credit_net``. The engine
+      populates this field during compute(); it is $0 on a fresh return.
     """
     w2_withholding = sum(
         (w2.box2_federal_income_tax_withheld for w2 in return_.w2s), start=Decimal("0")
@@ -691,6 +694,7 @@ def total_payments(return_: CanonicalReturn) -> Decimal:
         + p.earned_income_credit_refundable
         + p.additional_child_tax_credit_refundable
         + p.american_opportunity_credit_refundable
+        + return_.credits.premium_tax_credit_net
     )
 
 
@@ -788,6 +792,148 @@ def magi(return_: CanonicalReturn, agi: Decimal) -> Decimal:
     exclusions to add back.
     """
     return agi
+
+
+# ---------------------------------------------------------------------------
+# Schedule 3 credits — education (8863), dependent care (2441), PTC (8962)
+# ---------------------------------------------------------------------------
+#
+# These credits are computed by their own form modules but, prior to this
+# wiring, never reached the engine's total_tax / refund: Form 1040 lines 20
+# (Schedule 3 line 8, nonrefundable) and 31 (Schedule 3 line 15, refundable)
+# were hardcoded to $0. The result was an OVERSTATED tax (and understated
+# refund) for any filer with college tuition, daycare, or ACA marketplace
+# coverage — the exact "silently wrong number" failure mode this engine
+# guards against, and an internal inconsistency where the rendered Form 8863/
+# 2441/8962 disagreed with the Form 1040 in the same bundle.
+
+
+@dataclass(frozen=True)
+class _Schedule3Result:
+    """The Schedule 3 credit amounts the engine folds into the top-line totals.
+
+    All amounts are unrounded Decimals; the caller quantizes at fold time.
+    """
+
+    nonrefundable_total: Decimal  # Schedule 3 line 8 -> Form 1040 line 20
+    education_nonrefundable: Decimal  # Form 8863 nonrefundable (in nonref total)
+    education_refundable: Decimal  # Form 8863 AOTC 40% -> Form 1040 line 29
+    dependent_care: Decimal  # Form 2441 (in nonref total)
+    net_premium_tax_credit: Decimal  # Form 8962 line 24 -> Schedule 3 line 9
+    excess_aptc_repayment: Decimal  # Form 8962 line 29 -> Schedule 2 line 2 (a tax)
+
+
+_ZERO_SCHEDULE_3 = _Schedule3Result(
+    nonrefundable_total=Decimal("0"),
+    education_nonrefundable=Decimal("0"),
+    education_refundable=Decimal("0"),
+    dependent_care=Decimal("0"),
+    net_premium_tax_credit=Decimal("0"),
+    excess_aptc_repayment=Decimal("0"),
+)
+
+
+def _has_schedule_3_inputs(return_: CanonicalReturn) -> bool:
+    """Cheap gate: does this return have any Schedule 3 credit input?
+
+    Returns False for the common case (no education, no dependent care, no
+    1095-A, no caller-supplied Schedule 3 credits) so the engine skips the
+    Schedule 3 fold entirely and stays bit-for-bit identical to the pre-wiring
+    behavior on the existing golden fixtures.
+    """
+    c = return_.credits
+    return bool(
+        return_.education is not None
+        or return_.dependent_care is not None
+        or return_.forms_1095_a
+        or c.foreign_tax_credit > 0
+        or c.retirement_savings_credit > 0
+        or c.residential_energy_credits > 0
+        or c.dependent_care_credit > 0
+        or c.education_credits_nonrefundable > 0
+        or c.education_credits_refundable > 0
+        or c.premium_tax_credit_net > 0
+        or any(v > 0 for v in c.other_credits.values())
+    )
+
+
+def _compute_schedule_3_credits(
+    return_: CanonicalReturn, agi: Decimal
+) -> _Schedule3Result:
+    """Compute the Schedule 3 credits that fold into the top-line totals.
+
+    Education (Form 8863) and dependent care (Form 2441) are recomputed from
+    the input blocks when present; otherwise the caller-supplied ``credits``
+    values pass through. The Premium Tax Credit (Form 8962) is recomputed from
+    1095-A data and yields BOTH a refundable net PTC and an excess-advance-PTC
+    repayment (an additional tax) — the engine folds both so a marketplace
+    filer is neither over- nor under-credited.
+
+    The form-compute helpers read ``computed.adjusted_gross_income``; we thread
+    the engine's final post-OBBBA/QBI AGI in through a throwaway ``computed``
+    block (QBI does not change AGI, so this is the AGI that lands on line 11).
+
+    Lazy-imports the output modules to avoid a circular import (they import
+    ``schedule_c_net_profit`` and friends from this engine).
+    """
+    if not _has_schedule_3_inputs(return_):
+        return _ZERO_SCHEDULE_3
+
+    zero = Decimal("0")
+    return_with_agi = return_.model_copy(
+        update={"computed": ComputedTotals(adjusted_gross_income=agi)}
+    )
+
+    # Education credits (Form 8863). Caller-supplied values are the default;
+    # the form compute overrides when an `education` block with students is
+    # present (it applies the MAGI phase-out the raw fields cannot).
+    education_nonref = return_.credits.education_credits_nonrefundable
+    education_ref = return_.credits.education_credits_refundable
+    if return_.education is not None and return_.education.students:
+        from skill.scripts.output.form_8863 import compute_form_8863_fields
+
+        f8863 = compute_form_8863_fields(return_with_agi)
+        education_nonref = f8863.total_nonrefundable
+        education_ref = f8863.total_refundable
+
+    # Dependent care credit (Form 2441). Same pattern.
+    dependent_care = return_.credits.dependent_care_credit
+    if return_.dependent_care is not None:
+        from skill.scripts.output.form_2441 import compute_form_2441_fields
+
+        f2441 = compute_form_2441_fields(return_with_agi)
+        dependent_care = f2441.line_10_credit
+
+    # Premium Tax Credit (Form 8962) — net PTC (refundable) and excess advance
+    # PTC repayment (an additional tax, capped by FPL for filers under 400%).
+    net_ptc = return_.credits.premium_tax_credit_net
+    excess_aptc = zero
+    if return_.forms_1095_a:
+        from skill.scripts.output.form_8962 import compute_form_8962_fields
+
+        f8962 = compute_form_8962_fields(return_with_agi)
+        net_ptc = f8962.line_24_net_ptc
+        excess_aptc = f8962.line_29_repayment
+
+    # Schedule 3 Part I nonrefundable total (line 8 -> Form 1040 line 20).
+    # Mirrors output.schedule_3.compute_schedule_3_fields line 7/8.
+    nonref_total = (
+        return_.credits.foreign_tax_credit
+        + dependent_care
+        + education_nonref
+        + return_.credits.retirement_savings_credit
+        + return_.credits.residential_energy_credits
+        + sum(return_.credits.other_credits.values(), start=zero)
+    )
+
+    return _Schedule3Result(
+        nonrefundable_total=nonref_total,
+        education_nonrefundable=education_nonref,
+        education_refundable=education_ref,
+        dependent_care=dependent_care,
+        net_premium_tax_credit=net_ptc,
+        excess_aptc_repayment=excess_aptc,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1284,12 +1430,26 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     tax_before_credits = fed_tax if fed_tax is not None else Decimal("0")
 
     # -------------------------------------------------------------------
+    # Patch: Schedule 3 credits (education 8863, dependent care 2441, PTC 8962)
+    # -------------------------------------------------------------------
+    # These are nonrefundable (line 8 -> Form 1040 line 20) plus the
+    # refundable net PTC / AOTC and the excess-advance-PTC repayment (a tax).
+    # Computed before CTC because the Schedule 8812 Credit Limit Worksheet
+    # subtracts Schedule 3 Part I credits from tax BEFORE the child tax credit
+    # fills the remaining liability — so the CTC nonrefundable/ACTC split must
+    # see the tax left after these credits. Returns with no Schedule 3 inputs
+    # get the all-zero result and behave exactly as before this wiring.
+    sched3 = _compute_schedule_3_credits(return_, agi_for_patches)
+    schedule_3_nonref = _cents(sched3.nonrefundable_total) or Decimal("0")
+    tax_after_schedule_3 = max(Decimal("0"), tax_before_credits - schedule_3_nonref)
+
+    # -------------------------------------------------------------------
     # Patch: CTC + ACTC + ODC
     # -------------------------------------------------------------------
     ctc_result = compute_ctc(
         return_=return_,
         magi=magi_val,
-        tax_before_credits=tax_before_credits,
+        tax_before_credits=tax_after_schedule_3,
         earned_income=earned_income_val,
     )
 
@@ -1346,37 +1506,79 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
         Decimal("0") if eitc_result.disqualified else (_cents(eitc_result.eitc) or Decimal("0"))
     )
 
+    # Schedule 3 credit components, quantized for storage on the model.
+    sched3_dependent_care = _cents(sched3.dependent_care) or Decimal("0")
+    sched3_education_nonref = _cents(sched3.education_nonrefundable) or Decimal("0")
+    sched3_education_ref = _cents(sched3.education_refundable) or Decimal("0")
+    sched3_net_ptc = _cents(sched3.net_premium_tax_credit) or Decimal("0")
+    sched3_excess_aptc = _cents(sched3.excess_aptc_repayment) or Decimal("0")
+    # Refundable AOTC lands on Form 1040 line 29 (payments). `sched3_education_
+    # ref` is the single source of truth: the Form 8863 computed value when an
+    # `education` block is present, otherwise the caller-supplied
+    # `credits.education_credits_refundable` (which the gate already triggers
+    # on). Route it to the payments field whenever it is present; fall back to
+    # a directly-set `payments.american_opportunity_credit_refundable` only
+    # when there is no education-refundable value at all (back-compat for
+    # callers who populate the payments field instead of the credits field).
+    aotc_refundable = (
+        sched3_education_ref
+        if (return_.education is not None or sched3_education_ref > Decimal("0"))
+        else return_.payments.american_opportunity_credit_refundable
+    )
+
     updated_credits = return_.credits.model_copy(
         update={
             "child_tax_credit": nonref_ctc,
             "credit_for_other_dependents": nonref_odc,
             "additional_child_tax_credit_refundable": refundable_actc,
             "earned_income_tax_credit": eitc_val,
+            "dependent_care_credit": sched3_dependent_care,
+            "education_credits_nonrefundable": sched3_education_nonref,
+            "education_credits_refundable": sched3_education_ref,
+            "premium_tax_credit_net": sched3_net_ptc,
         }
     )
     updated_other_taxes = return_.other_taxes.model_copy(
         update={"net_investment_income_tax": niit_val}
     )
+    # Excess advance premium tax credit repayment (Form 8962 line 29) is an
+    # additional tax (Schedule 2 line 2). Stamp it on OtherTaxes.other so
+    # downstream consumers can see it; it is added into other_taxes_val below.
+    if sched3_excess_aptc > Decimal("0"):
+        updated_other_taxes = updated_other_taxes.model_copy(
+            update={
+                "other": {
+                    **return_.other_taxes.other,
+                    "excess_advance_ptc_repayment": sched3_excess_aptc,
+                }
+            }
+        )
     # The wave-1 patch layer sets Payments refundable-credit fields directly
-    # so total_payments() reflects them.
+    # so total_payments() reflects them. Net PTC is read by total_payments()
+    # straight off credits.premium_tax_credit_net (set above).
     updated_payments = return_.payments.model_copy(
         update={
             "additional_child_tax_credit_refundable": refundable_actc,
             "earned_income_credit_refundable": eitc_val,
+            "american_opportunity_credit_refundable": aotc_refundable,
         }
     )
 
     # -------------------------------------------------------------------
     # Recompute top-line totals using the patch-augmented return.
     # -------------------------------------------------------------------
-    total_credits_nonref = nonref_ctc + nonref_odc
+    # Nonrefundable credits = CTC + ODC (Form 1040 line 19) + Schedule 3
+    # Part I (line 20). They jointly reduce regular tax, floored at $0.
+    total_credits_nonref = nonref_ctc + nonref_odc + schedule_3_nonref
 
     # Other taxes: SE + Add'l Medicare already in tenforty's federal_total_tax,
-    # plus NIIT that we computed ourselves.
+    # plus NIIT that we computed ourselves, plus any excess advance PTC
+    # repayment (not offset by nonrefundable credits, mirroring how AMT is
+    # treated below).
     tf_other_taxes = (
         (tf_total_tax - fed_tax) if (tf_total_tax is not None and fed_tax is not None) else Decimal("0")
     )
-    other_taxes_val = tf_other_taxes + niit_val
+    other_taxes_val = tf_other_taxes + niit_val + sched3_excess_aptc
 
     # Final total tax:
     #   max(0, federal income tax - nonrefundable credits)

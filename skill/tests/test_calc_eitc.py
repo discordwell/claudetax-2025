@@ -368,6 +368,106 @@ class TestPhaseOut:
 
 
 # ---------------------------------------------------------------------------
+# Phase-in ramp combined with a high AGI (IRS Pub. 596 Worksheet A)
+# ---------------------------------------------------------------------------
+
+
+class TestPhaseInRampWithHighAGI:
+    """The EITC is the SMALLER of the table amount keyed on EARNED INCOME and the
+    table amount keyed on AGI (Pub. 596 Worksheet A, lines 1-6). The phase-out
+    reduction applies to the *max (plateau) credit*, never to a still-phasing-in
+    amount.
+
+    The earlier code computed ``min(earned*rate, max) - agi_phase_out_reduction``
+    — subtracting the AGI-based phase-out from the earned-income phase-in figure.
+    That double-penalized any filer simultaneously on the phase-in ramp (low
+    earned income) and past the phase-out threshold on AGI, e.g. a filer with
+    modest wages plus a pension / IRA / unemployment distribution that lifts AGI
+    without being "earned" or EITC investment income. Every prior test used
+    ``earned == AGI`` (or earned already at the plateau), where the two formulas
+    coincide, so the bug went undetected. These cases all FAIL against the old
+    formula.
+    """
+
+    def test_one_kid_phase_in_earned_with_high_agi(self):
+        """1 kid: earned $5,000 (phase-in, 5,000 × 0.34 = $1,700 < $4,328 max),
+        AGI $30,000 (past the $23,350 phase-out begin).
+        table(earned) = $1,700 ; table(AGI) = 4,328 − (30,000 − 23,350) × 0.1598
+        = $3,265. Credit = min($1,700, $3,265) = $1,700.
+        The buggy formula gave $1,700 − $1,063 = $637."""
+        ret = _return(status=FilingStatus.SINGLE, num_children=1)
+        result = compute_eitc(
+            ret,
+            agi=Decimal("30000"),
+            earned_income=Decimal("5000"),
+            investment_income=Decimal("0"),
+        )
+        assert result.eitc == Decimal("1700")
+        # Guard against the specific regression: the old result was $637.
+        assert result.eitc != Decimal("637")
+
+    def test_zero_kids_phase_in_high_agi_not_driven_negative(self):
+        """0 kids: earned $3,000 (phase-in, 3,000 × 0.0765 = $229.5), AGI $14,000
+        (past $10,620 begin). table(earned) = $230 ; table(AGI) = 649 − (14,000 −
+        10,620) × 0.0765 = $390. Credit = min($230, $390) = $230.
+        The buggy formula gave 229.5 − 258.57 < 0 → clamped to $0 (the whole
+        refundable credit was wiped out)."""
+        ret = _return(status=FilingStatus.SINGLE, num_children=0)
+        result = compute_eitc(
+            ret,
+            agi=Decimal("14000"),
+            earned_income=Decimal("3000"),
+            investment_income=Decimal("0"),
+        )
+        assert result.eitc == Decimal("230")
+        assert result.eitc > Decimal("0")
+
+    def test_two_kids_phase_in_high_agi(self):
+        """2 kids: earned $8,000 (phase-in, 8,000 × 0.40 = $3,200 < $7,152 max),
+        AGI $30,000. table(earned) = $3,200 is the smaller of the two lookups, so
+        the credit is $3,200. The buggy formula gave $3,200 − $1,400 = $1,800."""
+        ret = _return(status=FilingStatus.SINGLE, num_children=2)
+        result = compute_eitc(
+            ret,
+            agi=Decimal("30000"),
+            earned_income=Decimal("8000"),
+            investment_income=Decimal("0"),
+        )
+        assert result.eitc == pytest.approx(Decimal("3200"), abs=Decimal("2"))
+
+    def test_agi_below_earned_uses_smaller_agi_lookup(self):
+        """The reverse case: large above-the-line adjustments push AGI ($5,000)
+        BELOW earned income ($30,000, at the plateau). Worksheet A still takes the
+        smaller lookup: table(earned) = $4,328 (plateau), table(AGI) = 5,000 ×
+        0.34 = $1,700. Credit = min($4,328, $1,700) = $1,700."""
+        ret = _return(status=FilingStatus.SINGLE, num_children=1)
+        result = compute_eitc(
+            ret,
+            agi=Decimal("5000"),
+            earned_income=Decimal("30000"),
+            investment_income=Decimal("0"),
+        )
+        assert result.eitc == Decimal("1700")
+
+    def test_both_earned_and_agi_on_phase_in_ramp(self):
+        """The subtlest divergence: BOTH earned income and AGI sit on the phase-in
+        ramp, with AGI below earned (adjustments-heavy filer). 1 kid: earned
+        $10,000 (10,000 × 0.34 = $3,400), AGI $6,000 (6,000 × 0.34 = $2,040, the
+        smaller). Credit = min($3,400, $2,040) = $2,040. The buggy formula keyed
+        the phase-out off max(earned, AGI) = $10,000 (still below the $23,350
+        phase-out begin → no reduction) and returned the earned-income figure
+        $3,400 — overstating the credit by $1,360."""
+        ret = _return(status=FilingStatus.SINGLE, num_children=1)
+        result = compute_eitc(
+            ret,
+            agi=Decimal("6000"),
+            earned_income=Decimal("10000"),
+            investment_income=Decimal("0"),
+        )
+        assert result.eitc == Decimal("2040")
+
+
+# ---------------------------------------------------------------------------
 # EITCResult shape
 # ---------------------------------------------------------------------------
 

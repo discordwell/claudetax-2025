@@ -31,6 +31,7 @@ from skill.scripts.models import (
     Address,
     CanonicalReturn,
     FilingStatus,
+    FormSSA1099,
     Payments,
     Person,
     ScheduleC,
@@ -96,6 +97,10 @@ def _has_qbi_warning(warnings: list[str]) -> bool:
 
 def _has_double_withholding_warning(warnings: list[str]) -> bool:
     return any("W-2 federal withholding was supplied twice" in w for w in warnings)
+
+
+def _has_ssa_warning(warnings: list[str]) -> bool:
+    return any("Social Security benefits" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -298,3 +303,44 @@ class TestPipelineSurfacesEngineWarnings:
         assert _has_qbi_warning(result.warnings)
         # And it round-trips into result.json via canonical_return.computed.
         assert _has_qbi_warning(result.canonical_return.computed.warnings)
+
+
+# ---------------------------------------------------------------------------
+# Social Security benefits warning (IRC §86 worksheet not yet implemented)
+# ---------------------------------------------------------------------------
+
+
+class TestSocialSecurityBenefitsWarning:
+    """SSA-1099 benefits appear in the displayed total income, but the taxable
+    portion (up to 85% under the IRC §86 worksheet) is not yet routed into AGI /
+    taxable income. Rather than silently omit it — which understates tax for any
+    retiree with other income — the engine warns so the human can compute and add
+    the taxable amount. Same spirit as the QBI-above-threshold warning.
+    """
+
+    def _ssa(self, benefits: str) -> FormSSA1099:
+        return FormSSA1099(box5_net_benefits=Decimal(benefits))
+
+    def test_ssa_benefits_emit_warning(self):
+        ret = _base_return(forms_ssa_1099=[self._ssa("24000")])
+        c = compute(ret).computed
+        assert _has_ssa_warning(c.warnings)
+        # The warning is actionable: it names the amount, Form 1040 line 6b, and
+        # the §86 worksheet, and flags the 85% ceiling.
+        msg = next(w for w in c.warnings if "Social Security benefits" in w)
+        assert "24,000" in msg
+        assert "85%" in msg
+        assert "line 6b" in msg
+
+    def test_no_ssa_no_warning(self):
+        ret = _base_return(
+            w2s=[W2(employer_name="Acme", box1_wages=Decimal("50000"))]
+        )
+        c = compute(ret).computed
+        assert not _has_ssa_warning(c.warnings)
+
+    def test_zero_benefit_ssa_no_warning(self):
+        """An SSA-1099 with $0 net benefits does not trigger the warning."""
+        ret = _base_return(forms_ssa_1099=[self._ssa("0")])
+        c = compute(ret).computed
+        assert not _has_ssa_warning(c.warnings)

@@ -527,6 +527,22 @@ def _to_tenforty_input(
 
     sched_1 = schedule_1_net(return_)
 
+    # 1099-R taxable pension / IRA distributions (Form 1040 line 4b / 5b).
+    # tenforty has no dedicated retirement field, so route the taxable amount
+    # through schedule_1_income — tenforty adds it to AGI as ordinary income,
+    # which is taxed at ordinary rates exactly as a pension/IRA distribution
+    # should be (verified: schedule_1_income produces the same AGI/tax as the
+    # equivalent w2_income). This is a tenforty-input-only addition: the
+    # canonical schedule_1_net() stays clean so the Schedule 1 renderer keeps
+    # showing only true Schedule 1 line items (1099-R reports on line 4b/5b,
+    # NOT on Schedule 1). Without this, retirement income appeared on the
+    # rendered Form 1040 line 4b and in total_income (line 9) but never reached
+    # AGI/taxable income/tax — a silent tax understatement for every retiree
+    # with a pension or IRA distribution.
+    retirement = sum(
+        (f.box2a_taxable_amount for f in return_.forms_1099_r), start=Decimal("0")
+    )
+
     # Form 4797 §1231 net gain flows as long-term capital gain
     form_4797_lt_gain = _form_4797_schedule_d_amount(return_)
 
@@ -541,7 +557,7 @@ def _to_tenforty_input(
         long_term_capital_gains=float(lt_1099b + cap_gain_distr_sum + form_4797_lt_gain),
         self_employment_income=float(se_net_profit),
         rental_income=float(rental_net),
-        schedule_1_income=float(sched_1),
+        schedule_1_income=float(sched_1 + retirement),
         standard_or_itemized=standard_or_itemized,
         itemized_deductions=float(itemized_total),
         num_dependents=len(return_.dependents),
@@ -1225,6 +1241,26 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     # below and attached to ComputedTotals.warnings; the pipeline merges these
     # into PipelineResult.warnings so they reach the CLI / result.json.
     compute_warnings: list[str] = []
+
+    # SSA-1099 Social Security benefits: the IRC §86 taxable-benefit worksheet
+    # is not yet implemented, so the taxable portion (up to 85% of benefits) is
+    # NOT routed into AGI/taxable income. Warn loudly rather than silently omit
+    # it — for most retirees with other income a substantial share of benefits
+    # is taxable, so a silent $0 understates tax. (Contrast 1099-R taxable
+    # distributions, which DO reach AGI via `_to_tenforty_input`.)
+    _ssa_benefits = sum(
+        (f.box5_net_benefits for f in return_.forms_ssa_1099), start=Decimal("0")
+    )
+    if _ssa_benefits > Decimal("0"):
+        compute_warnings.append(
+            f"Social Security benefits of ${_ssa_benefits:,.0f} (SSA-1099 box 5) "
+            "were found, but the taxable portion is NOT included in taxable "
+            "income: this tool does not yet compute the IRC §86 Social "
+            "Security Benefits Worksheet. Depending on your other income, up to "
+            "85% of these benefits may be taxable (Form 1040 line 6b). Compute "
+            "the taxable amount manually and add it; your tax may be higher than "
+            "shown."
+        )
 
     # -------------------------------------------------------------------
     # Wave 6 — Form 8829 home-office dispatcher (pre-compute)

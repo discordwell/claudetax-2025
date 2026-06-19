@@ -213,19 +213,36 @@ def compute_eitc(
             details=details,
         )
 
-    phase_in_credit = earned_income * phase_in_rate
-    credit = min(phase_in_credit, max_credit)
-
-    # -- Phase-out --------------------------------------------------------------
-    if phase_determinant > phase_out_begin:
-        reduction = (phase_determinant - phase_out_begin) * phase_out_rate
-        credit = credit - reduction
+    # -- Credit lookup (IRS Pub. 596 Worksheet A) -------------------------------
+    # The EITC is the SMALLER of the table amount keyed on EARNED INCOME and the
+    # table amount keyed on AGI (Worksheet A lines 1-6): the credit is looked up
+    # twice on the same tent-shaped function and the lesser is taken. Crucially,
+    # the phase-out reduction applies to the *max (plateau) credit*, never to a
+    # still-phasing-in amount.
+    #
+    # The earlier code computed `min(earned*rate, max) - phase_out_reduction`,
+    # subtracting an AGI-driven phase-out from the earned-income phase-in figure.
+    # That diverges from Worksheet A whenever earned income and AGI fall on
+    # DIFFERENT parts of the tent (so the lesser of the two lookups is not what
+    # the old expression produced) — e.g. modest wages on the phase-in ramp plus
+    # a pension/IRA/unemployment distribution that lifts AGI past the phase-out
+    # threshold (understated the credit), or above-the-line adjustments pushing
+    # AGI below earned income (overstated it). The two coincide only when
+    # earned == AGI; every prior test used earned == AGI, so the bug went
+    # undetected.
+    def _table_credit(amount: Decimal) -> Decimal:
+        if amount <= 0:
+            return Decimal("0")
+        if amount > phase_out_begin:
+            # Plateau max credit reduced along the phase-out ramp.
+            value = max_credit - (amount - phase_out_begin) * phase_out_rate
+        else:
+            # Phase-in ramp, capped at the plateau max credit.
+            value = min(amount * phase_in_rate, max_credit)
+        return value if value > Decimal("0") else Decimal("0")
 
     # -- Clamp and round --------------------------------------------------------
-    if credit < 0:
-        credit = Decimal("0")
-    if credit > max_credit:
-        credit = max_credit
+    credit = min(_table_credit(earned_income), _table_credit(agi))
 
     # EITC is reported in whole-dollar amounts on the 1040. The published IRS
     # EITC tables use a small-bracket lookup that effectively rounds to the

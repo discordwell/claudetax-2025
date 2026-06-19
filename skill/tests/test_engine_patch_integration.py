@@ -234,19 +234,20 @@ class TestNIITWiring:
         r = compute(self._ret())
         assert r.other_taxes.net_investment_income_tax == Decimal("1900.00")
 
-    def test_niit_added_to_other_taxes_total(self):
+    def test_niit_added_to_other_taxes_total_without_double_count(self):
         r = compute(self._ret())
-        # other_taxes_total = tenforty's (total_tax - fed_tax) + NIIT.
-        # tenforty already computes Add'l Medicare in its total_tax for high
-        # wages, so we only assert that NIIT is present as an additive.
-        assert r.computed.other_taxes_total is not None
-        assert r.computed.other_taxes_total >= Decimal("1900.00")
+        # other_taxes_total = Add'l Medicare Tax + NIIT, counted ONCE each.
+        # Add'l Medicare = 0.9% * (300,000 - 200,000 single threshold) = $900.
+        # NIIT = $1,900. Total = $2,800. tenforty bundles its OWN NIIT into
+        # federal_total_tax, so the engine strips it before adding the
+        # authoritative Form 8960 value — otherwise this would be $4,700.
+        assert r.computed.other_taxes_total == Decimal("2800.00")
 
     def test_niit_added_to_total_tax(self):
-        """Compare against the same filer WITHOUT investment income — the
-        delta in total_tax attributable to our patch layer is exactly the
-        NIIT (plus whatever tenforty already changes from the extra income;
-        we subtract that delta to isolate the NIIT)."""
+        """Compare against the same filer WITHOUT investment income to isolate
+        the NIIT slice. tenforty independently raises fed_tax/total_tax for the
+        extra $50k of income, so we isolate NIIT via other_taxes_total, which
+        carries only the post-bracket additions (Add'l Medicare + NIIT)."""
         with_invest = compute(self._ret())
         without_invest = compute(
             _base_single_return(
@@ -262,16 +263,14 @@ class TestNIITWiring:
         # NIIT patch contribution is exactly 1900
         assert with_invest.other_taxes.net_investment_income_tax == Decimal("1900.00")
         assert without_invest.other_taxes.net_investment_income_tax == Decimal("0")
-        # The patch's NIIT 1900 must be present in with_invest's total_tax.
-        # Note: tenforty independently raises fed_tax and total_tax for the
-        # extra $50k of income, so we can't assert an exact delta — but we
-        # can assert that other_taxes_total with invest minus other_taxes_total
-        # without invest contains at least the $1,900 NIIT slice.
+        # Both filers have the same $900 Add'l Medicare (same wages), so the
+        # other_taxes_total delta is EXACTLY the $1,900 NIIT — counted once,
+        # not the $3,800 a double-count would produce.
         delta_other_taxes = (
             with_invest.computed.other_taxes_total
             - without_invest.computed.other_taxes_total
         )
-        assert delta_other_taxes >= Decimal("1900.00")
+        assert delta_other_taxes == Decimal("1900.00")
 
     def test_niit_below_threshold_does_not_fire(self):
         """Same investment mix but wages drop to $100k → MAGI = $150k <

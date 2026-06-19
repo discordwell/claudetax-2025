@@ -141,8 +141,11 @@ class TestAGICascades:
         r = compute(ret)
         assert r.computed.adjusted_gross_income == Decimal("255000.00")
         # NIIT correctly applies on $5,000 of net investment income over the
-        # MFJ threshold (per-field value; the engine's authoritative Form 8960).
+        # MFJ threshold (3.8% * 5,000 = $190).
         assert r.other_taxes.net_investment_income_tax == Decimal("190.00")
+        # No SE / Add'l Medicare here, so other_taxes_total is exactly the
+        # $190 NIIT — counted once (not double-counted with tenforty's NIIT).
+        assert r.computed.other_taxes_total == Decimal("190.00")
 
     def test_medical_floor_uses_unreduced_agi(self):
         """Single age 70 itemizing: $100k wages, $20k medical, $5k SALT, $8k

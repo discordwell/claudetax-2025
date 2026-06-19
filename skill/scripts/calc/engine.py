@@ -1629,12 +1629,20 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     # Part I (line 20). They jointly reduce regular tax, floored at $0.
     total_credits_nonref = nonref_ctc + nonref_odc + schedule_3_nonref
 
-    # Other taxes: SE + Add'l Medicare already in tenforty's federal_total_tax,
-    # plus NIIT that we computed ourselves, plus any excess advance PTC
-    # repayment (not offset by nonrefundable credits, mirroring how AMT is
-    # treated below).
+    # Other taxes: SE + Add'l Medicare from tenforty's federal_total_tax, plus
+    # NIIT and any excess advance PTC repayment (not offset by nonrefundable
+    # credits, mirroring how AMT is treated below).
+    #
+    # tenforty ALSO computes NIIT and bundles it into federal_total_tax, so the
+    # raw (total_tax - fed_tax) gap already contains tenforty's NIIT. We strip
+    # it out and add our own authoritative Form 8960 value (`niit_val`) instead,
+    # otherwise NIIT would be DOUBLE-COUNTED and total_tax overstated by the
+    # NIIT amount for every filer subject to it.
+    tf_niit = _d(getattr(tf_result, "federal_niit", None))
     tf_other_taxes = (
-        (tf_total_tax - fed_tax) if (tf_total_tax is not None and fed_tax is not None) else Decimal("0")
+        ((tf_total_tax - fed_tax) - tf_niit)
+        if (tf_total_tax is not None and fed_tax is not None)
+        else Decimal("0")
     )
     other_taxes_val = tf_other_taxes + niit_val + sched3_excess_aptc
 

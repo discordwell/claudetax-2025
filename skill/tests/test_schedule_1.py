@@ -18,7 +18,8 @@ Scenarios covered:
 2. Rental income: Schedule E total -> line 5
 3. Unemployment: 1099-G box 1 -> line 7
 4. HSA + student loan interest adjustments
-5. OBBBA: tips/overtime -> line 9, senior deduction -> line 25
+5. OBBBA tips/overtime/senior are below the line (Form 1040 line 13b) and
+   must NOT appear on Schedule 1
 6. Full return with multiple Part I + Part II items -> verify totals
 7. Layer 2 scaffold renders
 """
@@ -316,13 +317,17 @@ class TestHSAStudentLoan:
 
 
 # ---------------------------------------------------------------------------
-# Test 5: OBBBA — tips/overtime on line 9, senior deduction on line 25
+# Test 5: OBBBA Schedule 1-A deductions must NOT appear on Schedule 1
 # ---------------------------------------------------------------------------
 
 
-class TestOBBBA:
-    def test_tips_and_overtime_flow_to_line_9(self) -> None:
-        """OBBBA qualified tips + overtime deductions appear on line 9."""
+class TestOBBBANotOnSchedule1:
+    """The OBBBA Schedule 1-A deductions (tips, overtime, senior) are
+    below-the-line deductions on Form 1040 line 13b — they reduce taxable
+    income but NOT AGI. They must never appear on Schedule 1 (Part I income
+    or Part II adjustments), or Schedule 1 would corrupt AGI."""
+
+    def test_tips_and_overtime_excluded_from_part_i(self) -> None:
         ret = _make_return(
             adjustments={
                 "qualified_tips_deduction_schedule_1a": "15000",
@@ -330,22 +335,22 @@ class TestOBBBA:
             }
         )
         fields = compute_schedule_1_fields(ret)
+        # Line 9 is "total other income" (lines 8a-8z); no OBBBA tips here.
+        assert fields.line_9_total_other_income == Decimal("0")
+        assert fields.line_10_total_additional_income == Decimal("0")
 
-        assert fields.line_9_obbba_schedule_1a == Decimal("23000")
-
-    def test_senior_deduction_flows_to_line_25(self) -> None:
-        """OBBBA senior deduction appears on line 25."""
+    def test_senior_deduction_excluded_from_part_ii(self) -> None:
         ret = _make_return(
             adjustments={
                 "senior_deduction_obbba": "6000",
             }
         )
         fields = compute_schedule_1_fields(ret)
+        # Line 25 is "total other adjustments" (lines 24a-24z); no senior here.
+        assert fields.line_25_total_other_adjustments == Decimal("0")
+        assert fields.line_26_total_adjustments == Decimal("0")
 
-        assert fields.line_25_obbba_adjustments == Decimal("6000")
-
-    def test_tips_overtime_senior_all_present(self) -> None:
-        """All OBBBA items appear on their respective lines."""
+    def test_all_obbba_items_excluded(self) -> None:
         ret = _make_return(
             adjustments={
                 "qualified_tips_deduction_schedule_1a": "10000",
@@ -354,14 +359,11 @@ class TestOBBBA:
             }
         )
         fields = compute_schedule_1_fields(ret)
-
-        # Line 9 = tips + overtime
-        assert fields.line_9_obbba_schedule_1a == Decimal("15000")
-        # Line 25 = senior deduction
-        assert fields.line_25_obbba_adjustments == Decimal("6000")
-        # Both contribute to totals
-        assert fields.line_10_total_additional_income >= Decimal("15000")
-        assert fields.line_26_total_adjustments >= Decimal("6000")
+        # None of the OBBBA amounts flow into Schedule 1 income/adjustments.
+        assert fields.line_9_total_other_income == Decimal("0")
+        assert fields.line_10_total_additional_income == Decimal("0")
+        assert fields.line_25_total_other_adjustments == Decimal("0")
+        assert fields.line_26_total_adjustments == Decimal("0")
 
 
 # ---------------------------------------------------------------------------

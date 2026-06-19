@@ -1162,8 +1162,18 @@ class ComputedTotals(_StrictModel):
     total_income: Money | None = None
     adjustments_total: Money | None = None
     adjusted_gross_income: Money | None = None
-    deduction_taken: Money | None = None  # max(standard, itemized) + senior + OBBBA extras
-    qbi_deduction: Money | None = None
+    deduction_taken: Money | None = None
+    """Form 1040 line 12 — the standard deduction (base + §63(f) age-65/blind
+    additional) OR total itemized deductions. Does NOT include the QBI
+    deduction (line 13a, stored in ``qbi_deduction``) or the OBBBA Schedule
+    1-A deductions (line 13b, stored in ``additional_deductions_schedule_1a``).
+    Each of those is a separate below-the-line deduction."""
+    qbi_deduction: Money | None = None  # Form 1040 line 13a
+    additional_deductions_schedule_1a: Money | None = None
+    """Form 1040 line 13b — total OBBBA Schedule 1-A additional deductions
+    (senior deduction + qualified tips + qualified overtime). These reduce
+    TAXABLE INCOME but NOT AGI/MAGI: they sit below the AGI line, exactly
+    like the QBI deduction. ``None`` when no Schedule 1-A deduction applies."""
     taxable_income: Money | None = None
     tentative_tax: Money | None = None
     total_credits_nonrefundable: Money | None = None

@@ -14,7 +14,8 @@ Blockers covered:
 Plus regression coverage for:
 - 1099 federal withholding from multiple sources
 - Schedule E royalties included in rental net
-- OBBBA adjustments (tips, overtime, senior, Trump Account) reduce AGI
+- OBBBA Schedule 1-A deductions (tips, overtime, senior) are below the line:
+  they reduce taxable income but NOT AGI
 - Input hash changes when inputs change
 """
 from __future__ import annotations
@@ -562,18 +563,28 @@ class TestAdjustmentsReduceAGI:
         # AGI should drop by 4300 + 7000 + 2500 = 13800
         assert b.computed.adjusted_gross_income - r.computed.adjusted_gross_income == Decimal("13800")
 
-    def test_obbba_senior_deduction_reduces_agi(self):
-        """OBBBA senior deduction +$6k is a Schedule 1-like adjustment that reduces AGI."""
-        ret = _base_return(
-            w2s=[W2(employer_name="A", box1_wages=Decimal("60000"))],
-            adjustments=AdjustmentsToIncome(senior_deduction_obbba=Decimal("6000")),
+    def test_obbba_senior_deduction_does_not_reduce_agi(self):
+        """OBBBA senior deduction is BELOW the line (Form 1040 line 13b): it
+        reduces taxable income but NOT AGI. Unlike the HSA/IRA adjustments
+        above, it must never touch AGI."""
+        senior = Person(
+            first_name="Pat", last_name="X", ssn="111-22-3333",
+            date_of_birth=dt.date(1958, 1, 1),
         )
-        baseline = _base_return(w2s=[W2(employer_name="A", box1_wages=Decimal("60000"))])
+        ret = _base_return(
+            taxpayer=senior,
+            w2s=[W2(employer_name="A", box1_wages=Decimal("60000"))],
+        )
         r = compute(ret)
-        b = compute(baseline)
-        assert b.computed.adjusted_gross_income - r.computed.adjusted_gross_income == Decimal("6000")
+        # AGI is the full $60,000 — the senior deduction did not reduce it.
+        assert r.computed.adjusted_gross_income == Decimal("60000.00")
+        # The senior deduction ($6,000; no phase-out at $60k) lands on line 13b.
+        assert r.computed.additional_deductions_schedule_1a == Decimal("6000.00")
+        assert r.computed.adjustments_total == Decimal("0.00")
 
-    def test_obbba_schedule_1a_tips_and_overtime(self):
+    def test_obbba_schedule_1a_tips_and_overtime_below_the_line(self):
+        """OBBBA tips/overtime deductions are below the line: they reduce
+        taxable income but never AGI."""
         ret = _base_return(
             w2s=[W2(employer_name="Restaurant", box1_wages=Decimal("45000"))],
             adjustments=AdjustmentsToIncome(
@@ -586,7 +597,13 @@ class TestAdjustmentsReduceAGI:
         )
         r = compute(ret)
         b = compute(baseline)
-        assert b.computed.adjusted_gross_income - r.computed.adjusted_gross_income == Decimal("4500")
+        # AGI is unchanged by the tips/overtime deductions.
+        assert r.computed.adjusted_gross_income == b.computed.adjusted_gross_income
+        # The $4,500 lands on line 13b and reduces taxable income only.
+        assert r.computed.additional_deductions_schedule_1a == Decimal("4500.00")
+        assert (
+            b.computed.taxable_income - r.computed.taxable_income == Decimal("4500.00")
+        )
 
 
 # ---------------------------------------------------------------------------

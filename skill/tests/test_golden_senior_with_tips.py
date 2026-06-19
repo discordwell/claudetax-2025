@@ -2,10 +2,12 @@
 
 Exercises the wave-3 cleanup series (S1/S2/S3) end-to-end:
 
-  1. Both OBBBA pre-tax-bracket patches fire in a single compute() call
-     (senior deduction + Schedule 1-A tips). The two-pass tenforty
-     strategy must recompute AGI on the reduced value and produce the
-     correct bracket-calculated tax.
+  1. Both OBBBA Schedule 1-A deductions fire in a single compute() call
+     (senior deduction + qualified tips) AS BELOW-THE-LINE deductions: they
+     land on Form 1040 line 13b and reduce taxable income only, leaving AGI
+     unchanged at $80,000. The §63(f) age-65 additional standard deduction
+     ($2,000 single) is also applied to line 12. tenforty is re-run with the
+     combined below-the-line deduction so the bracket calculation is correct.
   2. The Form 4547 AGI-leak fix (S1) is preserved — the returned
      trump_account_deduction_form_4547 is $0 even though the canonical
      model still carries the field.
@@ -85,10 +87,10 @@ class TestSeniorWithTipsGolden:
             == exp["expected_validation_report"]["ffff_blockers_count"]
         )
 
-    def test_both_obbba_patches_fire_in_single_pass(self, fixtures_dir: Path):
-        """Proves both pre-tax-bracket patches fire simultaneously. The
-        two-pass tenforty strategy must handle the combined deduction
-        correctly, not just one patch at a time."""
+    def test_both_obbba_patches_fire_below_the_line(self, fixtures_dir: Path):
+        """Proves both Schedule 1-A deductions fire simultaneously and land
+        BELOW the line (line 13b), not on Schedule 1. AGI stays at $80,000;
+        only taxable income drops."""
         ret, _ = _load_fixture(fixtures_dir)
         r = compute(ret)
         # Senior deduction fired (age 67, $80k MAGI with phase-out)
@@ -97,6 +99,29 @@ class TestSeniorWithTipsGolden:
         assert r.adjustments.qualified_tips_deduction_schedule_1a == Decimal(
             "5000.00"
         )
-        # Combined adjustments: $10,700 reduction off $80k → $69,300 AGI
-        assert r.computed.adjustments_total == Decimal("10700.00")
-        assert r.computed.adjusted_gross_income == Decimal("69300.00")
+        # The $10,700 of OBBBA deductions is on Form 1040 line 13b, NOT in
+        # Schedule 1 adjustments, so AGI is unchanged at $80,000.
+        assert r.computed.additional_deductions_schedule_1a == Decimal("10700.00")
+        assert r.computed.adjustments_total == Decimal("0.00")
+        assert r.computed.adjusted_gross_income == Decimal("80000.00")
+
+    def test_age_65_additional_standard_deduction_applied(self, fixtures_dir: Path):
+        """The §63(f) age-65 additional standard deduction ($2,000 single)
+        stacks on the base standard deduction at line 12 — tenforty omits it
+        because it has no age input, so the engine must add it."""
+        ret, _ = _load_fixture(fixtures_dir)
+        r = compute(ret)
+        # line 12 = $15,750 base + $2,000 age-65 additional = $17,750
+        assert r.computed.deduction_taken == Decimal("17750.00")
+
+    def test_form_1040_taxable_income_reconciles(self, fixtures_dir: Path):
+        """Form 1040 line 15 = line 11 (AGI) - line 14, where line 14 =
+        line 12 + line 13a (QBI) + line 13b (Schedule 1-A)."""
+        ret, _ = _load_fixture(fixtures_dir)
+        r = compute(ret)
+        c = r.computed
+        line_12 = c.deduction_taken or Decimal("0")
+        line_13a = c.qbi_deduction or Decimal("0")
+        line_13b = c.additional_deductions_schedule_1a or Decimal("0")
+        line_14 = line_12 + line_13a + line_13b
+        assert c.adjusted_gross_income - line_14 == c.taxable_income

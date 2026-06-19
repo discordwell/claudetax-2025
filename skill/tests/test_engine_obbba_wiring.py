@@ -125,23 +125,26 @@ class TestMFJTwoSeniors180kFullDeduction:
     test_calc_obbba_senior.py):
       - num_filers_age_65_plus = 2
       - base_deduction = 2 * $6,000 = $12,000
-      - MAGI = $180,000 (first-pass AGI with OBBBA fields zeroed out)
+      - MAGI = $180,000 (== AGI; the senior deduction never reduces its
+        own MAGI because it is below the AGI line)
       - phase-out threshold (MFJ) = $150,000
       - excess = $30,000
       - phase-out reduction = 0.06 * $30,000 = $1,800
       - final senior_deduction = $12,000 - $1,800 = $10,200
 
-    After folding into adjustments and re-running tenforty:
-      - AGI = $180,000 - $10,200 = $169,800
-      - standard deduction MFJ = $31,500
-      - taxable income = $138,300
-      - fed tax (MFJ TY2025 brackets, tenforty-computed) = $20,254
-      - total tax = $20,254 (no SE, no NIIT)
+    The senior deduction is a BELOW-THE-LINE deduction (Form 1040 line 13b),
+    so AGI is unchanged; only taxable income drops. Both filers are also 65+,
+    so the §63(f) age-65 additional standard deduction applies on line 12:
+      - AGI = $180,000 (unchanged — OBBBA deductions never touch AGI)
+      - line 12 = $31,500 base MFJ standard + 2 * $1,600 age-65 = $34,700
+      - line 13b = $10,200 (senior deduction)
+      - taxable income = $180,000 - $34,700 - $10,200 = $135,100
+      - fed tax (MFJ TY2025 brackets, tenforty-computed) = $19,550
+      - total tax = $19,550 (no SE, no NIIT)
 
-    Baseline without OBBBA (same $180k, no seniors): fed tax = $22,498.
-    Delta from OBBBA = $2,244 = 22% * $10,200 (the filer stays in the 22%
-    bracket after the deduction, so the marginal approximation happens to
-    match — we lock the exact number for regression).
+    Baseline without OBBBA/age (same $180k, no seniors): fed tax = $22,498.
+    Delta = $2,948 = the tax benefit of the $10,200 senior deduction plus the
+    $3,200 age-65 additional standard deduction (both at the 22% margin).
     """
 
     def _ret(self, tax_year: int = 2025) -> CanonicalReturn:
@@ -162,41 +165,44 @@ class TestMFJTwoSeniors180kFullDeduction:
             ],
         )
 
-    def test_senior_deduction_applied_to_adjustments(self):
+    def test_senior_deduction_applied(self):
         r = compute(self._ret())
         assert r.adjustments.senior_deduction_obbba == Decimal("10200")
 
-    def test_agi_reduced_by_senior_deduction(self):
+    def test_agi_not_reduced_by_senior_deduction(self):
         r = compute(self._ret())
-        # $180,000 - $10,200 = $169,800
-        assert r.computed.adjusted_gross_income == Decimal("169800.00")
+        # AGI stays at the full $180,000 — the senior deduction is below the
+        # line (Form 1040 line 13b) and never touches AGI/MAGI.
+        assert r.computed.adjusted_gross_income == Decimal("180000.00")
+        # The $10,200 senior deduction shows on line 13b instead.
+        assert r.computed.additional_deductions_schedule_1a == Decimal("10200.00")
 
-    def test_deduction_taken_is_mfj_standard(self):
+    def test_deduction_taken_includes_age_65_additional(self):
         r = compute(self._ret())
-        # Note: this is the Form 1040 line 12 standard deduction ($31,500),
-        # NOT the senior deduction (which is a Schedule 1 above-the-line
-        # adjustment, flowing through AGI).
-        assert r.computed.deduction_taken == Decimal("31500.00")
+        # Form 1040 line 12 = $31,500 base MFJ standard + 2 * $1,600 age-65
+        # additional standard deduction = $34,700.
+        assert r.computed.deduction_taken == Decimal("34700.00")
 
-    def test_taxable_income_reflects_senior_deduction(self):
+    def test_taxable_income_reflects_below_line_deductions(self):
         r = compute(self._ret())
-        # $169,800 AGI - $31,500 standard = $138,300
-        assert r.computed.taxable_income == Decimal("138300.00")
+        # $180,000 AGI - $34,700 (line 12) - $10,200 (line 13b) = $135,100
+        assert r.computed.taxable_income == Decimal("135100.00")
 
     def test_fed_tax_reflects_bracket_reapplication(self):
         r = compute(self._ret())
-        assert r.computed.tentative_tax == Decimal("20254.00")
-        assert r.computed.total_tax == Decimal("20254.00")
+        assert r.computed.tentative_tax == Decimal("19550.00")
+        assert r.computed.total_tax == Decimal("19550.00")
 
-    def test_senior_deduction_is_in_adjustments_total(self):
+    def test_senior_deduction_not_in_adjustments_total(self):
         r = compute(self._ret())
-        # adjustments_total = sum of Schedule 1 Part II items; here only
-        # the senior deduction is non-zero.
-        assert r.computed.adjustments_total == Decimal("10200.00")
+        # The senior deduction is NOT a Schedule 1 Part II adjustment, so
+        # adjustments_total is $0.
+        assert r.computed.adjustments_total == Decimal("0.00")
 
     def test_delta_vs_no_senior_return(self):
         """Same return without age 65+ filers should NOT apply the senior
-        deduction (cheap gate skips the second pass entirely)."""
+        deduction or the age-65 additional standard deduction (cheap gate
+        skips the extra passes entirely)."""
         younger_tp = _person("Alex", "Doe", "111-11-1111", dt.date(1985, 3, 3))
         younger_sp = _person("Sam", "Doe", "222-22-2222", dt.date(1985, 7, 7))
         ret = CanonicalReturn(
@@ -218,10 +224,11 @@ class TestMFJTwoSeniors180kFullDeduction:
         assert without.adjustments.senior_deduction_obbba == Decimal("0")
         # MFJ $180k baseline fed tax (verified via direct tenforty call)
         assert without.computed.tentative_tax == Decimal("22498.00")
-        # Senior patch reduces tax by exactly $2,244 (= 22% * $10,200)
+        # The senior + age-65 deductions reduce tax by $2,948 (the tax
+        # benefit of $10,200 senior + $3,200 age-65 additional at 22%).
         assert (
             without.computed.total_tax - with_.computed.total_tax
-            == Decimal("2244.00")
+            == Decimal("2948.00")
         )
 
 
@@ -275,13 +282,16 @@ class TestSingleWithTips65k:
         assert r.adjustments.qualified_tips_deduction_schedule_1a == Decimal("5000.00")
         assert r.adjustments.qualified_overtime_deduction_schedule_1a == Decimal("0")
 
-    def test_agi_reduced_by_tips(self):
+    def test_agi_not_reduced_by_tips(self):
+        # The tips deduction is below the line (Form 1040 line 13b), so AGI
+        # stays at the full $65,000 — it never touches AGI/MAGI.
         r = compute(self._ret())
-        assert r.computed.adjusted_gross_income == Decimal("60000.00")
+        assert r.computed.adjusted_gross_income == Decimal("65000.00")
+        assert r.computed.additional_deductions_schedule_1a == Decimal("5000.00")
 
-    def test_taxable_income_after_standard_deduction(self):
+    def test_taxable_income_after_deductions(self):
         r = compute(self._ret())
-        # $60,000 - $15,750 = $44,250
+        # line 15 = AGI $65,000 - line 12 $15,750 - line 13b $5,000 = $44,250
         assert r.computed.taxable_income == Decimal("44250.00")
 
     def test_fed_tax_uses_correct_bracket(self):
@@ -299,9 +309,10 @@ class TestSingleWithTips65k:
         # Sanity: a $1,100 savings would be 22% * $5,000. We are NOT that.
         assert delta < Decimal("1100.00")
 
-    def test_adjustments_total_includes_tips(self):
+    def test_adjustments_total_excludes_tips(self):
+        # Tips are NOT a Schedule 1 Part II adjustment — adjustments_total is 0.
         r = compute(self._ret())
-        assert r.computed.adjustments_total == Decimal("5000.00")
+        assert r.computed.adjustments_total == Decimal("0.00")
 
 
 # ---------------------------------------------------------------------------

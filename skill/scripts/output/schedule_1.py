@@ -31,8 +31,8 @@ Part I — Additional Income (lines 1-10)
   Line 6  : Farm income/loss (from Schedule F) — DEFERRED
   Line 7  : Unemployment compensation (1099-G box 1)
   Line 8z : Other income (catch-all from canonical other_income dict)
-  Line 9  : OBBBA Schedule 1-A total (tips + overtime)
-  Line 10 : Total additional income (sum of Part I lines)
+  Line 9  : Total other income (sum of lines 8a-8z)
+  Line 10 : Total additional income (lines 1-7 + line 9)
 
 Part II — Adjustments to Income (lines 11-26)
   Line 11 : Educator expenses
@@ -50,8 +50,14 @@ Part II — Adjustments to Income (lines 11-26)
   Line 22 : Reserved
   Line 23 : Archer MSA deduction
   Line 24z: Other adjustments (catch-all)
-  Line 25 : OBBBA adjustments (senior deduction)
-  Line 26 : Total adjustments (sum of Part II)
+  Line 25 : Total other adjustments (sum of lines 24a-24z)
+  Line 26 : Total adjustments (lines 11-23 + line 25)
+
+The OBBBA Schedule 1-A deductions (qualified tips, qualified overtime, senior
+deduction) are intentionally absent from this schedule: they are below-the-line
+deductions reported on Form 1040 line 13b (see ``form_1040.py`` line 13b and
+``ComputedTotals.additional_deductions_schedule_1a``), so they reduce taxable
+income but never AGI, and must not flow through Schedule 1.
 
 Net = line 10 - line 26 -> flows to Form 1040 line 8.
 
@@ -126,7 +132,7 @@ class Schedule1Fields:
     line_6_farm_income: Decimal = _ZERO
     line_7_unemployment: Decimal = _ZERO
     line_8z_other_income: Decimal = _ZERO
-    line_9_obbba_schedule_1a: Decimal = _ZERO
+    line_9_total_other_income: Decimal = _ZERO
     line_10_total_additional_income: Decimal = _ZERO
 
     # ------------------------------------------------------------------
@@ -146,7 +152,7 @@ class Schedule1Fields:
     line_22_reserved: Decimal = _ZERO
     line_23_archer_msa: Decimal = _ZERO
     line_24z_other_adjustments: Decimal = _ZERO
-    line_25_obbba_adjustments: Decimal = _ZERO
+    line_25_total_other_adjustments: Decimal = _ZERO
     line_26_total_adjustments: Decimal = _ZERO
 
     # ------------------------------------------------------------------
@@ -270,18 +276,16 @@ def compute_schedule_1_fields(canonical: CanonicalReturn) -> Schedule1Fields:
         except (TypeError, ValueError, ArithmeticError):
             pass
 
-    # Line 9: OBBBA Schedule 1-A (tips + overtime deductions)
-    # These are adjustments (reduce AGI) but appear on Schedule 1-A
-    # which feeds into Schedule 1 line 9.
-    line_9 = (
-        adj.qualified_tips_deduction_schedule_1a
-        + adj.qualified_overtime_deduction_schedule_1a
-    )
+    # Line 9: total other income (sum of lines 8a-8z; only 8z is modeled).
+    # NOTE: the OBBBA Schedule 1-A deductions (tips, overtime, senior) are
+    # NOT Schedule 1 items — they are below-the-line deductions on Form 1040
+    # line 13b and must never appear here, or Schedule 1 would corrupt AGI.
+    line_9 = line_8z
 
-    # Line 10: total additional income
+    # Line 10: total additional income (lines 1-7 + line 9)
     line_10 = (
         line_1 + line_2a + line_3 + line_4 + line_5
-        + line_6 + line_7 + line_8z + line_9
+        + line_6 + line_7 + line_9
     )
 
     # ------------------------------------------------------------------
@@ -305,15 +309,17 @@ def compute_schedule_1_fields(canonical: CanonicalReturn) -> Schedule1Fields:
     # Line 24z: other adjustments (catch-all dict)
     line_24z = sum(adj.other_adjustments.values(), start=_ZERO)
 
-    # Line 25: OBBBA adjustments (senior deduction + Form 4547)
-    # Form 4547 is excluded per engine policy (always $0).
-    line_25 = adj.senior_deduction_obbba
+    # Line 25: total other adjustments (sum of lines 24a-24z; only 24z is
+    # modeled). NOTE: the OBBBA senior deduction is NOT a Schedule 1
+    # adjustment — it is a below-the-line deduction on Form 1040 line 13b
+    # and must never appear here.
+    line_25 = line_24z
 
-    # Line 26: total adjustments
+    # Line 26: total adjustments (lines 11-23 + line 25)
     line_26 = (
         line_11 + line_12 + line_13 + line_14 + line_15
         + line_16 + line_17 + line_18 + line_19 + line_20
-        + line_21 + line_22 + line_23 + line_24z + line_25
+        + line_21 + line_22 + line_23 + line_25
     )
 
     # Net: line 10 - line 26
@@ -331,7 +337,7 @@ def compute_schedule_1_fields(canonical: CanonicalReturn) -> Schedule1Fields:
         line_6_farm_income=line_6,
         line_7_unemployment=line_7,
         line_8z_other_income=line_8z,
-        line_9_obbba_schedule_1a=line_9,
+        line_9_total_other_income=line_9,
         line_10_total_additional_income=line_10,
         # Part II
         line_11_educator_expenses=line_11,
@@ -348,7 +354,7 @@ def compute_schedule_1_fields(canonical: CanonicalReturn) -> Schedule1Fields:
         line_22_reserved=line_22,
         line_23_archer_msa=line_23,
         line_24z_other_adjustments=line_24z,
-        line_25_obbba_adjustments=line_25,
+        line_25_total_other_adjustments=line_25,
         line_26_total_adjustments=line_26,
         schedule_1_net=net,
     )
@@ -449,7 +455,7 @@ def render_schedule_1_pdf(fields: Schedule1Fields, out_path: Path) -> Path:
     _line("6   Farm income or (loss) (Schedule F)", _format_decimal(fields.line_6_farm_income))
     _line("7   Unemployment compensation", _format_decimal(fields.line_7_unemployment))
     _line("8z  Other income", _format_decimal(fields.line_8z_other_income))
-    _line("9   OBBBA Schedule 1-A total", _format_decimal(fields.line_9_obbba_schedule_1a))
+    _line("9   Total other income", _format_decimal(fields.line_9_total_other_income))
     _line("10  Total additional income (sum of Part I)", _format_decimal(fields.line_10_total_additional_income))
 
     y -= 10
@@ -471,7 +477,7 @@ def render_schedule_1_pdf(fields: Schedule1Fields, out_path: Path) -> Path:
     _line("22  Reserved", _format_decimal(fields.line_22_reserved))
     _line("23  Archer MSA deduction", _format_decimal(fields.line_23_archer_msa))
     _line("24z Other adjustments", _format_decimal(fields.line_24z_other_adjustments))
-    _line("25  OBBBA adjustments (senior deduction)", _format_decimal(fields.line_25_obbba_adjustments))
+    _line("25  Total other adjustments", _format_decimal(fields.line_25_total_other_adjustments))
     _line("26  Total adjustments (sum of Part II)", _format_decimal(fields.line_26_total_adjustments))
 
     y -= 10

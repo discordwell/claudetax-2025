@@ -449,11 +449,14 @@ def _form_1040_entries(
          None if return_.itemize_deductions
          else "This figure is the standard deduction; toggle in interview if "
               "itemizing"),
-        ("13", fields.line_13_qbi_deduction,
+        ("13a", fields.line_13a_qbi_deduction,
          "QBI deduction from Form 8995 or 8995-A",
          None),
+        ("13b", fields.line_13b_additional_deductions_sch_1a,
+         "Additional deductions from Schedule 1-A (tips, overtime, senior)",
+         None),
         ("14", fields.line_14_sum_12_13,
-         "Add lines 12 and 13", None),
+         "Add lines 12, 13a, and 13b", None),
         ("15", fields.line_15_taxable_income,
          "Taxable income", None),
     ]
@@ -973,8 +976,8 @@ def _schedule_1_entries(fields: Schedule1Fields) -> list[FFFFEntry]:
          "Total additional income", None),
         ("15", fields.line_15_deductible_se_tax,
          "Deductible part of self-employment tax", None),
-        ("25", fields.line_25_obbba_adjustments,
-         "OBBBA adjustments (senior deduction)", None),
+        ("25", fields.line_25_total_other_adjustments,
+         "Total other adjustments (lines 24a-24z)", None),
         ("26", fields.line_26_total_adjustments,
          "Total adjustments to income", None),
         ("net", fields.schedule_1_net,

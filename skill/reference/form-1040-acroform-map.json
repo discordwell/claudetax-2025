@@ -7,8 +7,8 @@
   "pypdf_version": "5.9.0",
   "form_year": 2025,
   "total_widgets": 199,
-  "mapped_count": 52,
-  "unmapped_count": 147,
+  "mapped_count": 53,
+  "unmapped_count": 146,
   "notes": [
     "Widget enumeration uses page-level /Annots traversal (not reader.get_fields()) so that names include the full parent path (topmostSubform[0].PageN[0]...). reader.get_fields() also returns non-terminal group containers that do NOT have a widget annotation; we skip those and count only terminal widgets.",
     "The IRS-hosted 2025 Form 1040 PDF (title \"2025 Form 1040\") was downloaded on 2026-04-11. Although this research wave was scoped to TY2024, the IRS has already published the TY2025 PDF at the canonical url and we mapped that instead \u2014 Layer 1 Form1040Fields was already written against the TY2024 layout and is mostly identical, but TY2025 renumbers line 12 into 12a..12e and splits line 13 into 13a/13b and line 27 into 27a/b/c. See the methodology doc and per-field `note` entries for the renumbering.",
@@ -269,7 +269,7 @@
       ],
       "note": "TY2025 Form 1040 renumbered this to line 12e. Layer 1 uses the historical `line_12_` name; the widget is line 12e."
     },
-    "line_13_qbi_deduction": {
+    "line_13a_qbi_deduction": {
       "widget_name": "topmostSubform[0].Page2[0].f2_03[0]",
       "terminal_name": "f2_03[0]",
       "type": "text",
@@ -280,7 +280,20 @@
         576.0,
         684.0
       ],
-      "note": "TY2025 line 13a (QBI). Companion line 13b (additional deductions from Schedule 1-A, new OBBBA) is widget f2_04, tracked in unmapped_widgets until Layer 1 is extended."
+      "note": "TY2025 line 13a (QBI deduction, Form 8995/8995-A). Companion line 13b (Schedule 1-A additional deductions) is widget f2_04, mapped below."
+    },
+    "line_13b_additional_deductions_sch_1a": {
+      "widget_name": "topmostSubform[0].Page2[0].f2_04[0]",
+      "terminal_name": "f2_04[0]",
+      "type": "text",
+      "page": 2,
+      "rect": [
+        504.0,
+        660.002,
+        576.0,
+        672.001
+      ],
+      "note": "TY2025 line 13b (additional deductions from Schedule 1-A, line 38: qualified tips + overtime + senior deduction; OBBBA). Below the AGI line \u2014 reduces taxable income only. Sits between line 13a (f2_03) and line 14 (f2_05) in the deduction column."
     },
     "line_14_sum_12_13": {
       "widget_name": "topmostSubform[0].Page2[0].f2_05[0]",
@@ -293,7 +306,7 @@
         576.0,
         659.999
       ],
-      "note": "TY2025 line 14 = 12e + 13a + 13b. Layer 1 computes 12+13 only \u2014 caller must ensure 13b is accounted for before overlaying."
+      "note": "TY2025 line 14 = 12e + 13a + 13b. Layer 1 now computes all three (line_14_sum_12_13 = deduction_taken + qbi + Schedule 1-A)."
     },
     "line_15_taxable_income": {
       "widget_name": "topmostSubform[0].Page2[0].f2_06[0]",
@@ -2120,19 +2133,6 @@
         706.002
       ],
       "reason": "header_page2_name_ssn_or_standard_deduction_checkboxes: widget c2_8[0] \u2014 SSN repeat or the 12a/12b/12c dependent/dual-status checkboxes or 12d age/blindness checkboxes."
-    },
-    {
-      "widget_name": "topmostSubform[0].Page2[0].f2_04[0]",
-      "terminal_name": "f2_04[0]",
-      "type": "text",
-      "page": 2,
-      "rect": [
-        504.0,
-        660.002,
-        576.0,
-        672.001
-      ],
-      "reason": "page2_checkboxes_12d_13a_block_or_standard_deduction: widget f2_04[0] \u2014 12d age/blind checkboxes or Form 8814/4972 checkbox on line 16."
     },
     {
       "widget_name": "topmostSubform[0].Page2[0].f2_07[0]",

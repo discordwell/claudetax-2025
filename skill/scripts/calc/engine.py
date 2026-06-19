@@ -52,6 +52,7 @@ from typing import Any
 
 import tenforty
 
+from skill.scripts.calc import constants as C
 from skill.scripts.models import (
     AdjustmentsToIncome,
     CanonicalReturn,
@@ -340,8 +341,16 @@ def _sum_adjustments(adj: AdjustmentsToIncome) -> Decimal:
     automatically from self_employment_income, so passing it again would double
     count.
 
-    OBBBA additions (Schedule 1-A tips/overtime, senior deduction) are included —
-    they reduce AGI just like traditional Part II items.
+    OBBBA Schedule 1-A deductions (qualified tips, qualified overtime, senior
+    deduction) are EXCLUDED: despite being stored on ``AdjustmentsToIncome``
+    for input convenience, they are NOT Schedule 1 Part II adjustments. The
+    IRS placed all four Schedule 1-A deductions (tips, overtime, car-loan
+    interest, senior) on Form 1040 line 13b — BELOW the AGI line — so they
+    reduce taxable income but never AGI/MAGI (see the Schedule 1-A handling in
+    ``compute()`` and ``ComputedTotals.additional_deductions_schedule_1a``).
+    Summing them here would understate AGI and corrupt every MAGI-driven
+    phase-out (NIIT, the 7.5% medical floor, education/IRA/savers credits) and
+    every state return that conforms to federal AGI.
 
     Form 4547 (Trump Account) is EXCLUDED: IRC §219 disallows any individual
     deduction for Trump Account contributions per the 12/2025 Form 4547
@@ -362,9 +371,6 @@ def _sum_adjustments(adj: AdjustmentsToIncome) -> Decimal:
         + adj.archer_msa_deduction
         + adj.penalty_on_early_withdrawal_of_savings
         + adj.moving_expenses_military
-        + adj.qualified_tips_deduction_schedule_1a
-        + adj.qualified_overtime_deduction_schedule_1a
-        + adj.senior_deduction_obbba
         + sum(adj.other_adjustments.values(), start=Decimal("0"))
     )
 
@@ -954,14 +960,17 @@ def _input_hash(return_: CanonicalReturn) -> str:
 
 
 # ---------------------------------------------------------------------------
-# OBBBA pre-tax-bracket patch gating
+# Below-the-line deduction gating (OBBBA Schedule 1-A + age-65/blind additional)
 # ---------------------------------------------------------------------------
 #
-# The OBBBA senior deduction and Schedule 1-A tips/overtime deductions both
-# reduce AGI (they are Schedule 1 Part II adjustments). Folding them in
-# requires a SECOND tenforty call so the bracket calculation sees the
-# reduced AGI. These helpers let us skip the second call when no trigger
-# is present — which is the majority of returns.
+# The OBBBA senior deduction and Schedule 1-A tips/overtime deductions reduce
+# TAXABLE INCOME but NOT AGI — they sit on Form 1040 line 13b, below the AGI
+# line (IRS 2025 Schedule 1-A; total flows to line 13b). The §63(f) age-65/
+# blind additional standard deduction is likewise applied below AGI, on line
+# 12, and tenforty has no age input so the engine must add it itself. Folding
+# any of these in requires a SECOND tenforty call so the bracket calculation
+# sees the lower taxable income. These helpers let us skip the second call
+# when no trigger is present — which is the majority of returns.
 
 
 def _person_age_at_end_of_year(person: Person, tax_year: int) -> int:
@@ -972,6 +981,61 @@ def _person_age_at_end_of_year(person: Person, tax_year: int) -> int:
     if (end_of_year.month, end_of_year.day) < (dob.month, dob.day):
         years -= 1
     return years
+
+
+def _is_age_65_or_older(person: Person, tax_year: int) -> bool:
+    """Whether `person` is 65+ at end of the tax year.
+
+    Honors an explicit ``Person.is_age_65_or_older`` override when the caller
+    set it; otherwise derives age from ``date_of_birth`` (a person born
+    1960-12-31 is exactly 65 on 2025-12-31 and qualifies).
+    """
+    if person.is_age_65_or_older is not None:
+        return person.is_age_65_or_older
+    return _person_age_at_end_of_year(person, tax_year) >= 65
+
+
+def _additional_standard_deduction_boxes(return_: CanonicalReturn) -> int:
+    """Count §63(f) age-65/blind "boxes" checked on Form 1040.
+
+    Each filer checks one box for being 65+ and one for being blind, so a
+    single filer who is both contributes 2. The spouse's boxes count only on
+    MFJ (a true joint return); on single/HoH/QSS there is no second living
+    filer to add here, and on MFS the spouse claims their own additional
+    amount on their own return (the rare no-income-spouse exception on MFS is
+    not modeled). Mirrors ``obbba_senior_deduction._count_qualifying_filers``
+    for the spouse rule.
+    """
+    tax_year = return_.tax_year
+    boxes = 0
+    tp = return_.taxpayer
+    boxes += 1 if _is_age_65_or_older(tp, tax_year) else 0
+    boxes += 1 if tp.is_blind else 0
+    if return_.filing_status == FilingStatus.MFJ and return_.spouse is not None:
+        sp = return_.spouse
+        boxes += 1 if _is_age_65_or_older(sp, tax_year) else 0
+        boxes += 1 if sp.is_blind else 0
+    return boxes
+
+
+def _additional_standard_deduction(return_: CanonicalReturn) -> Decimal:
+    """§63(f) additional standard deduction for age 65+/blind filers.
+
+    This is the long-standing add-on to the *base* standard deduction (it is
+    NOT the OBBBA senior deduction, which is the separate $6,000 line-13b
+    item). It applies ONLY to filers taking the standard deduction; itemizers
+    get $0 here. TY2025 amounts: $2,000 per box (single/HoH), $1,600 per box
+    (MFJ/MFS/QSS). tenforty has no age input, so the engine must add this.
+    """
+    if return_.itemize_deductions and return_.itemized is not None:
+        return Decimal("0")
+    boxes = _additional_standard_deduction_boxes(return_)
+    if boxes == 0:
+        return Decimal("0")
+    per_box = Decimal(
+        str(C.additional_standard_deduction_65_or_blind(return_.filing_status))
+    )
+    return per_box * Decimal(boxes)
 
 
 def _any_filer_age_65_plus(return_: CanonicalReturn) -> bool:
@@ -1183,46 +1247,76 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
     apply_home_office_deductions(return_)
 
     # -------------------------------------------------------------------
-    # OBBBA pre-tax-bracket patches (senior deduction + Schedule 1-A)
+    # Below-the-line deductions: standard/itemized (line 12), QBI (line
+    # 13a), and OBBBA Schedule 1-A (line 13b)
     # -------------------------------------------------------------------
-    # These are gated behind cheap detection so returns with no senior
-    # filers AND no caller-declared tips/overtime do NOT pay the second
-    # tenforty call. This preserves the bit-for-bit "no-op" invariant on
-    # the existing golden fixtures (simple_w2_standard, w2_investments_
-    # itemized, se_home_office — none have age 65+ filers or tips/overtime).
+    # CRITICAL: none of these reduce AGI. The 2025 Form 1040 subtracts all
+    # three from AGI to reach taxable income:
+    #     line 14 = line 12 (standard/itemized) + line 13a (QBI)
+    #               + line 13b (Schedule 1-A: senior + tips + overtime)
+    #     line 15 (taxable income) = line 11 (AGI) - line 14
+    # The OBBBA Schedule 1-A deductions are BELOW the AGI line (their total
+    # flows to Form 1040 line 13b per the IRS 2025 Schedule 1-A), so they
+    # reduce taxable income but never AGI/MAGI — exactly like QBI. tenforty
+    # has no concept of line 13a/13b, nor of the §63(f) age-65/blind
+    # additional standard deduction, so the engine computes each piece itself
+    # and folds the TOTAL below-the-line deduction into a single "Itemized"
+    # amount on a final tenforty pass, leaving AGI untouched.
     #
-    # MAGI-for-phase-out semantics: The OBBBA senior-deduction and
-    # Schedule 1-A phase-outs compare MAGI to a threshold. That MAGI is
-    # explicitly the AGI WITHOUT the OBBBA deduction in question (you
-    # cannot let a deduction reduce its own phase-out MAGI — that would
-    # be circular). So our first tenforty pass strips the OBBBA
-    # adjustment fields to zero before computing AGI, uses that AGI as
-    # MAGI for the phase-out math, then folds the patch outputs into a
-    # fresh AdjustmentsToIncome and calls tenforty a second time for the
-    # final bracket computation.
+    # These passes are gated behind cheap detection so a plain
+    # standard/itemized return with no senior, tips/overtime, QBI, medical
+    # floor, or age-65/blind add-on takes a single tenforty call — preserving
+    # bit-for-bit invariance on the baseline golden fixtures.
+    #
+    # MAGI-for-phase-out semantics: the OBBBA senior-deduction and Schedule
+    # 1-A phase-outs compare MAGI to a threshold. That MAGI is the AGI itself
+    # (these deductions never reduce it), discovered by a clean first tenforty
+    # pass with the OBBBA input fields stripped to zero.
     run_senior_patch = _any_filer_age_65_plus(return_)
     run_schedule_1a_patch = _any_tips_or_overtime_declared(return_)
 
-    # CP8-A: medical-floor trigger. Whenever itemizing with nonzero
-    # medical, the SECOND pass must use a post-floor itemized total
-    # (tenforty does not apply the 7.5% floor itself).
+    itemizing = return_.itemize_deductions and return_.itemized is not None
+
+    # CP8-A: medical-floor trigger. When itemizing with nonzero medical, the
+    # line-12 itemized total needs the 7.5%-of-AGI floor applied against the
+    # TRUE AGI (tenforty does not apply the floor itself).
     need_medical_floor = (
-        return_.itemize_deductions
-        and return_.itemized is not None
-        and return_.itemized.medical_and_dental_total > Decimal("0")
+        itemizing and return_.itemized.medical_and_dental_total > Decimal("0")
+    )
+
+    # §63(f) age-65/blind additional standard deduction (standard filers only;
+    # $0 for itemizers). tenforty omits it because it has no age input.
+    age_blind_additional = _additional_standard_deduction(return_)
+
+    # QBI sources present? (Schedule C / qualified Sch E / qualified K-1.)
+    has_qbi_sources = (
+        bool(return_.schedules_c)
+        or any(
+            p.qbi_qualified
+            for se in return_.schedules_e
+            for p in se.properties
+        )
+        or any(k1.qbi_qualified for k1 in return_.schedules_k1)
     )
 
     senior_deduction_amount = Decimal("0")
     sched_1a_tips_amount = Decimal("0")
     sched_1a_overtime_amount = Decimal("0")
-
+    qbi_deduction_val = Decimal("0")
     updated_adjustments = return_.adjustments
 
-    if run_senior_patch or run_schedule_1a_patch or need_medical_floor:
-        # First pass MUST exclude the OBBBA adjustments so MAGI is clean.
-        # First pass uses agi_for_medical_floor=0 because AGI isn't known
-        # yet — we're running this pass precisely to discover AGI. The
-        # first-pass TI/tax values are thrown away; only AGI matters.
+    needs_below_line_pass = (
+        run_senior_patch
+        or run_schedule_1a_patch
+        or need_medical_floor
+        or age_blind_additional > Decimal("0")
+        or has_qbi_sources
+    )
+
+    if needs_below_line_pass:
+        # First pass discovers AGI on a return with the OBBBA input fields
+        # zeroed (so MAGI is clean) and the medical floor deferred. Its TI
+        # and tax are thrown away; only AGI is kept.
         adjustments_without_obbba = return_.adjustments.model_copy(
             update={
                 "senior_deduction_obbba": Decimal("0"),
@@ -1230,46 +1324,93 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
                 "qualified_overtime_deduction_schedule_1a": Decimal("0"),
             }
         )
-        return_for_first_pass = return_.model_copy(
+        return_for_clean_pass = return_.model_copy(
             update={"adjustments": adjustments_without_obbba}
         )
-        tf_input = _to_tenforty_input(
-            return_for_first_pass, agi_for_medical_floor=Decimal("0")
+        tf_first = _call_tenforty(
+            _to_tenforty_input(
+                return_for_clean_pass, agi_for_medical_floor=Decimal("0")
+            )
         )
-        tf_result = _call_tenforty(tf_input)
 
-        # First-pass AGI is MAGI (== AGI before any OBBBA deduction).
-        prelim_agi = _d(tf_result.federal_adjusted_gross_income)
+        # AGI is FINAL here — nothing below this line changes it.
+        prelim_agi = _d(tf_first.federal_adjusted_gross_income)
         prelim_magi = magi(return_, prelim_agi)
 
-        if run_senior_patch:
-            senior_result = compute_senior_deduction(
-                return_=return_,
-                magi=prelim_magi,
+        # Line 12 — itemized (floored on the TRUE AGI) or the base standard
+        # deduction (from the clean pass) plus the age-65/blind add-on.
+        if itemizing:
+            line_12_deduction = itemized_total_capped(
+                return_.itemized, return_.filing_status, prelim_agi
             )
-            senior_deduction_amount = senior_result.deduction
+        else:
+            base_standard = prelim_agi - _d(tf_first.federal_taxable_income)
+            line_12_deduction = base_standard + age_blind_additional
 
+        # Line 13b — OBBBA Schedule 1-A deductions (senior + tips + overtime).
+        if run_senior_patch:
+            senior_deduction_amount = compute_senior_deduction(
+                return_=return_, magi=prelim_magi
+            ).deduction
         if run_schedule_1a_patch:
-            # The caller-populated adjustment fields act as the "raw
-            # qualified tips/overtime input" — see
-            # `_any_tips_or_overtime_declared` docstring for the rationale
-            # and TODO. The patch caps each amount, applies the MAGI
-            # phase-out, and returns the final deductions.
-            raw_tips = return_.adjustments.qualified_tips_deduction_schedule_1a
-            raw_overtime = return_.adjustments.qualified_overtime_deduction_schedule_1a
+            # The caller-populated adjustment fields act as the raw qualified
+            # tips/overtime input — see `_any_tips_or_overtime_declared`. The
+            # patch caps each amount and applies the MAGI phase-out.
             sched_1a_result = compute_schedule_1a(
                 return_=return_,
                 magi=prelim_magi,
-                qualified_tips_input=raw_tips,
-                qualified_overtime_input=raw_overtime,
+                qualified_tips_input=(
+                    return_.adjustments.qualified_tips_deduction_schedule_1a
+                ),
+                qualified_overtime_input=(
+                    return_.adjustments.qualified_overtime_deduction_schedule_1a
+                ),
             )
             sched_1a_tips_amount = sched_1a_result.tips_deduction
             sched_1a_overtime_amount = sched_1a_result.overtime_deduction
+        obbba_total = (
+            senior_deduction_amount
+            + sched_1a_tips_amount
+            + sched_1a_overtime_amount
+        )
 
-        # Build a new AdjustmentsToIncome with the OBBBA values folded in.
-        # We OVERWRITE rather than ADD: the patches are idempotent on the
-        # canonical state, so if a caller calls compute() twice on the same
-        # return, the second pass must see the same inputs as the first.
+        # Line 13a — QBI deduction (Section 199A, Form 8995 simplified). The
+        # QBI 20%-of-taxable-income cap uses taxable income BEFORE the QBI
+        # deduction = AGI - line 12 - line 13b (Form 8995 line 11), so the
+        # Schedule 1-A deductions correctly tighten the cap.
+        if has_qbi_sources:
+            ti_before_qbi = prelim_agi - line_12_deduction - obbba_total
+            qbi_result = compute_qbi(
+                return_=return_, taxable_income_before_qbi=ti_before_qbi
+            )
+            if (
+                not qbi_result.simplified_eligible
+                and qbi_result.total_qbi > Decimal("0")
+            ):
+                # Above the §199A simplified threshold, Form 8995-A governs the
+                # deduction. We deliberately do NOT compute it: a safe 8995-A
+                # needs per-business W-2 wages, UBIA of qualified property, and
+                # SSTB classification that this tool does not collect, and
+                # guessing "non-SSTB" could understate tax. So the deduction
+                # shows as $0 — but a silent $0 would overstate tax for filers
+                # who do qualify, so warn loudly instead of dropping it quietly.
+                compute_warnings.append(
+                    "QBI deduction shown as $0: taxable income before QBI "
+                    f"(${ti_before_qbi:,.0f}) exceeds the Section 199A "
+                    "simplified threshold, so Form 8995-A applies. This tool "
+                    "does not compute Form 8995-A (it needs SSTB "
+                    "classification, per-business W-2 wages, and UBIA of "
+                    "qualified property). Total qualified business income of "
+                    f"${qbi_result.total_qbi:,.0f} was found; your actual QBI "
+                    "deduction may be greater than $0. Compute Form 8995-A "
+                    "manually to confirm."
+                )
+            qbi_deduction_val = qbi_result.qbi_deduction
+
+        # Persist the computed OBBBA amounts on the returned model so the
+        # Schedule 1-A / Form 1040 line-13b renderers can read them. They are
+        # stored on AdjustmentsToIncome for input convenience but are NOT
+        # Schedule 1 adjustments (excluded from `_sum_adjustments`).
         updated_adjustments = return_.adjustments.model_copy(
             update={
                 "senior_deduction_obbba": senior_deduction_amount,
@@ -1278,139 +1419,56 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
             }
         )
 
-        obbba_total = (
-            senior_deduction_amount
-            + sched_1a_tips_amount
-            + sched_1a_overtime_amount
+        # Final pass: fold line 12 + line 13a + line 13b into one "Itemized"
+        # amount so the bracket / LTCG tax is computed on the correct taxable
+        # income. AGI is unchanged — the OBBBA input fields stay zero in this
+        # input, exactly like the clean first pass.
+        total_below_line = line_12_deduction + qbi_deduction_val + obbba_total
+        tf_final_input = _to_tenforty_input(
+            return_for_clean_pass, agi_for_medical_floor=prelim_agi
         )
-
-        # Real filed-form AGI for the medical floor. AGI = total_income -
-        # adjustments, so the OBBBA adjustments (which reduce adjustments-
-        # total in favor of the filer) reduce AGI by exactly their sum.
-        # No second tenforty call is needed to discover this.
-        real_agi = prelim_agi - obbba_total
-
-        # Second tenforty pass with the updated adjustments AND the post-
-        # floor itemized total. Skipped only when NOTHING changed — i.e.
-        # no OBBBA patches fired AND no medical-floor pass needed.
-        # (If OBBBA patches net to zero — full phase-out, year gate, etc.
-        # — and no medical, we also skip.)
-        second_pass_needed = (
-            obbba_total != Decimal("0") or need_medical_floor
+        tf_final_input = TenfortyInput(
+            year=tf_final_input.year,
+            filing_status=tf_final_input.filing_status,
+            w2_income=tf_final_input.w2_income,
+            taxable_interest=tf_final_input.taxable_interest,
+            qualified_dividends=tf_final_input.qualified_dividends,
+            ordinary_dividends=tf_final_input.ordinary_dividends,
+            short_term_capital_gains=tf_final_input.short_term_capital_gains,
+            long_term_capital_gains=tf_final_input.long_term_capital_gains,
+            self_employment_income=tf_final_input.self_employment_income,
+            rental_income=tf_final_input.rental_income,
+            schedule_1_income=tf_final_input.schedule_1_income,
+            standard_or_itemized="Itemized",
+            itemized_deductions=float(total_below_line),
+            num_dependents=tf_final_input.num_dependents,
         )
-        if second_pass_needed:
-            return_for_second_pass = return_.model_copy(
-                update={"adjustments": updated_adjustments}
-            )
-            tf_input = _to_tenforty_input(
-                return_for_second_pass,
-                agi_for_medical_floor=real_agi,
-            )
-            tf_result = _call_tenforty(tf_input)
+        tf_result = _call_tenforty(tf_final_input)
+
+        agi = _cents(prelim_agi)
+        ti = _cents(tf_result.federal_taxable_income)
+        fed_tax = _cents(tf_result.federal_income_tax)
+        tf_total_tax = _cents(tf_result.federal_total_tax)
+        # Form 1040 line 12 (NOT including QBI or Schedule 1-A — those are
+        # lines 13a / 13b, reported separately).
+        deduction = _cents(line_12_deduction)
     else:
-        # No OBBBA patches fire AND no medical floor — single tenforty
-        # call, identical to the pre-CP8 behavior. Hot path for most
-        # returns and preserves bit-for-bit invariance on all goldens
-        # that do not have medical expenses.
-        tf_input = _to_tenforty_input(return_)
-        tf_result = _call_tenforty(tf_input)
+        # Hot path: a plain standard or itemized deduction with no QBI, no
+        # OBBBA Schedule 1-A, no age-65/blind add-on, and no medical floor.
+        # Single tenforty call, bit-for-bit identical to prior behavior.
+        tf_result = _call_tenforty(_to_tenforty_input(return_))
+        agi = _cents(tf_result.federal_adjusted_gross_income)
+        ti = _cents(tf_result.federal_taxable_income)
+        fed_tax = _cents(tf_result.federal_income_tax)
+        tf_total_tax = _cents(tf_result.federal_total_tax)
+        deduction = (agi - ti) if (agi is not None and ti is not None) else None
 
-    agi = _cents(tf_result.federal_adjusted_gross_income)
-    ti = _cents(tf_result.federal_taxable_income)
-    fed_tax = _cents(tf_result.federal_income_tax)
-    tf_total_tax = _cents(tf_result.federal_total_tax)
-    deduction = (agi - ti) if (agi is not None and ti is not None) else None
-
-    # -------------------------------------------------------------------
-    # Patch: QBI deduction (Section 199A, Form 8995 simplified)
-    # -------------------------------------------------------------------
-    # QBI reduces taxable income (Form 1040 line 13) but NOT AGI. The
-    # deduction = min(20% of total QBI, 20% of TI before QBI). TI before
-    # QBI = AGI - standard/itemized deduction = what tenforty just gave us.
-    # When QBI > 0, we re-call tenforty with the QBI folded into the
-    # deduction amount so bracket/LTCG computation is correct on the lower
-    # taxable income. Returns with no QBI skip the re-call.
-    qbi_deduction_val = Decimal("0")
-    _has_qbi_sources = (
-        return_.schedules_c
-        or any(
-            p.qbi_qualified
-            for se in return_.schedules_e
-            for p in se.properties
-        )
-        or any(k1.qbi_qualified for k1 in return_.schedules_k1)
+    # Form 1040 line 13b — total OBBBA Schedule 1-A deductions.
+    obbba_schedule_1a_total = (
+        senior_deduction_amount
+        + sched_1a_tips_amount
+        + sched_1a_overtime_amount
     )
-    if _has_qbi_sources:
-        ti_before_qbi = ti if ti is not None else Decimal("0")
-        qbi_result = compute_qbi(return_=return_, taxable_income_before_qbi=ti_before_qbi)
-        if not qbi_result.simplified_eligible and qbi_result.total_qbi > Decimal("0"):
-            # Above the §199A simplified threshold, Form 8995-A governs the
-            # deduction. We deliberately do NOT compute it: a safe 8995-A needs
-            # per-business W-2 wages, UBIA of qualified property, and SSTB
-            # classification that this tool does not collect, and guessing
-            # "non-SSTB" could understate tax. So the deduction shows as $0 —
-            # but a silent $0 would overstate tax for filers who do qualify, so
-            # warn loudly instead of dropping it quietly.
-            compute_warnings.append(
-                "QBI deduction shown as $0: taxable income before QBI "
-                f"(${ti_before_qbi:,.0f}) exceeds the Section 199A simplified "
-                "threshold, so Form 8995-A applies. This tool does not compute "
-                "Form 8995-A (it needs SSTB classification, per-business W-2 "
-                "wages, and UBIA of qualified property). Total qualified "
-                f"business income of ${qbi_result.total_qbi:,.0f} was found; "
-                "your actual QBI deduction may be greater than $0. Compute "
-                "Form 8995-A manually to confirm."
-            )
-        if qbi_result.qbi_deduction > Decimal("0"):
-            qbi_deduction_val = qbi_result.qbi_deduction
-            # Re-call tenforty with the QBI deduction added to the
-            # standard/itemized deduction so taxable income and the
-            # bracket/LTCG tax computation reflect the lower TI.
-            return_for_qbi = return_.model_copy(
-                update={"adjustments": updated_adjustments}
-            )
-            tf_input_qbi = _to_tenforty_input(
-                return_for_qbi,
-                agi_for_medical_floor=(
-                    agi if agi is not None else Decimal("0")
-                ),
-            )
-            # Increase itemized_deductions by QBI so tenforty sees a
-            # higher deduction and computes a lower TI / tax. For
-            # standard-deduction filers we switch to "Itemized" and pass
-            # the standard deduction + QBI as the amount, because
-            # tenforty recomputes the standard deduction itself when it
-            # sees "Standard". Using "Itemized" with the sum forces our
-            # exact deduction through.
-            combined_deduction = float(
-                (deduction if deduction is not None else Decimal("0"))
-                + qbi_deduction_val
-            )
-            tf_input_qbi = TenfortyInput(
-                year=tf_input_qbi.year,
-                filing_status=tf_input_qbi.filing_status,
-                w2_income=tf_input_qbi.w2_income,
-                taxable_interest=tf_input_qbi.taxable_interest,
-                qualified_dividends=tf_input_qbi.qualified_dividends,
-                ordinary_dividends=tf_input_qbi.ordinary_dividends,
-                short_term_capital_gains=tf_input_qbi.short_term_capital_gains,
-                long_term_capital_gains=tf_input_qbi.long_term_capital_gains,
-                self_employment_income=tf_input_qbi.self_employment_income,
-                rental_income=tf_input_qbi.rental_income,
-                schedule_1_income=tf_input_qbi.schedule_1_income,
-                standard_or_itemized="Itemized",
-                itemized_deductions=combined_deduction,
-                num_dependents=tf_input_qbi.num_dependents,
-            )
-            tf_result_qbi = _call_tenforty(tf_input_qbi)
-            # AGI stays the same (QBI doesn't change AGI). Update only
-            # the TI, tax, and total_tax from the QBI-adjusted result.
-            # `deduction` is NOT updated — it stays as the
-            # standard/itemized deduction (Form 1040 line 12). QBI is
-            # separate (line 13) and stored on ComputedTotals.qbi_deduction.
-            ti = _cents(tf_result_qbi.federal_taxable_income)
-            fed_tax = _cents(tf_result_qbi.federal_income_tax)
-            tf_total_tax = _cents(tf_result_qbi.federal_total_tax)
 
     ti_val = _cents(total_income(return_))
     # adjustments_total must reflect the OBBBA patch outputs if they fired.
@@ -1720,6 +1778,11 @@ def compute(return_: CanonicalReturn) -> CanonicalReturn:
         adjusted_gross_income=agi,
         deduction_taken=deduction,
         qbi_deduction=qbi_deduction_val if qbi_deduction_val > Decimal("0") else None,
+        additional_deductions_schedule_1a=(
+            _cents(obbba_schedule_1a_total)
+            if obbba_schedule_1a_total > Decimal("0")
+            else None
+        ),
         taxable_income=ti,
         tentative_tax=fed_tax,
         total_credits_nonrefundable=_cents(total_credits_nonref),

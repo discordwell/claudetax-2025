@@ -411,11 +411,15 @@ def compute_form_6251_fields(
     is the already-capped SALT) plus any manual preferences. The
     structure is:
 
-        line 1a = deduction_taken minus Schedule 1-A line 37 (zero in
-                  wave 6 — Schedule 1-A is OBBBA tips/overtime, not a
-                  subtraction from the deduction)
-        line 1b = taxable_income + deduction_taken (equivalent to
-                  Form 1040 line 11b)
+        line 1a = deduction_taken (Form 1040 line 12). Schedule 1-A
+                  (line 13b) is a SEPARATE below-the-line deduction, not a
+                  part of line 12, so there is nothing to subtract here.
+        line 1b = taxable_income + deduction_taken. With QBI (line 13a)
+                  and Schedule 1-A (line 13b) still subtracted, this is
+                  AGI - QBI - Schedule 1-A — the correct AMTI starting
+                  point (taxable income with only the standard/itemized
+                  deduction added back; QBI and Sch 1-A stay subtracted as
+                  they are allowed for AMT).
         line 2a = Schedule A line 7 (SALT add-back)
         line 2g = 1099-INT box 9 + manual PAB entry
         line 2i = manual ISO bargain element
@@ -456,19 +460,18 @@ def compute_form_6251_fields(
     taxable_income = _dec(c.taxable_income)
     deduction_taken = _dec(c.deduction_taken)
 
-    # Line 1a: Schedule 1-A line 37 subtraction. Schedule 1-A (OBBBA
-    # tips/overtime deductions) is a Schedule 1 Part II adjustment, NOT
-    # a piece of the Form 1040 line 12 deduction. The Form 6251 line 1a
-    # instruction on "Subtract Schedule 1-A line 37 from Form 1040 line
-    # 14" is about the PORTION of the deduction that came from Sch 1-A
-    # — wave 6 models this as zero because tenforty + the engine already
-    # fold Sch 1-A into AGI, so none of it leaks into line 14. Kept as a
-    # named field in case a future wave distinguishes these paths.
+    # Line 1a: Form 1040 line 12 (standard/itemized deduction). The OBBBA
+    # Schedule 1-A deductions live on Form 1040 line 13b, a SEPARATE
+    # below-the-line deduction — they are not part of line 12, so there is
+    # nothing to subtract from deduction_taken here. (Informational only:
+    # line_1a is not part of the AMTI sum below.)
     line_1a = deduction_taken
 
-    # Line 1b: taxable income + deduction = Form 1040 line 11b ("taxable
-    # income before deduction"). This is the IRS Form 6251 instruction's
-    # natural AMTI starting point.
+    # Line 1b: taxable income (line 15) + the line-12 deduction. Because
+    # QBI (line 13a) and Schedule 1-A (line 13b) remain subtracted, this
+    # equals AGI - QBI - Schedule 1-A — the correct AMTI starting point
+    # (only the standard/itemized deduction is added back; QBI and Sch 1-A
+    # are allowed for AMT and stay subtracted).
     line_1b = taxable_income + deduction_taken
 
     # -- Line 2a: SALT add-back from Schedule A line 7 ----------------

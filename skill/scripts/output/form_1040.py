@@ -108,7 +108,8 @@ class Form1040Fields:
     line_10_adjustments_from_sch_1: Decimal = _ZERO
     line_11_adjusted_gross_income: Decimal = _ZERO
     line_12_standard_or_itemized_deduction: Decimal = _ZERO
-    line_13_qbi_deduction: Decimal = _ZERO
+    line_13a_qbi_deduction: Decimal = _ZERO
+    line_13b_additional_deductions_sch_1a: Decimal = _ZERO
     line_14_sum_12_13: Decimal = _ZERO
     line_15_taxable_income: Decimal = _ZERO
 
@@ -220,12 +221,15 @@ def compute_form_1040_fields(return_: CanonicalReturn) -> Form1040Fields:
     # -- Line 9: total income (trust the engine) ----------------------
     line_9 = _dec(c.total_income)
 
-    # -- Line 10: adjustments / Line 11: AGI / Line 12: deduction ------
+    # -- Line 10: adjustments / Line 11: AGI / Lines 12-15: deductions -
     line_10 = _dec(c.adjustments_total)
     line_11 = _dec(c.adjusted_gross_income)
     line_12 = _dec(c.deduction_taken)
-    line_13 = _dec(c.qbi_deduction)
-    line_14 = line_12 + line_13
+    line_13a = _dec(c.qbi_deduction)
+    # Line 13b — OBBBA Schedule 1-A additional deductions (senior + tips +
+    # overtime). Below the AGI line, like QBI; reduces taxable income only.
+    line_13b = _dec(c.additional_deductions_schedule_1a)
+    line_14 = line_12 + line_13a + line_13b
     line_15 = _dec(c.taxable_income)
 
     # -- Line 16: tax / Line 17-21: credits ---------------------------
@@ -343,7 +347,8 @@ def compute_form_1040_fields(return_: CanonicalReturn) -> Form1040Fields:
         line_10_adjustments_from_sch_1=line_10,
         line_11_adjusted_gross_income=line_11,
         line_12_standard_or_itemized_deduction=line_12,
-        line_13_qbi_deduction=line_13,
+        line_13a_qbi_deduction=line_13a,
+        line_13b_additional_deductions_sch_1a=line_13b,
         line_14_sum_12_13=line_14,
         line_15_taxable_income=line_15,
         line_16_tax=line_16,

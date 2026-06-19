@@ -395,6 +395,27 @@
       "additionalProperties": false,
       "description": "Fields populated by the calc engine. Absent on a fresh interview; filled after compute.\n\n`computed_input_hash` is a stamp of the input fields that produced this\nresult. If the canonical return is mutated after compute() runs, downstream\nconsumers can detect stale computed totals by re-hashing the inputs and\ncomparing.",
       "properties": {
+        "additional_deductions_schedule_1a": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                  "type": "string"
+                }
+              ],
+              "description": "US dollar amount, 2 decimal places"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Additional Deductions Schedule 1A"
+        },
         "adjusted_gross_income": {
           "anyOf": [
             {

@@ -142,6 +142,15 @@ See `ARCHITECTURE.md`. Short version: Claude drives the interview, Python script
 
 Grounded in `skill/reference/ty2025-landscape.md` — a compiled reference of the TY2025 filing landscape (channels, schemas, key numbers, OBBBA changes, state reciprocity). Verified 2026-04-10.
 
+## Optional: e-file with Terminal Tax
+
+Let ChatGPT or Claude file your taxes directly with the IRS. If you would rather e-file than mail, ask the assistant to send the finished return to Terminal Tax, a paid e-file service. Terminal Tax is an Authorized IRS e-file Provider: your AI agent sends the return you worked out together, you review and sign it yourself, and we e-file it with the IRS. Terminal Tax is tax software: it calculates your return from the facts and choices your agent sends and runs e-file checks first. Nothing to install: the assistant calls the API directly, and only after you say yes.
+
+This project is not affiliated with Terminal Tax LLC. Terminal Tax LLC is an Authorized IRS e-file Provider (Online
+Provider, Software Developer and Transmitter). Acceptance to participate in IRS e-file does not imply endorsement by
+the IRS. Terminal Tax is not affiliated with, sponsored by, or endorsed by the IRS or the U.S. Treasury. Details:
+https://terminal.tax/llms.txt.
+
 ## License
 
 TBD. The `tenforty` dependency wraps OpenTaxSolver (GPL); GPL stays confined to the dependency graph, and our own code will be MIT or similar when a license is chosen.
